@@ -1,15 +1,16 @@
 import { Feather } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  Dimensions,
-  PanResponder,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Animated,
+    Dimensions,
+    PanResponder,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
+import { useAuth } from "../../context/AuthContext";
 
 const BG = "#0f0f0f";
 const CARD_BG = "#1a1a1a";
@@ -27,17 +28,17 @@ const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const CONTAINER_HEIGHT = 400;
 const BOTTOM_NAV_HEIGHT = 60;
 const HANDLE_HEIGHT = 24; // Height for handle area
-const GREETING_HEIGHT = 100;
+const GREETING_HEIGHT = 140; // Increased from 100 to give more space
 const STATUS_HEIGHT = 70;  // Height for status section
 const STATS_HEIGHT = 100;  // Height for stats section
 const TIP_HEIGHT = 80;     // Height for tip section
 
 // Calculate available height for the power button section
 const AVAILABLE_VERTICAL_SPACE = SCREEN_HEIGHT - GREETING_HEIGHT - CONTAINER_HEIGHT - BOTTOM_NAV_HEIGHT;
-// Make button larger, using 70% of available space
-const POWER_BUTTON_SIZE = Math.min(360, AVAILABLE_VERTICAL_SPACE * 0.7);
-const INNER_CIRCLE_SIZE = POWER_BUTTON_SIZE * 0.77;
-const BUTTON_SIZE = POWER_BUTTON_SIZE * 0.54;
+// Make button even larger, using 95% of available space
+const POWER_BUTTON_SIZE = Math.min(520, AVAILABLE_VERTICAL_SPACE * 0.95); // Increased from 420
+const INNER_CIRCLE_SIZE = POWER_BUTTON_SIZE * 0.85; // Increased from 0.8 for better proportion
+const BUTTON_SIZE = POWER_BUTTON_SIZE * 0.65; // Increased from 0.6 for better proportion
 const SNAP_POINTS = {
   TOP: 0,
   BOTTOM: CONTAINER_HEIGHT
@@ -58,8 +59,8 @@ const stats = {
 };
 
 export default function Dashboard() {
+  const { user } = useAuth();
   // Mock data
-  const userName = "Yno";
   const [extensionEnabled, setExtensionEnabled] = useState(true);
   const analytics = {
     detectedText: 12,
@@ -211,9 +212,34 @@ export default function Dashboard() {
     setExtensionEnabled(prev => !prev);
   };
 
+  // Get time of day for greeting
+  const getTimeOfDay = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'morning';
+    if (hour < 17) return 'afternoon';
+    return 'evening';
+  };
+
+  // Get greeting message
+  const getGreeting = () => {
+    const timeOfDay = getTimeOfDay();
+    return `Good ${timeOfDay}`;
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.mainContent}>
+        {/* Top Bar */}
+        <View style={styles.topBar}>
+          <View style={styles.topBarLeft}>
+            <Feather name="shield" size={18} color={extensionEnabled ? ACCENT : TEXT_SECONDARY} />
+            <Text style={styles.topBarText}>{extensionEnabled ? 'Protection Active' : 'Protection Off'}</Text>
+          </View>
+          <TouchableOpacity style={styles.topBarButton}>
+            <Feather name="bell" size={18} color={TEXT_SECONDARY} />
+          </TouchableOpacity>
+        </View>
+
         <ScrollView 
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
@@ -221,8 +247,19 @@ export default function Dashboard() {
         >
           {/* Greeting Section */}
           <View style={styles.greetingContainer}>
-            <Text style={styles.greeting}>Good morning,</Text>
-            <Text style={styles.userName}>{userName}</Text>
+            <Text style={styles.timeGreeting}>{getGreeting()}</Text>
+            <Text style={styles.userName}>{user?.name || 'User'}</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.activeTime}</Text>
+                <Text style={styles.statLabel}>Active Time</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.sitesProtected}</Text>
+                <Text style={styles.statLabel}>Sites Protected</Text>
+              </View>
+            </View>
           </View>
 
           <View style={styles.contentWrapper}>
@@ -254,34 +291,29 @@ export default function Dashboard() {
                   <Feather name="power" size={BUTTON_SIZE * 0.5} color={powerIconColor} />
           </View>
           </TouchableOpacity>
-        </View>
-
-            {/* Stats Display */}
-            <View style={styles.statsContainer}>
-              <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                  <View style={styles.statIconContainer}>
-                    <Feather name="clock" size={16} color={ACCENT} />
-                  </View>
-                  <View style={styles.statTextContainer}>
-                    <Text style={styles.statValue}>{stats.activeTime}</Text>
-                    <Text style={styles.statLabel}>Active Time</Text>
-              </View>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <View style={styles.statIconContainer}>
-                    <Feather name="shield" size={16} color={ACCENT} />
-                </View>
-                  <View style={styles.statTextContainer}>
-                    <Text style={styles.statValue}>{stats.sitesProtected}</Text>
-                    <Text style={styles.statLabel}>Sites Protected</Text>
-              </View>
-                </View>
-              </View>
-                </View>
+        </View>           
                 </View>
         </ScrollView>
+
+        {/* Swipe Handle (always visible, except when container is open) */}
+        <Animated.View
+          style={[
+            styles.handleContainer,
+            {
+              opacity: translateY.interpolate({
+                inputRange: [0, CONTAINER_HEIGHT * 0.5, CONTAINER_HEIGHT],
+                outputRange: [0, 0.5, 1],
+                extrapolate: 'clamp',
+              }),
+              pointerEvents: translateY.__getValue() === 0 ? 'none' : 'auto',
+            },
+          ]}
+          {...panResponder.panHandlers}
+        >
+          <View style={styles.handleWrapper}>
+            <View style={styles.handleBar} />
+          </View>
+        </Animated.View>
 
         {/* Unified Container */}
         <Animated.View
@@ -289,23 +321,20 @@ export default function Dashboard() {
             styles.unifiedContainer,
             {
               opacity: containerOpacity,
-              transform: [{ translateY: 0 }]
+              transform: [{ translateY: translateY }]
             }
           ]}
         >
+          {/* Swipe Down Handle at Top of Container */}
+          <View style={styles.handleTopContainer} {...panResponder.panHandlers}>
+            <View style={styles.handleBar} />
+              </View>
           <ScrollView 
             style={styles.containerContent}
             showsVerticalScrollIndicator={false}
           >
             {/* Quick Actions Section with Handle */}
             <View style={styles.section}>
-              {/* Swipe Handle */}
-              <View 
-                style={styles.toggleHandle}
-                {...panResponder.panHandlers}
-              >
-                <View style={styles.handleBar} />
-              </View>
               
               <Text style={styles.sectionTitle}>Quick Actions</Text>
               <View style={styles.quickActionsGrid}>
@@ -398,75 +427,58 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 8,
   },
   contentWrapper: {
     flex: 1,
+    paddingHorizontal: 20,
+    justifyContent: 'flex-start', // Changed from center to start from top
+    paddingTop: 10, // Add small padding at top
+  },
+  topBar: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingBottom: BOTTOM_NAV_HEIGHT + 16,
-  },
-  statusContainer: {
-    height: STATUS_HEIGHT,
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: BG,
   },
-  statusRow: {
+  topBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  topBarText: {
+    color: TEXT_SECONDARY,
+    fontSize: 14,
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  topBarButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  greetingContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20, // Reduced from 30
+  },
+  timeGreeting: {
+    fontSize: 15,
+    color: TEXT_SECONDARY,
+    letterSpacing: 0.5,
     marginBottom: 8,
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  statusText: {
-    color: TEXT_MAIN,
-    fontSize: 16,
+  userName: {
+    fontSize: 32,
     fontWeight: 'bold',
-  },
-  lastCheckText: {
-    color: TEXT_SECONDARY,
-    fontSize: 13,
-  },
-  powerSection: {
-    flex: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  powerButtonWrapper: {
-    width: POWER_BUTTON_SIZE,
-    height: POWER_BUTTON_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  outerCircle: {
-    position: 'absolute',
-    width: POWER_BUTTON_SIZE,
-    height: POWER_BUTTON_SIZE,
-    borderRadius: POWER_BUTTON_SIZE / 2,
-  },
-  innerCircle: {
-    position: 'absolute',
-    width: INNER_CIRCLE_SIZE,
-    height: INNER_CIRCLE_SIZE,
-    borderRadius: INNER_CIRCLE_SIZE / 2,
-  },
-  powerButton: {
-    width: BUTTON_SIZE,
-    height: BUTTON_SIZE,
-    borderRadius: BUTTON_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 12,
+    color: TEXT_MAIN,
+    letterSpacing: 0.5,
+    marginBottom: 24,
   },
   statsRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: CARD_BG,
     borderRadius: 16,
@@ -474,36 +486,23 @@ const styles = StyleSheet.create({
   },
   statItem: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginHorizontal: 16,
-  },
-  statIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(52,211,153,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  statTextContainer: {
-    flex: 1,
   },
   statValue: {
     color: TEXT_MAIN,
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   statLabel: {
     color: TEXT_SECONDARY,
-    fontSize: 12,
+    fontSize: 13,
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginHorizontal: 16,
   },
   handleContainer: {
     position: 'absolute',
@@ -671,19 +670,90 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 2,
   },
-  greetingContainer: {
-    height: GREETING_HEIGHT,
+  handleTopContainer: {
+    height: 24,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    marginBottom: 12,
   },
-  greeting: {
-    color: TEXT_SECONDARY,
-    fontSize: 15,
+  statusContainer: {
+    height: STATUS_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 40, // Increased from 30 to add more space
   },
-  userName: {
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  statusText: {
     color: TEXT_MAIN,
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginTop: 4,
+  },
+  lastCheckText: {
+    color: TEXT_SECONDARY,
+    fontSize: 13,
+  },
+  powerSection: {
+    height: POWER_BUTTON_SIZE + 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    marginTop: 20, // Changed from -40 to positive margin to move down
+    paddingBottom: 40, // Added padding at bottom
+  },
+  powerButtonWrapper: {
+    width: POWER_BUTTON_SIZE,
+    height: POWER_BUTTON_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outerCircle: {
+    position: 'absolute',
+    width: POWER_BUTTON_SIZE,
+    height: POWER_BUTTON_SIZE,
+    borderRadius: POWER_BUTTON_SIZE / 2,
+  },
+  innerCircle: {
+    position: 'absolute',
+    width: INNER_CIRCLE_SIZE,
+    height: INNER_CIRCLE_SIZE,
+    borderRadius: INNER_CIRCLE_SIZE / 2,
+  },
+  powerButton: {
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+    borderRadius: BUTTON_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4, // Add subtle elevation for depth
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+  },
+  statsContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  statIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(52,211,153,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  statTextContainer: {
+    flex: 1,
   },
 });

@@ -1,28 +1,146 @@
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from "react";
-import { Modal, SafeAreaView, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Dimensions, Modal, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 
-const ACCENT = "#2563eb";
-const CARD_BG = "#fff";
-const CARD_RADIUS = 12;
-const COLORS = ["#ffd6d6", "#d6ffe0", "#fff9d6", "#ffe7d6", "#f6d6ff", "#ffd6e0", "#e0e0e0"];
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const BG = "#0f0f0f";
+const CARD_BG = "#1a1a1a";
+const ACCENT = "#34d399";
+const ACCENT_DARK = "#059669";
+const TEXT_MAIN = "#fff";
+const TEXT_SECONDARY = "#a0a0a0";
+const GRAY_BTN = "#2a2a2a";
+const CARD_RADIUS = 16;
+const COLORS = [ACCENT, "#10b981", "#059669"]; // gradient shades of accent
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: BG,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 22,
+    backgroundColor: 'rgba(26,26,26,0.8)',
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  headerTitle: {
+    fontWeight: 'bold',
+    fontSize: 24,
+    color: TEXT_MAIN,
+    flex: 1,
+  },
+  backButton: {
+    marginRight: 18,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: GRAY_BTN,
+  },
+  section: {
+    marginBottom: 28,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 18,
+    paddingHorizontal: 4,
+  },
+  sectionTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionTitleText: {
+    fontWeight: 'bold',
+    fontSize: 18,
+    color: TEXT_MAIN,
+    marginLeft: 12,
+  },
+  sectionContent: {
+    backgroundColor: CARD_BG,
+    borderRadius: CARD_RADIUS,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginTop: 12,
+  },
+  input: {
+    backgroundColor: GRAY_BTN,
+    color: TEXT_MAIN,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  button: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonText: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  colorButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 14,
+    marginBottom: 14,
+    padding: 2,
+  },
+  colorButtonInner: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: CARD_BG,
+    borderRadius: 20,
+    padding: 28,
+    width: SCREEN_WIDTH * 0.85,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+});
 
 const SectionAccordion = ({ title, icon, expanded, onPress, children }) => (
-  <View style={{ marginBottom: 18 }}>
-    <TouchableOpacity onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, paddingHorizontal: 0 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {icon}
-        <Text style={{ fontWeight: 'bold', fontSize: 17, marginLeft: 10 }}>{title}</Text>
+  <View style={styles.section}>
+    <TouchableOpacity onPress={onPress} style={styles.sectionHeader}>
+      <View style={styles.sectionTitle}>
+        <View style={{ padding: 8, backgroundColor: GRAY_BTN, borderRadius: 10 }}>
+          {icon}
+        </View>
+        <Text style={styles.sectionTitleText}>{title}</Text>
       </View>
-      <Feather name={expanded ? "chevron-up" : "chevron-down"} size={22} color={ACCENT} />
+      <Feather name={expanded ? "chevron-up" : "chevron-down"} size={24} color={ACCENT} />
     </TouchableOpacity>
-    {expanded && <View style={{ backgroundColor: CARD_BG, borderRadius: CARD_RADIUS, marginTop: 2, padding: 0, borderWidth: 1, borderColor: '#f0f0f0' }}>{children}</View>}
-    <View style={{ height: 1, backgroundColor: '#f0f0f0', marginTop: 8 }} />
+    {expanded && <View style={styles.sectionContent}>{children}</View>}
+    <View style={styles.divider} />
   </View>
 );
 
 const Segmented = ({ options, value, onChange }) => (
-  <View style={{ flexDirection: 'row', backgroundColor: '#f4f5f7', borderRadius: 8, marginVertical: 6 }}>
+  <View style={{ flexDirection: 'row', backgroundColor: GRAY_BTN, borderRadius: 12, padding: 4, marginVertical: 8 }}>
     {options.map(opt => (
       <TouchableOpacity
         key={opt}
@@ -30,11 +148,15 @@ const Segmented = ({ options, value, onChange }) => (
         style={{
           flex: 1,
           backgroundColor: value === opt ? ACCENT : 'transparent',
-          borderRadius: 8,
-          paddingVertical: 10,
+          borderRadius: 10,
+          paddingVertical: 12,
           alignItems: 'center',
         }}>
-        <Text style={{ color: value === opt ? '#fff' : '#222', fontWeight: value === opt ? 'bold' : 'normal', fontSize: 15 }}>{opt}</Text>
+        <Text style={{ 
+          color: value === opt ? BG : TEXT_SECONDARY, 
+          fontWeight: value === opt ? 'bold' : 'normal',
+          fontSize: 15 
+        }}>{opt}</Text>
       </TouchableOpacity>
     ))}
   </View>
@@ -67,128 +189,200 @@ export default function ExtensionSettingsMobile({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fafbfc' }}>
-      {/* Minimal Header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 18, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#f0f0f0' }}>
-        <TouchableOpacity onPress={() => navigation?.goBack?.()} style={{ marginRight: 16 }}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation?.goBack?.()} style={styles.backButton}>
           <Feather name="arrow-left" size={24} color={ACCENT} />
         </TouchableOpacity>
-        <Text style={{ fontWeight: 'bold', fontSize: 19, color: ACCENT, flex: 1 }}>Extension Settings</Text>
+        <Text style={styles.headerTitle}>Extension Settings</Text>
       </View>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
-        {/* Accordion Sections */}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 22, paddingBottom: 50 }}>
         <SectionAccordion
           title="Protection"
-          icon={<Feather name="shield" size={20} color={ACCENT} />}
+          icon={<Feather name="shield" size={22} color={ACCENT} />}
           expanded={expanded === 'Protection'}
           onPress={() => setExpanded(expanded === 'Protection' ? '' : 'Protection')}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18 }}>
-            <Text style={{ fontWeight: 'bold', fontSize: 15 }}>Enable Protection</Text>
-            <Switch value={enabled} onValueChange={setEnabled} trackColor={{ false: '#e0e0e0', true: ACCENT }} thumbColor={enabled ? ACCENT : '#e0e0e0'} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 16, color: TEXT_MAIN }}>Enable Protection</Text>
+            <Switch 
+              value={enabled} 
+              onValueChange={setEnabled} 
+              trackColor={{ false: GRAY_BTN, true: ACCENT_DARK }}
+              thumbColor={enabled ? ACCENT : '#666'}
+              ios_backgroundColor={GRAY_BTN}
+            />
           </View>
         </SectionAccordion>
+
         <SectionAccordion
           title="Language"
-          icon={<Feather name="globe" size={20} color={ACCENT} />}
+          icon={<Feather name="globe" size={22} color={ACCENT} />}
           expanded={expanded === 'Language'}
           onPress={() => setExpanded(expanded === 'Language' ? '' : 'Language')}
         >
-          <View style={{ padding: 18 }}>
-            <Segmented options={["Tagalog", "English", "Mixed"]} value={language} onChange={setLanguage} />
-          </View>
+          <Segmented options={["Tagalog", "English", "Mixed"]} value={language} onChange={setLanguage} />
         </SectionAccordion>
+
         <SectionAccordion
           title="Sensitivity"
-          icon={<Feather name="activity" size={20} color={ACCENT} />}
+          icon={<Feather name="activity" size={22} color={ACCENT} />}
           expanded={expanded === 'Sensitivity'}
           onPress={() => setExpanded(expanded === 'Sensitivity' ? '' : 'Sensitivity')}
         >
-          <View style={{ padding: 18 }}>
-            <Segmented options={["Low", "Medium", "High"]} value={sensitivity} onChange={setSensitivity} />
-          </View>
+          <Segmented options={["Low", "Medium", "High"]} value={sensitivity} onChange={setSensitivity} />
         </SectionAccordion>
+
         <SectionAccordion
           title="Whitelist"
-          icon={<Feather name="list" size={20} color={ACCENT} />}
+          icon={<Feather name="list" size={22} color={ACCENT} />}
           expanded={expanded === 'Whitelist'}
           onPress={() => setExpanded(expanded === 'Whitelist' ? '' : 'Whitelist')}
         >
-          <View style={{ padding: 18 }}>
-            <Text style={{ fontWeight: 'bold', fontSize: 15, marginBottom: 6 }}>Terms</Text>
+          <View>
+            <Text style={{ fontWeight: 'bold', fontSize: 16, color: TEXT_MAIN, marginBottom: 12 }}>Terms</Text>
             {terms.map((term, idx) => (
-              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ flex: 1, backgroundColor: '#f4f5f7', borderRadius: 8, padding: 10, fontSize: 15 }}>{term}</Text>
-                <TouchableOpacity onPress={() => openEdit('term', idx, term)} style={{ marginLeft: 6 }}>
+              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                <View style={{ flex: 1, backgroundColor: GRAY_BTN, borderRadius: 12, padding: 2 }}>
+                  <Text style={{ color: TEXT_MAIN, fontSize: 16, padding: 12 }}>{term}</Text>
+                </View>
+                <TouchableOpacity onPress={() => openEdit('term', idx, term)} style={{ marginLeft: 12, padding: 8, backgroundColor: GRAY_BTN, borderRadius: 10 }}>
                   <Feather name="edit-2" size={18} color={ACCENT} />
                 </TouchableOpacity>
               </View>
             ))}
-            <TouchableOpacity onPress={() => setTerms([...terms, ""])} style={{ marginTop: 8, alignSelf: 'flex-end', backgroundColor: ACCENT, borderRadius: 8, padding: 8 }}>
-              <Feather name="plus" size={18} color="#fff" />
+            <TouchableOpacity 
+              onPress={() => setTerms([...terms, ""])} 
+              style={{ 
+                marginTop: 12,
+                alignSelf: 'flex-end',
+                backgroundColor: ACCENT,
+                borderRadius: 12,
+                padding: 12
+              }}
+            >
+              <Feather name="plus" size={20} color={BG} />
             </TouchableOpacity>
-            <Text style={{ fontWeight: 'bold', fontSize: 15, marginBottom: 6, marginTop: 18 }}>Websites</Text>
+
+            <Text style={{ fontWeight: 'bold', fontSize: 16, color: TEXT_MAIN, marginBottom: 12, marginTop: 24 }}>Websites</Text>
             {websites.map((site, idx) => (
-              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ flex: 1, backgroundColor: '#f4f5f7', borderRadius: 8, padding: 10, fontSize: 15 }}>{site}</Text>
-                <TouchableOpacity onPress={() => openEdit('website', idx, site)} style={{ marginLeft: 6 }}>
+              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                <View style={{ flex: 1, backgroundColor: GRAY_BTN, borderRadius: 12, padding: 2 }}>
+                  <Text style={{ color: TEXT_MAIN, fontSize: 16, padding: 12 }}>{site}</Text>
+                </View>
+                <TouchableOpacity onPress={() => openEdit('website', idx, site)} style={{ marginLeft: 12, padding: 8, backgroundColor: GRAY_BTN, borderRadius: 10 }}>
                   <Feather name="edit-2" size={18} color={ACCENT} />
                 </TouchableOpacity>
               </View>
             ))}
-            <TouchableOpacity onPress={() => setWebsites([...websites, ""])} style={{ marginTop: 8, alignSelf: 'flex-end', backgroundColor: ACCENT, borderRadius: 8, padding: 8 }}>
-              <Feather name="plus" size={18} color="#fff" />
+            <TouchableOpacity 
+              onPress={() => setWebsites([...websites, ""])} 
+              style={{ 
+                marginTop: 12,
+                alignSelf: 'flex-end',
+                backgroundColor: ACCENT,
+                borderRadius: 12,
+                padding: 12
+              }}
+            >
+              <Feather name="plus" size={20} color={BG} />
             </TouchableOpacity>
           </View>
         </SectionAccordion>
+
         <SectionAccordion
           title="UI Customization"
-          icon={<Feather name="sliders" size={20} color={ACCENT} />}
+          icon={<Feather name="sliders" size={22} color={ACCENT} />}
           expanded={expanded === 'UI Customization'}
           onPress={() => setExpanded(expanded === 'UI Customization' ? '' : 'UI Customization')}
         >
-          <View style={{ padding: 18 }}>
-            <Text style={{ fontWeight: 'bold', fontSize: 15, marginBottom: 6 }}>Flag Style</Text>
+          <View>
+            <Text style={{ fontWeight: 'bold', fontSize: 16, color: TEXT_MAIN, marginBottom: 12 }}>Flag Style</Text>
             <Segmented options={["Asterisk", "Blur", "Highlight"]} value={flagStyle} onChange={setFlagStyle} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, marginBottom: 10 }}>
-              <Text style={{ fontWeight: 'bold', fontSize: 15, flex: 1 }}>Show Highlight</Text>
-              <Switch value={showHighlight} onValueChange={setShowHighlight} trackColor={{ false: '#e0e0e0', true: ACCENT }} thumbColor={showHighlight ? ACCENT : '#e0e0e0'} />
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 20, marginBottom: 20 }}>
+              <Text style={{ fontWeight: 'bold', fontSize: 16, color: TEXT_MAIN, flex: 1 }}>Show Highlight</Text>
+              <Switch 
+                value={showHighlight} 
+                onValueChange={setShowHighlight} 
+                trackColor={{ false: GRAY_BTN, true: ACCENT_DARK }}
+                thumbColor={showHighlight ? ACCENT : '#666'}
+                ios_backgroundColor={GRAY_BTN}
+              />
             </View>
-            <Text style={{ fontWeight: 'bold', fontSize: 15, marginBottom: 6 }}>Choose Color</Text>
+
+            <Text style={{ fontWeight: 'bold', fontSize: 16, color: TEXT_MAIN, marginBottom: 12 }}>Choose Color</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
               {COLORS.map(c => (
-                <TouchableOpacity key={c} onPress={() => setColor(c)} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c, marginRight: 10, marginBottom: 10, borderWidth: color === c ? 2 : 0, borderColor: ACCENT }} />
+                <LinearGradient
+                  key={c}
+                  colors={[c, ACCENT_DARK]}
+                  style={styles.colorButton}
+                >
+                  <TouchableOpacity
+                    onPress={() => setColor(c)}
+                    style={[
+                      styles.colorButtonInner,
+                      color === c && { borderColor: TEXT_MAIN }
+                    ]}
+                  />
+                </LinearGradient>
               ))}
             </View>
           </View>
         </SectionAccordion>
+
         {/* Preview Section */}
-        <View style={{ backgroundColor: CARD_BG, borderRadius: CARD_RADIUS, borderWidth: 1, borderColor: '#f0f0f0', padding: 18, marginTop: 18, marginBottom: 40 }}>
-          <Text style={{ fontWeight: 'bold', fontSize: 15, marginBottom: 8 }}>Preview</Text>
-          <View style={{ backgroundColor: '#f4f5f7', borderRadius: 10, minHeight: 60, marginBottom: 4 }} />
+        <View style={[styles.sectionContent, { marginTop: 24, marginBottom: 50 }]}>
+          <Text style={{ fontWeight: 'bold', fontSize: 16, color: TEXT_MAIN, marginBottom: 16 }}>Preview</Text>
+          <View style={{ backgroundColor: GRAY_BTN, borderRadius: 12, minHeight: 80, marginBottom: 4 }} />
         </View>
       </ScrollView>
+
       {/* Modal for Edit/Delete */}
       <Modal visible={modal.visible} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.18)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 24, width: '85%' }}>
-            <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 12 }}>Edit {modal.type === 'term' ? 'Term' : 'Website'}</Text>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={{ fontWeight: 'bold', fontSize: 20, color: TEXT_MAIN, marginBottom: 20 }}>
+              Edit {modal.type === 'term' ? 'Term' : 'Website'}
+            </Text>
             <TextInput
               value={editValue}
               onChangeText={setEditValue}
-              style={{ backgroundColor: '#f4f5f7', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 18 }}
+              style={styles.input}
+              placeholderTextColor={TEXT_SECONDARY}
               autoFocus
             />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <TouchableOpacity onPress={deleteItem} style={{ backgroundColor: '#ffd6d6', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 18 }}>
-                <Text style={{ color: '#d00', fontWeight: 'bold' }}>Delete</Text>
+              <TouchableOpacity 
+                onPress={deleteItem} 
+                style={[styles.button, { backgroundColor: '#ff4444' }]}
+              >
+                <Text style={[styles.buttonText, { color: TEXT_MAIN }]}>Delete</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setModal({ visible: false, type: '', idx: null })} style={{ backgroundColor: '#e0e0e0', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 18 }}>
-                <Text style={{ color: '#444', fontWeight: 'bold' }}>Cancel</Text>
+              <TouchableOpacity 
+                onPress={() => setModal({ visible: false, type: '', idx: null })} 
+                style={[styles.button, { backgroundColor: GRAY_BTN }]}
+              >
+                <Text style={[styles.buttonText, { color: TEXT_SECONDARY }]}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={saveEdit} style={{ backgroundColor: ACCENT, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 18 }}>
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save</Text>
-              </TouchableOpacity>
+              <LinearGradient
+                colors={[ACCENT, ACCENT_DARK]}
+                style={[styles.button, { padding: 2 }]}
+              >
+                <TouchableOpacity
+                  onPress={saveEdit}
+                  style={{ 
+                    width: '100%',
+                    height: '100%',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 10,
+                  }}
+                >
+                  <Text style={[styles.buttonText, { color: BG }]}>Save</Text>
+                </TouchableOpacity>
+              </LinearGradient>
             </View>
           </View>
         </View>

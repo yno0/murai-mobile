@@ -13,6 +13,7 @@ const Tab = createBottomTabNavigator();
 const ACCENT = "#34d399";
 const BG = "#0f0f0f";
 const INACTIVE = "#666666";
+const NAV_BG = "#1a1a1a"; // Added slightly lighter background for nav
 
 export default function RootNavigator() {
   return (
@@ -21,12 +22,15 @@ export default function RootNavigator() {
       screenOptions={({ route }) => ({
         tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: BG,
-          borderTopWidth: 1,
-          borderTopColor: '#222',
+          backgroundColor: NAV_BG,
+          borderTopWidth: 0, // Removed border
+          elevation: 0, // Remove Android shadow
+          shadowOpacity: 0, // Remove iOS shadow
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
+          marginBottom: 0,
+          borderRadius: 0,
         },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
