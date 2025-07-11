@@ -6,6 +6,7 @@ import DetectionStack from "./DetectionStack";
 import ExtensionStack from "./ExtensionStack";
 import GroupStack from "./GroupStack";
 import HomeStack from "./HomeStack";
+import ProfileStack from "./ProfileStack";
 
 const Tab = createBottomTabNavigator();
 
@@ -48,6 +49,9 @@ export default function RootNavigator() {
             case "Group":
               iconName = "users";
               break;
+            case "Profile":
+              iconName = "user";
+              break;
             default:
               iconName = "circle";
           }
@@ -81,6 +85,7 @@ export default function RootNavigator() {
       <Tab.Screen name="Extension" component={ExtensionStack} />
       <Tab.Screen name="Detection" component={DetectionStack} />
       <Tab.Screen name="Group" component={GroupStack} />
+      <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
   );
 }
