@@ -1,14 +1,13 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
 import React, { useState } from "react";
-import { ActivityIndicator, Image, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Image, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../context/AuthContext";
 
 const BG = "#0f0f0f";
 const CARD_BG = "#1a1a1a";
 const ACCENT = "#34d399";
 const TEXT = "#ffffff";
-const SUBTLE = "#666666";
+const SUBTLE = "#9ca3af";
 const ERROR = "#ef4444";
 const WARNING = "#f59e0b";
 
@@ -61,32 +60,52 @@ export default function Register() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG, padding: 20 }}>
-      <View style={{ alignItems: "center", marginTop: 60, marginBottom: 40 }}>
+    <View style={{ flex: 1, backgroundColor: BG }}>
+      <StatusBar barStyle="light-content" backgroundColor={BG} />
+      
+      {/* Header Section */}
+      <View style={{ 
+        alignItems: "center", 
+        paddingTop: 80, 
+        paddingBottom: 48,
+        paddingHorizontal: 24
+      }}>
         <Image
           source={require("../../assets/images/logo.png")}
-          style={{ width: 120, height: 120, marginBottom: 20 }}
+          style={{ width: 100, height: 100, marginBottom: 24 }}
           resizeMode="contain"
         />
-        <Text style={{ color: TEXT, fontSize: 28, fontWeight: "bold" }}>
+        <Text style={{ 
+          color: TEXT, 
+          fontSize: 32, 
+          fontWeight: "700",
+          marginBottom: 8,
+          textAlign: 'center'
+        }}>
           Create Account
         </Text>
-        <Text style={{ color: SUBTLE, marginTop: 8 }}>
+        <Text style={{ 
+          color: SUBTLE, 
+          fontSize: 16,
+          textAlign: 'center',
+          lineHeight: 22
+        }}>
           Join Murai to get started
         </Text>
       </View>
 
-      <LinearGradient
-        colors={[CARD_BG, `${CARD_BG}cc`]}
-        style={{
-          borderRadius: 12,
-          padding: 20,
-          marginBottom: 20,
-        }}
-      >
-        <View style={{ gap: 16 }}>
+      {/* Form Section */}
+      <View style={{ flex: 1, paddingHorizontal: 24 }}>
+        <View style={{ gap: 20, marginBottom: 24 }}>
           <View>
-            <Text style={{ color: SUBTLE, marginBottom: 8 }}>Full Name</Text>
+            <Text style={{ 
+              color: SUBTLE, 
+              marginBottom: 8,
+              fontSize: 14,
+              fontWeight: '500'
+            }}>
+              Full Name
+            </Text>
             <TextInput
               value={name}
               onChangeText={(text) => {
@@ -94,19 +113,29 @@ export default function Register() {
                 setError("");
               }}
               placeholder="Enter your full name"
-              placeholderTextColor={SUBTLE}
+              placeholderTextColor={`${SUBTLE}80`}
               style={{
-                backgroundColor: `${BG}cc`,
-                borderRadius: 8,
-                padding: 12,
+                backgroundColor: CARD_BG,
+                borderRadius: 12,
+                padding: 16,
                 color: TEXT,
+                fontSize: 16,
+                borderWidth: 1,
+                borderColor: `${SUBTLE}30`,
               }}
               autoCapitalize="words"
             />
           </View>
 
           <View>
-            <Text style={{ color: SUBTLE, marginBottom: 8 }}>Email</Text>
+            <Text style={{ 
+              color: SUBTLE, 
+              marginBottom: 8,
+              fontSize: 14,
+              fontWeight: '500'
+            }}>
+              Email Address
+            </Text>
             <TextInput
               value={email}
               onChangeText={(text) => {
@@ -114,21 +143,31 @@ export default function Register() {
                 setError("");
               }}
               placeholder="Enter your email"
-              placeholderTextColor={SUBTLE}
+              placeholderTextColor={`${SUBTLE}80`}
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
               style={{
-                backgroundColor: `${BG}cc`,
-                borderRadius: 8,
-                padding: 12,
+                backgroundColor: CARD_BG,
+                borderRadius: 12,
+                padding: 16,
                 color: TEXT,
+                fontSize: 16,
+                borderWidth: 1,
+                borderColor: `${SUBTLE}30`,
               }}
             />
           </View>
 
           <View>
-            <Text style={{ color: SUBTLE, marginBottom: 8 }}>Password</Text>
+            <Text style={{ 
+              color: SUBTLE, 
+              marginBottom: 8,
+              fontSize: 14,
+              fontWeight: '500'
+            }}>
+              Password
+            </Text>
             <TextInput
               value={password}
               onChangeText={(text) => {
@@ -136,74 +175,109 @@ export default function Register() {
                 setError("");
               }}
               placeholder="Choose a strong password (min. 8 characters)"
-              placeholderTextColor={SUBTLE}
+              placeholderTextColor={`${SUBTLE}80`}
               secureTextEntry
               autoComplete="new-password"
               style={{
-                backgroundColor: `${BG}cc`,
-                borderRadius: 8,
-                padding: 12,
+                backgroundColor: CARD_BG,
+                borderRadius: 12,
+                padding: 16,
                 color: TEXT,
+                fontSize: 16,
+                borderWidth: 1,
+                borderColor: `${SUBTLE}30`,
               }}
             />
           </View>
 
           {error ? (
             <View style={{ 
-              backgroundColor: `${ERROR}22`,
-              padding: 12,
-              borderRadius: 8,
+              backgroundColor: `${ERROR}15`,
+              padding: 16,
+              borderRadius: 12,
               borderLeftWidth: 4,
               borderLeftColor: ERROR
             }}>
-              <Text style={{ color: ERROR }}>{error}</Text>
+              <Text style={{ 
+                color: ERROR,
+                fontSize: 14,
+                fontWeight: '500'
+              }}>
+                {error}
+              </Text>
             </View>
           ) : null}
         </View>
-      </LinearGradient>
 
-      <TouchableOpacity
-        onPress={handleRegister}
-        disabled={loading}
-        style={{
-          backgroundColor: ACCENT,
-          borderRadius: 8,
-          padding: 16,
-          alignItems: "center",
-          marginBottom: 16,
-          opacity: loading ? 0.7 : 1,
-        }}
-      >
-        {loading ? (
-          <ActivityIndicator color={BG} />
-        ) : (
-          <Text style={{ color: BG, fontWeight: "bold", fontSize: 16 }}>
-            Create Account
+        {/* Create Account Button */}
+        <TouchableOpacity
+          onPress={handleRegister}
+          disabled={loading}
+          style={{
+            backgroundColor: ACCENT,
+            borderRadius: 12,
+            padding: 18,
+            alignItems: "center",
+            marginBottom: 24,
+            opacity: loading ? 0.7 : 1,
+            shadowColor: ACCENT,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 6,
+          }}
+          activeOpacity={0.8}
+        >
+          {loading ? (
+            <ActivityIndicator color={BG} size="small" />
+          ) : (
+            <Text style={{ 
+              color: BG, 
+              fontWeight: "600", 
+              fontSize: 16,
+              letterSpacing: 0.5
+            }}>
+              Create Account
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Sign In Link */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: 32,
+          }}
+        >
+          <Text style={{ 
+            color: SUBTLE,
+            fontSize: 15
+          }}>
+            Already have an account?
           </Text>
-        )}
-      </TouchableOpacity>
+          <Link href="/(auth)/login" style={{ 
+            color: ACCENT,
+            fontSize: 15,
+            fontWeight: '600'
+          }}>
+            Sign In
+          </Link>
+        </View>
 
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "center",
-          gap: 4,
-        }}
-      >
-        <Text style={{ color: SUBTLE }}>Already have an account?</Text>
-        <Link href="/(auth)/login" style={{ color: ACCENT }}>
-          Sign In
+        {/* Test Connection Link */}
+        <Link href="/(auth)/test" style={{ 
+          color: SUBTLE,
+          textAlign: "center",
+          fontSize: 14,
+          textDecorationLine: "underline",
+          opacity: 0.7
+        }}>
+          Test Connection
         </Link>
       </View>
-
-      <Link href="/(auth)/test" style={{ 
-        color: SUBTLE,
-        textAlign: "center",
-        marginTop: 20,
-        textDecorationLine: "underline"
-      }}>
-        Test Connection
-      </Link>
     </View>
   );
 } 
