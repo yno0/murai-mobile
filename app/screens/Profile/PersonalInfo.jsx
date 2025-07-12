@@ -2,9 +2,11 @@ import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React from "react";
 import { ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import { useAuth } from "../../context/AuthContext";
 
 export default function PersonalInfo() {
   const navigation = useNavigation();
+  const { user, loading, logout } = useAuth();
 
   const profileOptions = [
     {
@@ -28,6 +30,15 @@ export default function PersonalInfo() {
       onPress: () => navigation.navigate("SecuritySettings"),
     },
   ];
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0f0f0f', justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar barStyle="light-content" backgroundColor="#0f0f0f" />
+        <Text style={{ color: 'white', fontSize: 16 }}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0f0f0f' }}>
@@ -53,13 +64,13 @@ export default function PersonalInfo() {
           fontWeight: '600', 
           marginBottom: 6,
         }}>
-          John Doe
+          {user?.name || 'User'}
         </Text>
         <Text style={{ 
           color: '#9ca3af', 
           fontSize: 16, 
         }}>
-          john.doe@example.com
+          {user?.email || 'No email'}
         </Text>
       </View>
 
@@ -100,6 +111,7 @@ export default function PersonalInfo() {
         
         {/* Sign Out */}
         <TouchableOpacity
+          onPress={logout}
           style={{
             flexDirection: 'row',
             alignItems: 'center',

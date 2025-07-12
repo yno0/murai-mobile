@@ -1,20 +1,127 @@
 import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import React, { useState } from "react";
-import { ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Alert, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useAuth } from "../../context/AuthContext";
+import { appwriteService } from "../../services/appwrite";
 
 export default function AccountManagement() {
   const navigation = useNavigation();
+  const { user, loading } = useAuth();
   const [formData, setFormData] = useState({
-    firstName: "John",
-    lastName: "Doe",
-    email: "john.doe@example.com",
-    phone: "+1 (555) 123-4567",
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
   });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      // Parse the full name into first and last name
+      const nameParts = user.name ? user.name.split(' ') : ['', ''];
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      setFormData({
+        firstName,
+        lastName,
+        email: user.email || '',
+        phone: user.phone || '',
+      });
+    }
+  }, [user]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const handleSave = async () => {
+    if (!user) return;
+    
+    setSaving(true);
+    try {
+      // Combine first and last name
+      const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
+      
+      // Update name if it changed
+      if (fullName !== user.name) {
+        await appwriteService.updateName(fullName);
+      }
+      
+      // Update email if it changed
+      if (formData.email !== user.email) {
+        Alert.alert(
+          "Email Update",
+          "To change your email, you'll need to confirm your current password.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { 
+              text: "Continue", 
+              onPress: () => {
+                Alert.prompt(
+                  "Confirm Password",
+                  "Enter your current password to update your email:",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    { 
+                      text: "Update", 
+                      onPress: async (password) => {
+                        if (password) {
+                          try {
+                            await appwriteService.updateEmail(formData.email, password);
+                            Alert.alert("Success", "Email updated successfully!");
+                          } catch (error) {
+                            Alert.alert("Error", error.message || "Failed to update email");
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "secure-text"
+                );
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert("Success", "Profile updated successfully!");
+      }
+      
+      // Note: Phone number is not stored in Appwrite user object by default
+      // You would need to implement a separate user preferences collection for this
+      
+    } catch (error) {
+      Alert.alert("Error", error.message || "Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    // Reset form data to original user data
+    if (user) {
+      const nameParts = user.name ? user.name.split(' ') : ['', ''];
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      setFormData({
+        firstName,
+        lastName,
+        email: user.email || '',
+        phone: user.phone || '',
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0f0f0f', justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar barStyle="light-content" backgroundColor="#0f0f0f" />
+        <Text style={{ color: 'white', fontSize: 16 }}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0f0f0f' }}>
@@ -83,11 +190,14 @@ export default function AccountManagement() {
         {/* Action Buttons */}
         <View style={{ marginBottom: 32 }}>
           <TouchableOpacity 
+            onPress={handleSave}
+            disabled={saving}
             style={{
-              backgroundColor: '#34d399',
+              backgroundColor: saving ? '#22c55e' : '#34d399',
               paddingVertical: 16,
               borderRadius: 12,
               marginBottom: 12,
+              opacity: saving ? 0.7 : 1,
             }}
             activeOpacity={0.8}
           >
@@ -97,11 +207,12 @@ export default function AccountManagement() {
               fontWeight: '600', 
               textAlign: 'center',
             }}>
-              Save Changes
+              {saving ? 'Saving...' : 'Save Changes'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
+            onPress={handleCancel}
             style={{
               paddingVertical: 16,
               borderRadius: 12,
