@@ -1,7 +1,6 @@
 import { Link } from "expo-router";
 import React, { useState } from "react";
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { appwriteService } from "../services/appwrite";
 
 const BG = "#0f0f0f";
 const CARD_BG = "#1a1a1a";
@@ -29,23 +28,16 @@ export default function Test() {
     setResults([]);
     
     try {
-      addResult("🔄 Starting Appwrite connection test...", 'info');
-      const result = await appwriteService.testConnection();
+      addResult("🔄 Starting mock connection test...", 'info');
       
-      if (result.success) {
-        addResult("✅ All tests passed successfully!", 'success');
-      } else {
-        addResult(`❌ Test failed: ${result.message}`, 'error');
-        if (result.error?.step) {
-          addResult(`Failed at step: ${result.error.step}`, 'error');
-        }
-        if (result.error?.details) {
-          addResult(`Details: ${result.error.details}`, 'error');
-        }
-        if (result.hint) {
-          addResult(`💡 Hint: ${result.hint}`, 'warning');
-        }
-      }
+      // Simulate test delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      addResult("✅ Mock authentication service ready", 'success');
+      addResult("✅ Mock user management ready", 'success');
+      addResult("✅ Mock data storage ready", 'success');
+      addResult("✅ All mock services initialized successfully!", 'success');
+      
     } catch (error) {
       addResult(`❌ Unexpected error: ${error.message}`, 'error');
     } finally {
@@ -66,10 +58,10 @@ export default function Test() {
     <View style={{ flex: 1, backgroundColor: BG, padding: 20 }}>
       <View style={{ alignItems: "center", marginTop: 40, marginBottom: 20 }}>
         <Text style={{ color: TEXT, fontSize: 24, fontWeight: "bold" }}>
-          Appwrite Connection Test
+          Mock Service Test
         </Text>
         <Text style={{ color: SUBTLE, marginTop: 8, textAlign: "center" }}>
-          This will test your Appwrite connection and permissions
+          This will test your mock authentication and data services
         </Text>
       </View>
 
@@ -123,7 +115,7 @@ export default function Test() {
 
         {results.length === 0 && (
           <Text style={{ color: SUBTLE, textAlign: "center" }}>
-            Click "Run Test" to start testing your Appwrite connection
+            Click "Run Test" to start testing your mock services
           </Text>
         )}
       </ScrollView>

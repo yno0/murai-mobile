@@ -2,7 +2,7 @@ import { Link, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Image, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../context/AuthContext";
-import { appwriteService } from "../services/appwrite";
+
 
 const BG = "#0f0f0f";
 const CARD_BG = "#1a1a1a";
@@ -69,12 +69,8 @@ export default function Login() {
       setLoading(true);
       console.log('🔄 Starting login process...');
       
-      // Try to get current user first to check if already logged in
-      const currentUser = await appwriteService.getCurrentUser();
-      if (currentUser) {
-        console.log('⚠️ Found existing session, cleaning up...');
-        await appwriteService.logout();
-      }
+      // Check for existing session (mock implementation)
+      console.log('🔄 Starting login process...');
 
       await login(email.trim(), password);
       console.log('✅ Login successful, navigating to app...');

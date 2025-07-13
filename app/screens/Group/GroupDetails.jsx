@@ -2,8 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import { Alert, Clipboard, FlatList, Modal, SafeAreaView, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { account } from "../../lib/appwrite-config";
-import { groupService } from "../../services/groupService";
 
 // Theme colors
 const BG = "#0f0f0f";
@@ -38,23 +36,13 @@ export default function GroupDetails() {
 
   const checkCurrentUser = async () => {
     try {
-      // Ensure groupId is available before proceeding
-      if (!groupId) {
-        console.log('groupId not available yet, skipping admin check');
-        return;
-      }
-
-      const user = await account.get();
-      setCurrentUserId(user.$id);
-      console.log('Current user ID:', user.$id);
+      // Mock user check
+      const mockUserId = 'mock-user-id';
+      setCurrentUserId(mockUserId);
+      console.log('Current user ID:', mockUserId);
       
-      // Ensure we have both groupId and userId before checking admin status
-      if (groupId && user.$id) {
-        console.log('Checking admin status for groupId:', groupId, 'userId:', user.$id);
-        const adminStatus = await groupService.isGroupAdmin(groupId, user.$id);
-        console.log('Admin status result:', adminStatus);
-        setIsAdmin(adminStatus);
-      }
+      // Mock admin check - assume user is admin for demo
+      setIsAdmin(true);
     } catch (error) {
       console.error('Error checking current user:', error);
     }
@@ -62,38 +50,38 @@ export default function GroupDetails() {
 
   const loadGroupDetails = async () => {
     try {
-      // Ensure groupId is available before proceeding
-      if (!groupId) {
-        console.log('groupId not available yet, skipping group details load');
-        return;
-      }
-
       setLoading(true);
-      const [groupData, membersData] = await Promise.all([
-        groupService.getGroupById(groupId),
-        groupService.getGroupMembers(groupId)
-      ]);
       
-      setGroup(groupData);
-      setMembers(membersData);
+      // Mock group data
+      const mockGroup = {
+        $id: groupId,
+        name: groupName || 'Mock Group',
+        shortCode: 'MOCK123',
+        createdBy: 'mock-user-id',
+        createdAt: new Date().toISOString(),
+      };
+      
+      // Mock members data
+      const mockMembers = [
+        {
+          id: 'mock-user-id',
+          name: 'Mock User',
+          role: 'admin',
+          joinedAt: new Date().toISOString(),
+        },
+        {
+          id: 'mock-user-2',
+          name: 'John Doe',
+          role: 'member',
+          joinedAt: new Date(Date.now() - 86400000).toISOString(),
+        },
+      ];
+      
+      setGroup(mockGroup);
+      setMembers(mockMembers);
     } catch (error) {
       console.error('Error loading group details:', error);
-      
-      if (error.code === 404 || error.message.includes('Document with the requested ID could not be found')) {
-        // Group document doesn't exist
-        Alert.alert(
-          'Group Not Found',
-          'This group no longer exists. It may have been deleted.',
-          [
-            {
-              text: 'Go Back',
-              onPress: () => navigation.goBack()
-            }
-          ]
-        );
-      } else {
-        Alert.alert('Error', 'Failed to load group details');
-      }
+      Alert.alert('Error', 'Failed to load group details');
     } finally {
       setLoading(false);
     }
@@ -119,94 +107,21 @@ export default function GroupDetails() {
 
     setActionLoading(true);
     try {
-      console.log('Updating group name from:', group?.name, 'to:', editGroupName.trim());
-      await groupService.updateGroupName(groupId, editGroupName.trim());
+      // Mock update
+      console.log('Mock updating group name from:', group?.name, 'to:', editGroupName.trim());
+      
+      // Update local state
+      setGroup(prev => ({ ...prev, name: editGroupName.trim() }));
       
       // Close modal and reset form
       setEditModalVisible(false);
       setEditGroupName("");
       
-      // Reload group details first
-      await loadGroupDetails();
-      
-      // Show success message
-      Alert.alert('Success', 'Group name updated successfully!');
+      Alert.alert('Success', 'Group name updated successfully! (Mock implementation)');
       
     } catch (error) {
       console.error('Error updating group name:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        type: error.type
-      });
-      
-      // Check if it's a team-related error
-      if (error.message && (error.message.includes('missing a Team ID') || error.message.includes('no longer exists'))) {
-        Alert.alert(
-          'Group Recovery Needed',
-          error.message + '\n\nWould you like to try recovering this group?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Recover Group',
-              onPress: async () => {
-                try {
-                  await groupService.recoverGroup(groupId);
-                  Alert.alert(
-                    'Recovery Successful', 
-                    'Group recovered successfully! You can now try updating the name again.',
-                    [
-                      {
-                        text: 'OK',
-                        onPress: async () => {
-                          await loadGroupDetails();
-                        }
-                      }
-                    ]
-                  );
-                } catch (recoveryError) {
-                  console.error('Error recovering group:', recoveryError);
-                  Alert.alert(
-                    'Recovery Failed', 
-                    recoveryError.message || 'Failed to recover the group. Please try deleting and recreating it.',
-                    [
-                      {
-                        text: 'Try Delete',
-                        onPress: () => setDeleteModalVisible(true)
-                      },
-                      {
-                        text: 'Cancel',
-                        style: 'cancel'
-                      }
-                    ]
-                  );
-                }
-              }
-            }
-          ]
-        );
-      } else {
-        Alert.alert(
-          'Update Failed',
-          error.message || 'Failed to update group name. You may not have permission to edit this group.',
-          [
-            {
-              text: 'Try Again',
-              onPress: () => {
-                // Keep the modal open for retry
-              }
-            },
-            {
-              text: 'Cancel',
-              style: 'cancel',
-              onPress: () => {
-                setEditModalVisible(false);
-                setEditGroupName("");
-              }
-            }
-          ]
-        );
-      }
+      Alert.alert('Update Failed', 'Failed to update group name.');
     } finally {
       setActionLoading(false);
     }
@@ -219,61 +134,29 @@ export default function GroupDetails() {
   const confirmDeleteGroup = async () => {
     setActionLoading(true);
     try {
-      console.log('Deleting group:', groupId);
-      await groupService.deleteGroup(groupId);
+      console.log('Mock deleting group:', groupId);
       
       // Close modal
       setDeleteModalVisible(false);
       
-      // Navigate back first
+      // Navigate back
       navigation.navigate('CreateGroup');
       
       // Show success message after navigation
       setTimeout(() => {
-        Alert.alert('Success', 'Group deleted successfully!');
+        Alert.alert('Success', 'Group deleted successfully! (Mock implementation)');
       }, 100);
       
     } catch (error) {
       console.error('Error deleting group:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        type: error.type
-      });
-      
-      // Close modal on error too
       setDeleteModalVisible(false);
-      
-      // Show error message with more details
-      Alert.alert(
-        'Delete Failed',
-        error.message || 'Failed to delete group. You may not have permission to delete this group.',
-        [
-          {
-            text: 'Try Again',
-            onPress: () => setDeleteModalVisible(true)
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          }
-        ]
-      );
+      Alert.alert('Delete Failed', 'Failed to delete group.');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleRemoveMember = async (memberId, memberName) => {
-    console.log('--- handleRemoveMember called ---');
-    console.log('Attempting to remove member:', memberName, 'with ID:', memberId);
-    console.log('Current admin status (isAdmin state):', isAdmin);
-
-    if (!isAdmin) {
-      Alert.alert('Permission Denied', 'You are not an admin for this group.');
-      return;
-    }
-
     Alert.alert(
       'Remove Member',
       `Are you sure you want to remove ${memberName} from the group?`,
@@ -284,27 +167,36 @@ export default function GroupDetails() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await groupService.removeMember(groupId, memberId);
-              Alert.alert('Success', 'Member removed successfully');
-              loadGroupDetails(); // Reload the member list
+              // Mock remove member
+              console.log('Mock removing member:', memberId);
+              setMembers(prev => prev.filter(member => member.id !== memberId));
+              Alert.alert('Success', `${memberName} has been removed from the group. (Mock implementation)`);
             } catch (error) {
-              console.error('Detailed error removing member:', JSON.stringify(error, null, 2));
-              Alert.alert(
-                'Removal Failed',
-                error.message || 'Failed to remove member. Please try again.',
-                [{ text: 'OK' }]
-              );
+              console.error('Error removing member:', error);
+              Alert.alert('Error', 'Failed to remove member from group.');
             }
-          },
-        },
+          }
+        }
       ]
     );
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: BG, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: TEXT_MAIN }}>Loading...</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: TEXT_MAIN, fontSize: 16 }}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!group) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: TEXT_MAIN, fontSize: 16 }}>Group not found</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -315,105 +207,152 @@ export default function GroupDetails() {
       <View style={{ 
         flexDirection: 'row', 
         alignItems: 'center', 
-        padding: 20,
-        paddingTop: 24,
-        backgroundColor: CARD_BG,
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.1)'
+        borderBottomColor: CARD_BG
       }}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()}
-          style={{ marginRight: 16 }}
+          style={{ padding: 8 }}
         >
           <Feather name="arrow-left" size={24} color={TEXT_MAIN} />
         </TouchableOpacity>
-        <Text style={{ flex: 1, fontWeight: 'bold', fontSize: 24, color: TEXT_MAIN }}>{groupName}</Text>
+        
+        <Text style={{ 
+          color: TEXT_MAIN, 
+          fontSize: 18, 
+          fontWeight: 'bold',
+          flex: 1,
+          textAlign: 'center',
+          marginHorizontal: 16
+        }}>
+          {group.name}
+        </Text>
+        
         {isAdmin && (
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity 
-              onPress={handleEditGroup}
-              style={{ 
-                backgroundColor: GRAY_BTN,
-                borderRadius: 8,
-                padding: 8
-              }}
-            >
-              <Feather name="edit-2" size={20} color={TEXT_SECONDARY} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={handleDeleteGroup}
-              style={{ 
-                backgroundColor: DANGER + '20',
-                borderRadius: 8,
-                padding: 8
-              }}
-            >
-              <Feather name="trash-2" size={20} color={DANGER} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity 
+            onPress={handleEditGroup}
+            style={{ padding: 8 }}
+          >
+            <Feather name="edit-3" size={20} color={ACCENT} />
+          </TouchableOpacity>
         )}
       </View>
 
-      {/* Group Info */}
+      {/* Group Info Card */}
       <View style={{ 
         backgroundColor: CARD_BG, 
         margin: 20, 
-        borderRadius: 16,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)'
+        borderRadius: 16, 
+        padding: 20 
       }}>
-        <Text style={{ color: TEXT_MAIN, fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>Group Code</Text>
-        <TouchableOpacity 
-          onPress={handleCopyCode}
-          style={{ 
+        <Text style={{ 
+          color: TEXT_MAIN, 
+          fontSize: 20, 
+          fontWeight: 'bold', 
+          marginBottom: 16 
+        }}>
+          Group Information
+        </Text>
+        
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ color: TEXT_SECONDARY, fontSize: 14, marginBottom: 4 }}>
+            Group Code
+          </Text>
+          <View style={{ 
             flexDirection: 'row', 
             alignItems: 'center',
             backgroundColor: INPUT_BG,
-            padding: 12,
             borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: ACCENT, fontSize: 20, fontWeight: 'bold', letterSpacing: 3, flex: 1 }}>
-            {group?.shortCode}
+            padding: 12
+          }}>
+            <Text style={{ 
+              color: TEXT_MAIN, 
+              fontSize: 16, 
+              fontWeight: 'bold',
+              flex: 1
+            }}>
+              {group.shortCode}
+            </Text>
+            <TouchableOpacity onPress={handleCopyCode}>
+              <Feather name="copy" size={20} color={ACCENT} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ color: TEXT_SECONDARY, fontSize: 14, marginBottom: 4 }}>
+            Created
           </Text>
-          <Feather name="copy" size={20} color={TEXT_SECONDARY} />
-        </TouchableOpacity>
-        <Text style={{ color: TEXT_SECONDARY, fontSize: 14, marginTop: 12 }}>
-          Created {group?.createdAt ? new Date(group.createdAt).toLocaleDateString() : '...'}
-        </Text>
+          <Text style={{ color: TEXT_MAIN, fontSize: 16 }}>
+            {new Date(group.createdAt).toLocaleDateString()}
+          </Text>
+        </View>
+        
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ color: TEXT_SECONDARY, fontSize: 14, marginBottom: 4 }}>
+            Members
+          </Text>
+          <Text style={{ color: TEXT_MAIN, fontSize: 16 }}>
+            {members.length} member{members.length !== 1 ? 's' : ''}
+          </Text>
+        </View>
+        
+        {isAdmin && (
+          <TouchableOpacity 
+            onPress={handleDeleteGroup}
+            style={{ 
+              backgroundColor: DANGER + '20',
+              padding: 12,
+              borderRadius: 8,
+              alignItems: 'center',
+              marginTop: 8
+            }}
+          >
+            <Text style={{ color: DANGER, fontWeight: 'bold' }}>
+              Delete Group
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Members List */}
       <View style={{ flex: 1, paddingHorizontal: 20 }}>
-        <Text style={{ color: TEXT_MAIN, fontWeight: 'bold', fontSize: 18, marginBottom: 16 }}>
-          Members ({members.length})
+        <Text style={{ 
+          color: TEXT_MAIN, 
+          fontSize: 18, 
+          fontWeight: 'bold', 
+          marginBottom: 16 
+        }}>
+          Members
         </Text>
+        
         <FlatList
           data={members}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <View style={{ 
-              backgroundColor: CARD_BG,
-              borderRadius: 12,
-              padding: 16,
-              marginBottom: 12,
-              flexDirection: 'row',
+              flexDirection: 'row', 
               alignItems: 'center',
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.05)'
+              backgroundColor: CARD_BG,
+              padding: 16,
+              borderRadius: 12,
+              marginBottom: 8
             }}>
               <View style={{ 
-                backgroundColor: GRAY_BTN,
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                alignItems: 'center',
+                width: 40, 
+                height: 40, 
+                borderRadius: 20, 
+                backgroundColor: ACCENT + '20',
                 justifyContent: 'center',
+                alignItems: 'center',
                 marginRight: 12
               }}>
-                <Text style={{ color: ACCENT, fontWeight: 'bold' }}>
-                  {item.name.split(' ').map(n => n[0]).join('')}
+                <Text style={{ color: ACCENT, fontWeight: 'bold', fontSize: 16 }}>
+                  {item.name.charAt(0).toUpperCase()}
                 </Text>
               </View>
               <View style={{ flex: 1 }}>
@@ -575,7 +514,7 @@ export default function GroupDetails() {
               marginBottom: 24,
               lineHeight: 22
             }}>
-              Are you sure you want to delete &quot;{group?.name}&quot;? This action cannot be undone and will remove all members from the group.
+              Are you sure you want to delete "{group?.name}"? This action cannot be undone and will remove all members from the group.
             </Text>
 
             <TouchableOpacity 

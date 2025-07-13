@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
 import { Alert, FlatList, Modal, SafeAreaView, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { groupService } from "../../services/groupService";
 
 // Theme colors
 const BG = "#0f0f0f";
@@ -35,55 +34,28 @@ export default function CreateGroup() {
   const loadGroups = async () => {
     try {
       setLoading(true);
-      const response = await groupService.getUserGroups();
       
-      // Filter out broken groups (those with null teamId or undefined)
-      const validGroups = response.documents.filter(group => group && group.teamId);
-      const brokenGroups = response.documents.filter(group => group && !group.teamId);
-      
-      // Check for orphaned memberships (where group document doesn't exist)
-      const orphanedMemberships = response.documents.filter(group => !group);
-      
-      if (brokenGroups.length > 0) {
-        console.warn('Found broken groups (missing teamId):', brokenGroups);
-        
-        // Show alert about broken groups
-        Alert.alert(
-          'Broken Groups Detected',
-          `Found ${brokenGroups.length} group(s) with missing team data. These groups may not work properly. Would you like to clean them up?`,
-          [
-            { text: 'Keep Them', style: 'cancel' },
-            {
-              text: 'Clean Up',
-              onPress: async () => {
-                try {
-                  for (const brokenGroup of brokenGroups) {
-                    await groupService.cleanupBrokenGroup(brokenGroup.$id);
-                  }
-                  Alert.alert('Success', 'Broken groups have been cleaned up.');
-                  await loadGroups(); // Reload after cleanup
-                } catch (error) {
-                  console.error('Error cleaning up broken groups:', error);
-                  Alert.alert('Error', 'Failed to clean up some broken groups.');
-                }
-              }
-            }
-          ]
-        );
-      }
-      
-      if (orphanedMemberships.length > 0) {
-        console.warn('Found orphaned memberships (group document missing):', orphanedMemberships.length);
-        // Automatically clean up orphaned memberships
-        try {
-          await groupService.cleanupOrphanedMemberships();
-          console.log('Cleaned up orphaned memberships');
-        } catch (error) {
-          console.error('Error cleaning up orphaned memberships:', error);
+      // Mock groups data
+      const mockGroups = [
+        {
+          $id: 'mock-group-1',
+          name: 'Mock Group 1',
+          shortCode: 'MOCK1',
+          createdBy: 'mock-user-id',
+          createdAt: new Date().toISOString(),
+          teamId: 'mock-team-1'
+        },
+        {
+          $id: 'mock-group-2',
+          name: 'Mock Group 2',
+          shortCode: 'MOCK2',
+          createdBy: 'mock-user-id',
+          createdAt: new Date(Date.now() - 86400000).toISOString(),
+          teamId: 'mock-team-2'
         }
-      }
+      ];
       
-      setGroups(validGroups);
+      setGroups(mockGroups);
     } catch (error) {
       console.error('Error loading groups:', error);
       Alert.alert('Error', 'Failed to load groups');
@@ -100,18 +72,23 @@ export default function CreateGroup() {
 
     setLoading(true);
     try {
-      await groupService.createGroup(groupName.trim());
+      // Mock group creation
+      const newGroup = {
+        $id: `mock-group-${Date.now()}`,
+        name: groupName.trim(),
+        shortCode: `MOCK${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+        createdBy: 'mock-user-id',
+        createdAt: new Date().toISOString(),
+        teamId: `mock-team-${Date.now()}`
+      };
+      
+      setGroups(prev => [newGroup, ...prev]);
       setGroupName("");
       setModalVisible(false);
-      Alert.alert('Success', 'Group created successfully!');
-      await loadGroups(); // Reload the groups list
+      Alert.alert('Success', 'Group created successfully! (Mock implementation)');
     } catch (error) {
-      console.error('Detailed error creating group:', JSON.stringify(error, null, 2));
-      Alert.alert(
-        'Creation Failed',
-        `Message: ${error.message}\n\nType: ${error.type}\nCode: ${error.code}`,
-        [{ text: 'OK' }]
-      );
+      console.error('Error creating group:', error);
+      Alert.alert('Creation Failed', 'Failed to create group');
     } finally {
       setLoading(false);
     }
@@ -125,95 +102,27 @@ export default function CreateGroup() {
 
     setLoading(true);
     try {
-      console.log('Attempting to join group with code:', groupCode.trim());
-      const joinedGroup = await groupService.joinGroup(groupCode.trim());
+      console.log('Mock attempting to join group with code:', groupCode.trim());
+      
+      // Mock join logic
+      const mockJoinedGroup = {
+        $id: `mock-joined-group-${Date.now()}`,
+        name: 'Mock Joined Group',
+        shortCode: groupCode.trim(),
+        createdBy: 'mock-user-id',
+        createdAt: new Date().toISOString(),
+        teamId: `mock-team-${Date.now()}`,
+        joinMethod: 'mock_join'
+      };
+      
+      setGroups(prev => [mockJoinedGroup, ...prev]);
       setGroupCode("");
       setModalVisible(false);
       
-      // Show different success messages based on join method
-      const successMessage = joinedGroup.joinMethod === 'database_only' 
-        ? `Joined group "${joinedGroup.name}" successfully!\n\nNote: Team permissions may be limited due to technical issues.`
-        : `Joined group "${joinedGroup.name}" successfully!`;
-      
-      Alert.alert('Success', successMessage);
-      await loadGroups(); // Reload the groups list
+      Alert.alert('Success', `Joined group "${mockJoinedGroup.name}" successfully! (Mock implementation)`);
     } catch (error) {
       console.error('Error joining group:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        type: error.type
-      });
-      
-      // Provide more specific error messages
-      let errorMessage = error.message || 'Failed to join group. Please check the code and try again.';
-      
-      if (error.message && error.message.includes('Group not found')) {
-        errorMessage = 'Group not found. Please check the group code and try again.';
-      } else if (error.message && error.message.includes('already a member')) {
-        errorMessage = 'You are already a member of this group.';
-      } else if (error.message && error.message.includes('broken')) {
-        // Show an alert with recovery options for broken groups
-        Alert.alert(
-          'Broken Group Detected',
-          error.message + '\n\nWhat would you like to do?',
-          [
-            {
-              text: 'Delete Broken Group',
-              style: 'destructive',
-              onPress: async () => {
-                try {
-                  setLoading(true);
-                  // Find the group by code
-                  const allGroupsResponse = await groupService.findGroupByShortCode(groupCode.trim());
-                  if (allGroupsResponse) {
-                    await groupService.cleanupBrokenGroup(allGroupsResponse.$id);
-                    Alert.alert('Deleted', 'Broken group has been deleted.');
-                    await loadGroups();
-                  } else {
-                    Alert.alert('Error', 'Could not find the group to delete.');
-                  }
-                } catch (cleanupError) {
-                  console.error('Cleanup failed:', cleanupError);
-                  Alert.alert('Cleanup Failed', cleanupError.message || 'Failed to delete the broken group.');
-                } finally {
-                  setLoading(false);
-                }
-              }
-            },
-            {
-              text: 'Recover Group (Admin Only)',
-              onPress: async () => {
-                try {
-                  setLoading(true);
-                  // Find the group by code
-                  const allGroupsResponse = await groupService.findGroupByShortCode(groupCode.trim());
-                  if (allGroupsResponse) {
-                    await groupService.recoverGroup(allGroupsResponse.$id);
-                    Alert.alert('Success', 'Group recovered successfully! You can now try joining again.');
-                  } else {
-                    Alert.alert('Error', 'Could not find the group to recover.');
-                  }
-                } catch (recoveryError) {
-                  console.error('Recovery failed:', recoveryError);
-                  Alert.alert(
-                    'Recovery Failed',
-                    recoveryError.message || 'Failed to recover the group. You may not be an admin of this group.'
-                  );
-                } finally {
-                  setLoading(false);
-                }
-              }
-            },
-            { text: 'Cancel', style: 'cancel' }
-          ]
-        );
-        return; // Exit early to avoid showing the generic error
-      } else if (error.message && error.message.includes('URL')) {
-        errorMessage = 'There was a technical issue joining the group. Please try again or contact support.';
-      }
-      
-      Alert.alert('Error', errorMessage);
+      Alert.alert('Error', 'Failed to join group. Please check the code and try again.');
     } finally {
       setLoading(false);
     }
@@ -248,58 +157,76 @@ export default function CreateGroup() {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={groups}
-        keyExtractor={item => item.$id}
-        contentContainerStyle={{ padding: 20 }}
-        renderItem={({ item }) => (
-          <TouchableOpacity 
-            onPress={() => handleGroupPress(item)}
-            style={{ 
-              backgroundColor: CARD_BG, 
-              borderRadius: 16, 
-              marginBottom: 16,
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.05)'
-            }}
-          >
-            {/* Header bar */}
-            <View style={{ 
-              flexDirection: 'row', 
-              alignItems: 'center', 
-              padding: 16,
-              borderBottomWidth: 1,
-              borderBottomColor: 'rgba(255,255,255,0.05)'
-            }}>
-              <View style={{ 
-                backgroundColor: GRAY_BTN, 
-                borderRadius: 12, 
-                width: 40, 
-                height: 40, 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                marginRight: 12 
-              }}>
-                <Text style={{ color: ACCENT, fontWeight: 'bold', fontSize: 16 }}>{getInitials(item.name)}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: TEXT_MAIN, fontWeight: 'bold', fontSize: 16 }}>{item.name}</Text>
-                <Text style={{ color: TEXT_SECONDARY, fontSize: 14, marginTop: 4 }}>
-                  {item.memberCount} {item.memberCount === 1 ? 'member' : 'members'}
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={20} color={TEXT_SECONDARY} />
-            </View>
-          </TouchableOpacity>
+      {/* Groups List */}
+      <View style={{ flex: 1, padding: 20 }}>
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ color: TEXT_MAIN, fontSize: 16 }}>Loading...</Text>
+          </View>
+        ) : groups.length === 0 ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ color: TEXT_SECONDARY, fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
+              You haven't joined any groups yet
+            </Text>
+            <TouchableOpacity 
+              onPress={() => setModalVisible(true)}
+              style={{ 
+                backgroundColor: ACCENT,
+                paddingHorizontal: 24,
+                paddingVertical: 12,
+                borderRadius: 8
+              }}
+            >
+              <Text style={{ color: BG, fontWeight: 'bold' }}>Create or Join a Group</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={groups}
+            keyExtractor={(item) => item.$id}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                onPress={() => handleGroupPress(item)}
+                style={{ 
+                  backgroundColor: CARD_BG,
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.05)'
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ 
+                    backgroundColor: GRAY_BTN,
+                    width: 50, 
+                    height: 50, 
+                    borderRadius: 25, 
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 16
+                  }}>
+                    <Text style={{ color: ACCENT, fontWeight: 'bold', fontSize: 18 }}>
+                      {getInitials(item.name)}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: TEXT_MAIN, fontWeight: 'bold', fontSize: 16, marginBottom: 4 }}>
+                      {item.name}
+                    </Text>
+                    <Text style={{ color: TEXT_SECONDARY, fontSize: 14 }}>
+                      Code: {item.shortCode} • Created {new Date(item.createdAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={20} color={TEXT_SECONDARY} />
+                </View>
+              </TouchableOpacity>
+            )}
+          />
         )}
-        ListEmptyComponent={
-          <Text style={{ color: TEXT_SECONDARY, textAlign: 'center', marginTop: 40 }}>
-            No groups yet.
-          </Text>
-        }
-      />
+      </View>
 
-      {/* Modal for Create/Join */}
+      {/* Create/Join Modal */}
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={{ 
           flex: 1, 
@@ -311,25 +238,32 @@ export default function CreateGroup() {
             backgroundColor: CARD_BG, 
             borderRadius: 20, 
             padding: 24, 
-            width: '85%',
+            width: '90%',
+            maxWidth: 400,
             borderWidth: 1,
             borderColor: 'rgba(255,255,255,0.05)'
           }}>
-            <View style={{ flexDirection: 'row', marginBottom: 24 }}>
+            {/* Tab Buttons */}
+            <View style={{ 
+              flexDirection: 'row', 
+              backgroundColor: INPUT_BG, 
+              borderRadius: 12, 
+              padding: 4, 
+              marginBottom: 24 
+            }}>
               <TouchableOpacity 
                 onPress={() => setTab("create")}
                 style={{ 
                   flex: 1, 
-                  alignItems: 'center', 
+                  backgroundColor: tab === "create" ? ACCENT : 'transparent',
+                  borderRadius: 8,
                   paddingVertical: 12,
-                  borderBottomWidth: tab === "create" ? 2 : 0, 
-                  borderColor: ACCENT 
+                  alignItems: 'center'
                 }}
               >
                 <Text style={{ 
-                  fontWeight: tab === "create" ? 'bold' : 'normal', 
-                  color: tab === "create" ? ACCENT : TEXT_SECONDARY,
-                  fontSize: 16 
+                  color: tab === "create" ? BG : TEXT_MAIN, 
+                  fontWeight: 'bold' 
                 }}>
                   Create Group
                 </Text>
@@ -338,16 +272,15 @@ export default function CreateGroup() {
                 onPress={() => setTab("join")}
                 style={{ 
                   flex: 1, 
-                  alignItems: 'center', 
+                  backgroundColor: tab === "join" ? ACCENT : 'transparent',
+                  borderRadius: 8,
                   paddingVertical: 12,
-                  borderBottomWidth: tab === "join" ? 2 : 0, 
-                  borderColor: ACCENT 
+                  alignItems: 'center'
                 }}
               >
                 <Text style={{ 
-                  fontWeight: tab === "join" ? 'bold' : 'normal', 
-                  color: tab === "join" ? ACCENT : TEXT_SECONDARY,
-                  fontSize: 16 
+                  color: tab === "join" ? BG : TEXT_MAIN, 
+                  fontWeight: 'bold' 
                 }}>
                   Join Group
                 </Text>
@@ -356,7 +289,27 @@ export default function CreateGroup() {
 
             {tab === "create" ? (
               <>
-                <Text style={{ fontWeight: 'bold', fontSize: 15, color: TEXT_MAIN, marginBottom: 12 }}>
+                <Text style={{ 
+                  fontWeight: 'bold', 
+                  fontSize: 18, 
+                  color: TEXT_MAIN, 
+                  marginBottom: 16 
+                }}>
+                  Create New Group
+                </Text>
+                <Text style={{ 
+                  color: TEXT_SECONDARY, 
+                  fontSize: 14, 
+                  marginBottom: 20,
+                  lineHeight: 20
+                }}>
+                  Create a new group and invite others to join using the generated code.
+                </Text>
+                <Text style={{ 
+                  color: TEXT_MAIN, 
+                  fontSize: 14, 
+                  marginBottom: 8 
+                }}>
                   Group Name
                 </Text>
                 <TextInput
@@ -368,7 +321,7 @@ export default function CreateGroup() {
                     backgroundColor: INPUT_BG,
                     borderRadius: 12,
                     padding: 16,
-                    fontSize: 15,
+                    fontSize: 16,
                     marginBottom: 24,
                     color: TEXT_MAIN,
                     borderWidth: 1,
@@ -383,17 +336,39 @@ export default function CreateGroup() {
                     backgroundColor: loading ? TEXT_SECONDARY : ACCENT,
                     borderRadius: 12,
                     paddingVertical: 16,
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    marginBottom: 12,
+                    opacity: loading ? 0.7 : 1
                   }}
                 >
                   <Text style={{ color: BG, fontWeight: 'bold', fontSize: 16 }}>
-                    {loading ? 'Creating...' : 'Create'}
+                    {loading ? 'Creating...' : 'Create Group'}
                   </Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
-                <Text style={{ fontWeight: 'bold', fontSize: 15, color: TEXT_MAIN, marginBottom: 12 }}>
+                <Text style={{ 
+                  fontWeight: 'bold', 
+                  fontSize: 18, 
+                  color: TEXT_MAIN, 
+                  marginBottom: 16 
+                }}>
+                  Join Existing Group
+                </Text>
+                <Text style={{ 
+                  color: TEXT_SECONDARY, 
+                  fontSize: 14, 
+                  marginBottom: 20,
+                  lineHeight: 20
+                }}>
+                  Enter the group code provided by the group admin to join.
+                </Text>
+                <Text style={{ 
+                  color: TEXT_MAIN, 
+                  fontSize: 14, 
+                  marginBottom: 8 
+                }}>
                   Group Code
                 </Text>
                 <TextInput
@@ -405,7 +380,7 @@ export default function CreateGroup() {
                     backgroundColor: INPUT_BG,
                     borderRadius: 12,
                     padding: 16,
-                    fontSize: 15,
+                    fontSize: 16,
                     marginBottom: 24,
                     color: TEXT_MAIN,
                     borderWidth: 1,
@@ -421,25 +396,34 @@ export default function CreateGroup() {
                     backgroundColor: loading ? TEXT_SECONDARY : ACCENT,
                     borderRadius: 12,
                     paddingVertical: 16,
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    marginBottom: 12,
+                    opacity: loading ? 0.7 : 1
                   }}
                 >
                   <Text style={{ color: BG, fontWeight: 'bold', fontSize: 16 }}>
-                    {loading ? 'Joining...' : 'Join'}
+                    {loading ? 'Joining...' : 'Join Group'}
                   </Text>
                 </TouchableOpacity>
               </>
             )}
 
             <TouchableOpacity 
-              onPress={() => setModalVisible(false)} 
+              onPress={() => {
+                setModalVisible(false);
+                setGroupName("");
+                setGroupCode("");
+              }} 
+              disabled={loading}
               style={{ 
-                marginTop: 20,
                 alignItems: 'center',
-                padding: 12
+                padding: 12,
+                opacity: loading ? 0.5 : 1
               }}
             >
-              <Text style={{ color: TEXT_SECONDARY, fontWeight: 'bold' }}>Cancel</Text>
+              <Text style={{ color: TEXT_SECONDARY, fontWeight: 'bold' }}>
+                {loading ? 'Please wait...' : 'Cancel'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

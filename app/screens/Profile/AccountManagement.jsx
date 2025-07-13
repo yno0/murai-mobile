@@ -3,7 +3,7 @@ import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../../context/AuthContext";
-import { appwriteService } from "../../services/appwrite";
+
 
 export default function AccountManagement() {
   const navigation = useNavigation();
@@ -44,52 +44,9 @@ export default function AccountManagement() {
       // Combine first and last name
       const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
       
-      // Update name if it changed
-      if (fullName !== user.name) {
-        await appwriteService.updateName(fullName);
-      }
-      
-      // Update email if it changed
-      if (formData.email !== user.email) {
-        Alert.alert(
-          "Email Update",
-          "To change your email, you'll need to confirm your current password.",
-          [
-            { text: "Cancel", style: "cancel" },
-            { 
-              text: "Continue", 
-              onPress: () => {
-                Alert.prompt(
-                  "Confirm Password",
-                  "Enter your current password to update your email:",
-                  [
-                    { text: "Cancel", style: "cancel" },
-                    { 
-                      text: "Update", 
-                      onPress: async (password) => {
-                        if (password) {
-                          try {
-                            await appwriteService.updateEmail(formData.email, password);
-                            Alert.alert("Success", "Email updated successfully!");
-                          } catch (error) {
-                            Alert.alert("Error", error.message || "Failed to update email");
-                          }
-                        }
-                      }
-                    }
-                  ],
-                  "secure-text"
-                );
-              }
-            }
-          ]
-        );
-      } else {
-        Alert.alert("Success", "Profile updated successfully!");
-      }
-      
-      // Note: Phone number is not stored in Appwrite user object by default
-      // You would need to implement a separate user preferences collection for this
+      // Mock profile update
+      console.log('Mock profile update:', { fullName, email: formData.email });
+      Alert.alert("Success", "Profile updated successfully! (Mock implementation)");
       
     } catch (error) {
       Alert.alert("Error", error.message || "Failed to update profile");

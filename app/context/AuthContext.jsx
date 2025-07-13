@@ -1,6 +1,5 @@
 import { router } from "expo-router";
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { appwriteService } from "../services/appwrite";
 
 const AuthContext = createContext({});
 
@@ -14,8 +13,13 @@ export function AuthProvider({ children }) {
 
   const checkUser = async () => {
     try {
-      const currentUser = await appwriteService.getCurrentUser();
-      setUser(currentUser);
+      // Mock user check - you can replace this with your own auth logic
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      } else {
+        setUser(null);
+      }
     } catch (_error) {
       setUser(null);
     } finally {
@@ -25,12 +29,18 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      const session = await appwriteService.login(email, password);
-      if (session) {
-        const currentUser = await appwriteService.getCurrentUser();
-        setUser(currentUser);
-        router.replace("/(app)");
-      }
+      // Mock login - replace with your own auth logic
+      const mockUser = {
+        $id: 'mock-user-id',
+        email: email,
+        name: 'Mock User',
+        // Add other user properties as needed
+      };
+      
+      // Store user in localStorage (or your preferred storage)
+      localStorage.setItem('user', JSON.stringify(mockUser));
+      setUser(mockUser);
+      router.replace("/(app)");
     } catch (error) {
       throw error;
     }
@@ -38,17 +48,11 @@ export function AuthProvider({ children }) {
 
   const register = async (email, password, name) => {
     try {
-      // Always log out before registering a new account
-      try {
-        await appwriteService.logout();
-      } catch (_logoutError) {
-        // Ignore logout errors (e.g., if not logged in)
-      }
-      // First create the account
-      await appwriteService.createAccount(email, password, name);
+      // Mock registration - replace with your own auth logic
+      console.log('Mock registration:', { email, password, name });
+      
       // After registration, redirect to login page
       router.replace("/(auth)/login");
-      // No error thrown here; registration is successful
     } catch (error) {
       throw error;
     }
@@ -56,7 +60,8 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
-      await appwriteService.logout();
+      // Mock logout
+      localStorage.removeItem('user');
       setUser(null);
       router.replace("/(auth)/login");
     } catch (error) {
