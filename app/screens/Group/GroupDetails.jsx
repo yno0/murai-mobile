@@ -13,6 +13,7 @@ const GRAY_BTN = "#2a2a2a";
 const INPUT_BG = "#222";
 const DANGER = "#ef4444";
 
+
 export default function GroupDetails() {
   const navigation = useNavigation();
   const route = useRoute();
