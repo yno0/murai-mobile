@@ -1,17 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
-import { Alert, Clipboard, FlatList, Modal, SafeAreaView, Text, TextInput, TouchableOpacity, View } from "react-native";
-
-// Theme colors
-const BG = "#0f0f0f";
-const CARD_BG = "#1a1a1a";
-const ACCENT = "#34d399";
-const TEXT_MAIN = "#fff";
-const TEXT_SECONDARY = "#a0a0a0";
-const GRAY_BTN = "#2a2a2a";
-const INPUT_BG = "#222";
-const DANGER = "#ef4444";
+import { Alert, Clipboard, FlatList, Modal, Pressable, SafeAreaView, Text, View } from "react-native";
+import AppButton from "../../components/common/AppButton";
+import AppInput from "../../components/common/AppInput";
+import Header from "../../components/common/Header";
+import { COLORS } from "../../constants/theme";
 
 
 export default function GroupDetails() {
@@ -28,22 +22,23 @@ export default function GroupDetails() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    if (groupId) {
-      loadGroupDetails();
-      checkCurrentUser();
-    }
-  }, [groupId]);
-
-  const checkCurrentUser = async () => {
+  // Fix: pass groupData to checkCurrentUser and update admin logic
+  const checkCurrentUser = async (groupData) => {
     try {
-      // Mock user check
-      const mockUserId = 'mock-user-id';
-      setCurrentUserId(mockUserId);
-      console.log('Current user ID:', mockUserId);
-      
-      // Mock admin check - assume user is admin for demo
-      setIsAdmin(true);
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const res = await fetch('http://localhost:3000/api/users/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentUserId(data.id || data._id || null);
+        // Find admin in group members
+        if (groupData && groupData.members) {
+          const admin = groupData.members.find(m => m.role === 'admin');
+          setIsAdmin(admin && (admin.id === (data.id || data._id)));
+        }
+      }
     } catch (error) {
       console.error('Error checking current user:', error);
     }
@@ -52,41 +47,32 @@ export default function GroupDetails() {
   const loadGroupDetails = async () => {
     try {
       setLoading(true);
-      
-      // Mock group data
-      const mockGroup = {
-        $id: groupId,
-        name: groupName || 'Mock Group',
-        shortCode: 'MOCK123',
-        createdBy: 'mock-user-id',
-        createdAt: new Date().toISOString(),
-      };
-      
-      // Mock members data
-      const mockMembers = [
-        {
-          id: 'mock-user-id',
-          name: 'Mock User',
-          role: 'admin',
-          joinedAt: new Date().toISOString(),
-        },
-        {
-          id: 'mock-user-2',
-          name: 'John Doe',
-          role: 'member',
-          joinedAt: new Date(Date.now() - 86400000).toISOString(),
-        },
-      ];
-      
-      setGroup(mockGroup);
-      setMembers(mockMembers);
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+      const response = await fetch(`http://localhost:3000/api/users/groups/${groupId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to load group details');
+      }
+      const groupData = await response.json();
+      setGroup(groupData);
+      setMembers(groupData.members || []);
+      checkCurrentUser(groupData);
     } catch (error) {
       console.error('Error loading group details:', error);
-      Alert.alert('Error', 'Failed to load group details');
+      Alert.alert('Error', error.message || 'Failed to load group details');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (groupId) {
+      loadGroupDetails();
+    }
+  }, [groupId]);
 
   const handleCopyCode = () => {
     if (group?.shortCode) {
@@ -108,21 +94,27 @@ export default function GroupDetails() {
 
     setActionLoading(true);
     try {
-      // Mock update
-      console.log('Mock updating group name from:', group?.name, 'to:', editGroupName.trim());
-      
-      // Update local state
-      setGroup(prev => ({ ...prev, name: editGroupName.trim() }));
-      
-      // Close modal and reset form
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+      const response = await fetch(`http://localhost:3000/api/users/groups/${groupId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: editGroupName.trim() })
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to update group name');
+      }
+      await loadGroupDetails();
       setEditModalVisible(false);
       setEditGroupName("");
-      
-      Alert.alert('Success', 'Group name updated successfully! (Mock implementation)');
-      
+      Alert.alert('Success', 'Group name updated successfully!');
     } catch (error) {
       console.error('Error updating group name:', error);
-      Alert.alert('Update Failed', 'Failed to update group name.');
+      Alert.alert('Update Failed', error.message || 'Failed to update group name.');
     } finally {
       setActionLoading(false);
     }
@@ -135,23 +127,25 @@ export default function GroupDetails() {
   const confirmDeleteGroup = async () => {
     setActionLoading(true);
     try {
-      console.log('Mock deleting group:', groupId);
-      
-      // Close modal
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+      const response = await fetch(`http://localhost:3000/api/users/groups/${groupId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to delete group');
+      }
       setDeleteModalVisible(false);
-      
-      // Navigate back
       navigation.navigate('CreateGroup');
-      
-      // Show success message after navigation
       setTimeout(() => {
-        Alert.alert('Success', 'Group deleted successfully! (Mock implementation)');
+        Alert.alert('Success', 'Group deleted successfully!');
       }, 100);
-      
     } catch (error) {
       console.error('Error deleting group:', error);
       setDeleteModalVisible(false);
-      Alert.alert('Delete Failed', 'Failed to delete group.');
+      Alert.alert('Delete Failed', error.message || 'Failed to delete group.');
     } finally {
       setActionLoading(false);
     }
@@ -168,13 +162,21 @@ export default function GroupDetails() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Mock remove member
-              console.log('Mock removing member:', memberId);
+              const token = localStorage.getItem('token');
+              if (!token) throw new Error('Not authenticated');
+              const response = await fetch(`http://localhost:3000/api/users/groups/${groupId}/members/${memberId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+              if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'Failed to remove member');
+              }
               setMembers(prev => prev.filter(member => member.id !== memberId));
-              Alert.alert('Success', `${memberName} has been removed from the group. (Mock implementation)`);
+              Alert.alert('Success', `${memberName} has been removed from the group.`);
             } catch (error) {
               console.error('Error removing member:', error);
-              Alert.alert('Error', 'Failed to remove member from group.');
+              Alert.alert('Error', error.message || 'Failed to remove member from group.');
             }
           }
         }
@@ -182,11 +184,14 @@ export default function GroupDetails() {
     );
   };
 
+  // Debug log for admin state
+  console.log('isAdmin:', isAdmin, 'currentUserId:', currentUserId, 'group:', group);
+
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.BG }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: TEXT_MAIN, fontSize: 16 }}>Loading...</Text>
+          <Text style={{ color: COLORS.TEXT_MAIN, fontSize: 16 }}>Loading...</Text>
         </View>
       </SafeAreaView>
     );
@@ -194,204 +199,117 @@ export default function GroupDetails() {
 
   if (!group) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.BG }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: TEXT_MAIN, fontSize: 16 }}>Group not found</Text>
+          <Text style={{ color: COLORS.TEXT_MAIN, fontSize: 16 }}>Group not found</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
-      {/* Header */}
-      <View style={{ 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: CARD_BG
-      }}>
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()}
-          style={{ padding: 8 }}
-        >
-          <Feather name="arrow-left" size={24} color={TEXT_MAIN} />
-        </TouchableOpacity>
-        
-        <Text style={{ 
-          color: TEXT_MAIN, 
-          fontSize: 18, 
-          fontWeight: 'bold',
-          flex: 1,
-          textAlign: 'center',
-          marginHorizontal: 16
-        }}>
-          {group.name}
-        </Text>
-        
-        {isAdmin && (
-          <TouchableOpacity 
-            onPress={handleEditGroup}
-            style={{ padding: 8 }}
-          >
-            <Feather name="edit-3" size={20} color={ACCENT} />
-          </TouchableOpacity>
-        )}
-      </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.BG }}>
+      <Header
+        title={group?.name || "Group"}
+        showBack
+        onBack={() => navigation.goBack()}
+        rightIcon={isAdmin ? "edit-3" : undefined}
+        onRightPress={isAdmin ? handleEditGroup : undefined}
+      />
 
-      {/* Group Info Card */}
-      <View style={{ 
-        backgroundColor: CARD_BG, 
-        margin: 20, 
-        borderRadius: 16, 
-        padding: 20 
-      }}>
-        <Text style={{ 
-          color: TEXT_MAIN, 
-          fontSize: 20, 
-          fontWeight: 'bold', 
-          marginBottom: 16 
-        }}>
-          Group Information
+      {/* Group Info Row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 28, marginHorizontal: 18, marginBottom: 4 }}>
+        <Text style={{ color: COLORS.TEXT_MAIN, fontSize: 28, fontWeight: '900', flex: 1, letterSpacing: 0.2 }} numberOfLines={1}>
+          {group?.name || 'Group'}
         </Text>
-        
-        <View style={{ marginBottom: 16 }}>
-          <Text style={{ color: TEXT_SECONDARY, fontSize: 14, marginBottom: 4 }}>
-            Group Code
-          </Text>
-          <View style={{ 
-            flexDirection: 'row', 
-            alignItems: 'center',
-            backgroundColor: INPUT_BG,
-            borderRadius: 8,
-            padding: 12
-          }}>
-            <Text style={{ 
-              color: TEXT_MAIN, 
-              fontSize: 16, 
-              fontWeight: 'bold',
-              flex: 1
-            }}>
-              {group.shortCode}
-            </Text>
-            <TouchableOpacity onPress={handleCopyCode}>
-              <Feather name="copy" size={20} color={ACCENT} />
-            </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 12 }}>
+          <View style={{ backgroundColor: '#f3f3f3', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6, marginRight: 6, borderWidth: 1, borderColor: '#111' }}>
+            <Text style={{ color: '#111', fontSize: 16, fontWeight: 'bold', letterSpacing: 1 }}>{group.shortCode}</Text>
           </View>
+          <Pressable onPress={handleCopyCode} style={{ padding: 4 }}>
+            <Feather name="copy" size={18} color={COLORS.ACCENT} />
+          </Pressable>
         </View>
-        
-        <View style={{ marginBottom: 16 }}>
-          <Text style={{ color: TEXT_SECONDARY, fontSize: 14, marginBottom: 4 }}>
-            Created
-          </Text>
-          <Text style={{ color: TEXT_MAIN, fontSize: 16 }}>
-            {new Date(group.createdAt).toLocaleDateString()}
-          </Text>
-        </View>
-        
-        <View style={{ marginBottom: 16 }}>
-          <Text style={{ color: TEXT_SECONDARY, fontSize: 14, marginBottom: 4 }}>
-            Members
-          </Text>
-          <Text style={{ color: TEXT_MAIN, fontSize: 16 }}>
-            {members.length} member{members.length !== 1 ? 's' : ''}
+      </View>
+      {/* Admin-only delete button for testing */}
+      {isAdmin && (
+        <AppButton
+          title="Delete Group"
+          onPress={handleDeleteGroup}
+          style={{ backgroundColor: COLORS.ERROR, marginHorizontal: 18, marginBottom: 10 }}
+          textStyle={{ color: COLORS.BG }}
+        />
+      )}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 18, marginBottom: 14 }}>
+        <View style={{ backgroundColor: '#f3f3f3', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#111' }}>
+          <Text style={{ color: '#111', fontSize: 13 }}>
+            Created: <Text style={{ color: '#111', fontWeight: 'bold' }}>{new Date(group.createdAt).toLocaleDateString()}</Text>
           </Text>
         </View>
-        
-        {isAdmin && (
-          <TouchableOpacity 
-            onPress={handleDeleteGroup}
-            style={{ 
-              backgroundColor: DANGER + '20',
-              padding: 12,
-              borderRadius: 8,
-              alignItems: 'center',
-              marginTop: 8
-            }}
-          >
-            <Text style={{ color: DANGER, fontWeight: 'bold' }}>
-              Delete Group
-            </Text>
-          </TouchableOpacity>
-        )}
+      </View>
+      <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: 18, marginBottom: 10 }} />
+
+      {/* Members Section Header */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 18, marginBottom: 10, paddingHorizontal: 22 }}>
+        <Text style={{ color: COLORS.TEXT_MAIN, fontSize: 18, fontWeight: 'bold', flex: 1, letterSpacing: 0.2 }}>Members ({members.length})</Text>
       </View>
 
       {/* Members List */}
-      <View style={{ flex: 1, paddingHorizontal: 20 }}>
-        <Text style={{ 
-          color: TEXT_MAIN, 
-          fontSize: 18, 
-          fontWeight: 'bold', 
-          marginBottom: 16 
-        }}>
-          Members
-        </Text>
-        
+      <View style={{ flex: 1, paddingHorizontal: 8 }}>
         <FlatList
           data={members}
           keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingBottom: 40 }}
           renderItem={({ item }) => (
-            <View style={{ 
-              flexDirection: 'row', 
-              alignItems: 'center',
-              backgroundColor: CARD_BG,
-              padding: 16,
-              borderRadius: 12,
-              marginBottom: 8
-            }}>
-              <View style={{ 
-                width: 40, 
-                height: 40, 
-                borderRadius: 20, 
-                backgroundColor: ACCENT + '20',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginRight: 12
-              }}>
-                <Text style={{ color: ACCENT, fontWeight: 'bold', fontSize: 16 }}>
-                  {item.name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
+            <Pressable
+              onPress={() => isAdmin && item.id !== currentUserId ? handleRemoveMember(item.id, item.name) : undefined}
+              style={({ pressed }) => ([
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: COLORS.CARD_BG,
+                  paddingVertical: 16,
+                  paddingHorizontal: 18,
+                  borderRadius: 14,
+                  marginBottom: 12,
+                  shadowColor: '#000',
+                  shadowOpacity: 0.06,
+                  shadowRadius: 6,
+                  shadowOffset: { width: 0, height: 2 },
+                  elevation: 2,
+                  opacity: pressed ? 0.85 : 1,
+                }
+              ])}
+            >
               <View style={{ flex: 1 }}>
-                <Text style={{ color: TEXT_MAIN, fontWeight: 'bold', fontSize: 16 }}>
-                  {item.name}
-                  {item.id === currentUserId && ' (You)'}
+                <Text style={{ color: COLORS.TEXT_MAIN, fontWeight: 'bold', fontSize: 16, marginBottom: 2 }}>
+                  {item.name}{item.id === currentUserId && ' (You)'}
                 </Text>
-                <Text style={{ color: TEXT_SECONDARY, fontSize: 14 }}>
-                  {item.role.charAt(0).toUpperCase() + item.role.slice(1)} • Joined {new Date(item.joinedAt).toLocaleDateString()}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                  <Text style={{ color: COLORS.TEXT_SECONDARY, fontSize: 12, marginRight: 10 }}>
+                    Joined {new Date(item.joinedAt).toLocaleDateString()}
+                  </Text>
+                  {item.role === 'admin' && (
+                    <View style={{ backgroundColor: '#f3f3f3', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3, marginLeft: 2, borderWidth: 1, borderColor: COLORS.ACCENT }}>
+                      <Text style={{ color: '#111', fontSize: 12, fontWeight: 'bold', letterSpacing: 0.5 }}>Admin</Text>
+                    </View>
+                  )}
+                  {item.role === 'member' && (
+                    <View style={{ backgroundColor: '#f3f3f3', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3, marginLeft: 2, borderWidth: 1, borderColor: '#bbb' }}>
+                      <Text style={{ color: '#111', fontSize: 12, fontWeight: 'bold', letterSpacing: 0.5 }}>Member</Text>
+                    </View>
+                  )}
+                </View>
               </View>
               {isAdmin && item.id !== currentUserId && (
-                <TouchableOpacity 
-                  onPress={() => handleRemoveMember(item.id, item.name)}
-                  style={{ 
-                    backgroundColor: DANGER + '20',
-                    borderRadius: 8,
-                    padding: 8
-                  }}
-                >
-                  <Feather name="user-x" size={18} color={DANGER} />
-                </TouchableOpacity>
-              )}
-              {item.role === 'admin' && (
-                <View style={{ 
-                  backgroundColor: ACCENT + '20',
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 8,
-                  marginLeft: 8
-                }}>
-                  <Text style={{ color: ACCENT, fontSize: 12, fontWeight: 'bold' }}>Admin</Text>
+                <View style={{ marginLeft: 10 }}>
+                  <Feather name="user-x" size={18} color={COLORS.ERROR} />
                 </View>
               )}
-            </View>
+            </Pressable>
           )}
           ListEmptyComponent={
-            <Text style={{ color: TEXT_SECONDARY, textAlign: 'center', marginTop: 20 }}>
+            <Text style={{ color: COLORS.TEXT_SECONDARY, textAlign: 'center', marginTop: 20 }}>
               No members found
             </Text>
           }
@@ -407,7 +325,7 @@ export default function GroupDetails() {
           alignItems: 'center' 
         }}>
           <View style={{ 
-            backgroundColor: CARD_BG, 
+            backgroundColor: COLORS.CARD_BG, 
             borderRadius: 20, 
             padding: 24, 
             width: '85%',
@@ -417,67 +335,42 @@ export default function GroupDetails() {
             <Text style={{ 
               fontWeight: 'bold', 
               fontSize: 20, 
-              color: TEXT_MAIN, 
+              color: COLORS.TEXT_MAIN, 
               textAlign: 'center',
               marginBottom: 24 
             }}>
               Edit Group Name
             </Text>
 
-            <Text style={{ fontWeight: 'bold', fontSize: 15, color: TEXT_MAIN, marginBottom: 12 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 15, color: COLORS.TEXT_MAIN, marginBottom: 12 }}>
               Group Name
             </Text>
-            <TextInput
+            <AppInput
               value={editGroupName}
               onChangeText={setEditGroupName}
-              placeholder="Enter new group name"
-              placeholderTextColor={TEXT_SECONDARY}
-              style={{ 
-                backgroundColor: INPUT_BG,
-                borderRadius: 12,
-                padding: 16,
-                fontSize: 15,
-                marginBottom: 24,
-                color: TEXT_MAIN,
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.05)'
-              }}
-              autoFocus
+              placeholder="Edit Group Name"
+              style={{ marginBottom: 16 }}
             />
 
-            <TouchableOpacity 
+            <AppButton
+              title={actionLoading ? "Updating..." : "Update Name"}
               onPress={handleUpdateGroupName}
-              disabled={actionLoading} 
-              style={{ 
-                backgroundColor: actionLoading ? TEXT_SECONDARY : ACCENT,
-                borderRadius: 12,
-                paddingVertical: 16,
-                alignItems: 'center',
-                marginBottom: 12,
-                opacity: actionLoading ? 0.7 : 1
-              }}
-            >
-              <Text style={{ color: BG, fontWeight: 'bold', fontSize: 16 }}>
-                {actionLoading ? 'Updating...' : 'Update Group Name'}
-              </Text>
-            </TouchableOpacity>
+              loading={actionLoading}
+              style={{ marginBottom: 16 }}
+            />
 
-            <TouchableOpacity 
+            <Pressable
               onPress={() => {
                 setEditModalVisible(false);
                 setEditGroupName("");
-              }} 
-              disabled={actionLoading}
-              style={{ 
-                alignItems: 'center',
-                padding: 12,
-                opacity: actionLoading ? 0.5 : 1
               }}
+              disabled={actionLoading}
+              style={{ alignItems: 'center', padding: 12, opacity: actionLoading ? 0.5 : 1 }}
             >
-              <Text style={{ color: TEXT_SECONDARY, fontWeight: 'bold' }}>
+              <Text style={{ color: COLORS.TEXT_SECONDARY, fontWeight: 'bold' }}>
                 {actionLoading ? 'Please wait...' : 'Cancel'}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -491,7 +384,7 @@ export default function GroupDetails() {
           alignItems: 'center' 
         }}>
           <View style={{ 
-            backgroundColor: CARD_BG, 
+            backgroundColor: COLORS.CARD_BG, 
             borderRadius: 20, 
             padding: 24, 
             width: '85%',
@@ -501,7 +394,7 @@ export default function GroupDetails() {
             <Text style={{ 
               fontWeight: 'bold', 
               fontSize: 20, 
-              color: TEXT_MAIN, 
+              color: COLORS.TEXT_MAIN, 
               textAlign: 'center',
               marginBottom: 16 
             }}>
@@ -510,44 +403,31 @@ export default function GroupDetails() {
 
             <Text style={{ 
               fontSize: 16, 
-              color: TEXT_SECONDARY, 
+              color: COLORS.TEXT_SECONDARY, 
               textAlign: 'center',
               marginBottom: 24,
               lineHeight: 22
             }}>
-              Are you sure you want to delete "{group?.name}"? This action cannot be undone and will remove all members from the group.
+              Are you sure you want to delete &quot;{group?.name}&quot;? This action cannot be undone and will remove all members from the group.
             </Text>
 
-            <TouchableOpacity 
+            <AppButton
+              title={actionLoading ? "Deleting..." : "Delete Group"}
               onPress={confirmDeleteGroup}
-              disabled={actionLoading} 
-              style={{ 
-                backgroundColor: actionLoading ? 'rgba(239, 68, 68, 0.5)' : DANGER,
-                borderRadius: 12,
-                paddingVertical: 16,
-                alignItems: 'center',
-                marginBottom: 12,
-                opacity: actionLoading ? 0.7 : 1
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
-                {actionLoading ? 'Deleting...' : 'Delete Group'}
-              </Text>
-            </TouchableOpacity>
+              loading={actionLoading}
+              style={{ backgroundColor: COLORS.ERROR, marginBottom: 16 }}
+              textStyle={{ color: COLORS.BG }}
+            />
 
-            <TouchableOpacity 
-              onPress={() => setDeleteModalVisible(false)} 
+            <Pressable
+              onPress={() => setDeleteModalVisible(false)}
               disabled={actionLoading}
-              style={{ 
-                alignItems: 'center',
-                padding: 12,
-                opacity: actionLoading ? 0.5 : 1
-              }}
+              style={{ alignItems: 'center', padding: 12, opacity: actionLoading ? 0.5 : 1 }}
             >
-              <Text style={{ color: TEXT_SECONDARY, fontWeight: 'bold' }}>
+              <Text style={{ color: COLORS.TEXT_SECONDARY, fontWeight: 'bold' }}>
                 {actionLoading ? 'Please wait...' : 'Cancel'}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
       </Modal>

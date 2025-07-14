@@ -2,6 +2,8 @@ import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React from "react";
 import { ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import AppButton from "../../components/common/AppButton";
+import { COLORS } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 
 export default function PersonalInfo() {
@@ -39,6 +41,9 @@ export default function PersonalInfo() {
       </View>
     );
   }
+
+  const BG = COLORS.BG;
+  const TEXT_MAIN = COLORS.TEXT_MAIN;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0f0f0f' }}>
@@ -110,28 +115,11 @@ export default function PersonalInfo() {
         </View>
         
         {/* Sign Out */}
-        <TouchableOpacity
+        <AppButton
+          title="Logout"
           onPress={logout}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingVertical: 16,
-            paddingHorizontal: 20,
-            backgroundColor: '#1a1a1a',
-            borderRadius: 16,
-            marginBottom: 40,
-          }}
-          activeOpacity={0.7}
-        >
-          <Feather name="log-out" size={20} color="#ef4444" style={{ marginRight: 16 }} />
-          <Text style={{ 
-            color: '#ef4444', 
-            fontSize: 16, 
-            flex: 1,
-          }}>
-            Sign Out
-          </Text>
-        </TouchableOpacity>
+          style={{ marginTop: 32 }}
+        />
       </ScrollView>
     </View>
   );

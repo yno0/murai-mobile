@@ -1,13 +1,16 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
 import React, { useState } from "react";
-import { Image, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Image, Text, View } from "react-native";
+import AppButton from "../../components/common/AppButton";
+import AppInput from "../../components/common/AppInput";
+import { COLORS } from "../../constants/theme";
 
-const BG = "#0f0f0f";
-const CARD_BG = "#1a1a1a";
-const ACCENT = "#34d399";
-const TEXT = "#ffffff";
-const SUBTLE = "#666666";
+const BG = COLORS.BG;
+const CARD_BG = COLORS.CARD_BG;
+const ACCENT = COLORS.ACCENT;
+const TEXT = COLORS.TEXT_MAIN;
+const SUBTLE = COLORS.SUBTLE;
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -43,57 +46,30 @@ export default function Login() {
         }}
       >
         <View style={{ gap: 16 }}>
-          <View>
-            <Text style={{ color: SUBTLE, marginBottom: 8 }}>Email</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Enter your email"
-              placeholderTextColor={SUBTLE}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              style={{
-                backgroundColor: `${BG}cc`,
-                borderRadius: 8,
-                padding: 12,
-                color: TEXT,
-              }}
-            />
-          </View>
+          <AppInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Enter your email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={{ marginBottom: 16 }}
+          />
 
-          <View>
-            <Text style={{ color: SUBTLE, marginBottom: 8 }}>Password</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Enter your password"
-              placeholderTextColor={SUBTLE}
-              secureTextEntry
-              style={{
-                backgroundColor: `${BG}cc`,
-                borderRadius: 8,
-                padding: 12,
-                color: TEXT,
-              }}
-            />
-          </View>
+          <AppInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Enter your password"
+            secureTextEntry
+            style={{ marginBottom: 16 }}
+          />
         </View>
       </LinearGradient>
 
-      <TouchableOpacity
+      <AppButton
+        title="Sign In"
         onPress={handleLogin}
-        style={{
-          backgroundColor: ACCENT,
-          borderRadius: 8,
-          padding: 16,
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <Text style={{ color: BG, fontWeight: "bold", fontSize: 16 }}>
-          Sign In
-        </Text>
-      </TouchableOpacity>
+        style={{ marginBottom: 16 }}
+      />
 
       <View
         style={{

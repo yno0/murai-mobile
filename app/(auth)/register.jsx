@@ -1,15 +1,18 @@
 import { Link } from "expo-router";
 import React, { useState } from "react";
-import { ActivityIndicator, Image, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Image, StatusBar, Text, View } from "react-native";
+import AppButton from "../components/common/AppButton";
+import AppInput from "../components/common/AppInput";
+import { COLORS } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 
-const BG = "#0f0f0f";
-const CARD_BG = "#1a1a1a";
-const ACCENT = "#34d399";
-const TEXT = "#ffffff";
-const SUBTLE = "#9ca3af";
-const ERROR = "#ef4444";
-const WARNING = "#f59e0b";
+const BG = COLORS.BG;
+const CARD_BG = COLORS.CARD_BG;
+const ACCENT = COLORS.ACCENT;
+const TEXT = COLORS.TEXT_MAIN;
+const SUBTLE = COLORS.SUBTLE;
+const ERROR = COLORS.ERROR;
+const WARNING = COLORS.WARNING;
 
 export default function Register() {
   const { register } = useAuth();
@@ -43,11 +46,11 @@ export default function Register() {
       setLoading(true);
       await register(email, password, name);
     } catch (err) {
-      // Handle specific Appwrite error codes
-      if (err.code === 400) {
-        setError("Invalid email or password format");
-      } else if (err.code === 409) {
+      // Handle backend error codes
+      if (err.code === 400 && err.message?.toLowerCase().includes('exists')) {
         setError("An account with this email already exists");
+      } else if (err.code === 400) {
+        setError("Invalid registration details");
       } else if (err.message) {
         setError(err.message);
       } else {
@@ -97,98 +100,29 @@ export default function Register() {
       {/* Form Section */}
       <View style={{ flex: 1, paddingHorizontal: 24 }}>
         <View style={{ gap: 20, marginBottom: 24 }}>
-          <View>
-            <Text style={{ 
-              color: SUBTLE, 
-              marginBottom: 8,
-              fontSize: 14,
-              fontWeight: '500'
-            }}>
-              Full Name
-            </Text>
-            <TextInput
-              value={name}
-              onChangeText={(text) => {
-                setName(text);
-                setError("");
-              }}
-              placeholder="Enter your full name"
-              placeholderTextColor={`${SUBTLE}80`}
-              style={{
-                backgroundColor: CARD_BG,
-                borderRadius: 12,
-                padding: 16,
-                color: TEXT,
-                fontSize: 16,
-                borderWidth: 1,
-                borderColor: `${SUBTLE}30`,
-              }}
-              autoCapitalize="words"
-            />
-          </View>
+          <AppInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Enter your name"
+            style={{ marginBottom: 16 }}
+          />
 
-          <View>
-            <Text style={{ 
-              color: SUBTLE, 
-              marginBottom: 8,
-              fontSize: 14,
-              fontWeight: '500'
-            }}>
-              Email Address
-            </Text>
-            <TextInput
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text.toLowerCase());
-                setError("");
-              }}
-              placeholder="Enter your email"
-              placeholderTextColor={`${SUBTLE}80`}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              style={{
-                backgroundColor: CARD_BG,
-                borderRadius: 12,
-                padding: 16,
-                color: TEXT,
-                fontSize: 16,
-                borderWidth: 1,
-                borderColor: `${SUBTLE}30`,
-              }}
-            />
-          </View>
+          <AppInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Enter your email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={{ marginBottom: 16 }}
+          />
 
-          <View>
-            <Text style={{ 
-              color: SUBTLE, 
-              marginBottom: 8,
-              fontSize: 14,
-              fontWeight: '500'
-            }}>
-              Password
-            </Text>
-            <TextInput
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                setError("");
-              }}
-              placeholder="Choose a strong password (min. 8 characters)"
-              placeholderTextColor={`${SUBTLE}80`}
-              secureTextEntry
-              autoComplete="new-password"
-              style={{
-                backgroundColor: CARD_BG,
-                borderRadius: 12,
-                padding: 16,
-                color: TEXT,
-                fontSize: 16,
-                borderWidth: 1,
-                borderColor: `${SUBTLE}30`,
-              }}
-            />
-          </View>
+          <AppInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Enter your password"
+            secureTextEntry
+            style={{ marginBottom: 16 }}
+          />
 
           {error ? (
             <View style={{ 
@@ -210,37 +144,12 @@ export default function Register() {
         </View>
 
         {/* Create Account Button */}
-        <TouchableOpacity
+        <AppButton
+          title={loading ? "Signing Up..." : "Sign Up"}
           onPress={handleRegister}
-          disabled={loading}
-          style={{
-            backgroundColor: ACCENT,
-            borderRadius: 12,
-            padding: 18,
-            alignItems: "center",
-            marginBottom: 24,
-            opacity: loading ? 0.7 : 1,
-            shadowColor: ACCENT,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            elevation: 6,
-          }}
-          activeOpacity={0.8}
-        >
-          {loading ? (
-            <ActivityIndicator color={BG} size="small" />
-          ) : (
-            <Text style={{ 
-              color: BG, 
-              fontWeight: "600", 
-              fontSize: 16,
-              letterSpacing: 0.5
-            }}>
-              Create Account
-            </Text>
-          )}
-        </TouchableOpacity>
+          loading={loading}
+          style={{ marginBottom: 16 }}
+        />
 
         {/* Sign In Link */}
         <View

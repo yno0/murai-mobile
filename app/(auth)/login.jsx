@@ -1,16 +1,19 @@
 import { Link, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Image, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Image, StatusBar, Text, View } from "react-native";
+import AppButton from "../components/common/AppButton";
+import AppInput from "../components/common/AppInput";
+import { COLORS } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 
 
-const BG = "#0f0f0f";
-const CARD_BG = "#1a1a1a";
-const ACCENT = "#34d399";
-const TEXT = "#ffffff";
-const SUBTLE = "#9ca3af";
-const ERROR = "#ef4444";
-const WARNING = "#f59e0b";
+const BG = COLORS.BG;
+const CARD_BG = COLORS.CARD_BG;
+const ACCENT = COLORS.ACCENT;
+const TEXT = COLORS.TEXT_MAIN;
+const SUBTLE = COLORS.SUBTLE;
+const ERROR = COLORS.ERROR;
+const WARNING = COLORS.WARNING;
 
 // Cooldown time in seconds
 const RATE_LIMIT_COOLDOWN = 60;
@@ -141,72 +144,22 @@ export default function Login() {
       {/* Form Section */}
       <View style={{ flex: 1, paddingHorizontal: 24 }}>
         <View style={{ gap: 20, marginBottom: 24 }}>
-          <View>
-            <Text style={{ 
-              color: SUBTLE, 
-              marginBottom: 8,
-              fontSize: 14,
-              fontWeight: '500'
-            }}>
-              Email Address
-            </Text>
-            <TextInput
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text.toLowerCase());
-                setError("");
-              }}
-              placeholder="Enter your email"
-              placeholderTextColor={`${SUBTLE}80`}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              editable={!loading && cooldownTime === 0}
-              style={{
-                backgroundColor: CARD_BG,
-                borderRadius: 12,
-                padding: 16,
-                color: TEXT,
-                fontSize: 16,
-                opacity: (loading || cooldownTime > 0) ? 0.7 : 1,
-                borderWidth: 1,
-                borderColor: `${SUBTLE}30`,
-              }}
-            />
-          </View>
+          <AppInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Enter your email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={{ marginBottom: 16 }}
+          />
 
-          <View>
-            <Text style={{ 
-              color: SUBTLE, 
-              marginBottom: 8,
-              fontSize: 14,
-              fontWeight: '500'
-            }}>
-              Password
-            </Text>
-            <TextInput
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                setError("");
-              }}
-              placeholder="Enter your password"
-              placeholderTextColor={`${SUBTLE}80`}
-              secureTextEntry
-              autoComplete="password"
-              editable={!loading && cooldownTime === 0}
-              style={{
-                backgroundColor: CARD_BG,
-                borderRadius: 12,
-                padding: 16,
-                color: TEXT,
-                fontSize: 16,
-                opacity: (loading || cooldownTime > 0) ? 0.7 : 1,
-                borderWidth: 1,
-                borderColor: `${SUBTLE}30`,
-              }}
-            />
-          </View>
+          <AppInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Enter your password"
+            secureTextEntry
+            style={{ marginBottom: 16 }}
+          />
 
           {error ? (
             <View style={{ 
@@ -238,37 +191,13 @@ export default function Login() {
         </View>
 
         {/* Sign In Button */}
-        <TouchableOpacity
+        <AppButton
+          title={loading ? "Signing In..." : "Sign In"}
           onPress={handleLogin}
-          disabled={loading || cooldownTime > 0}
-          style={{
-            backgroundColor: ACCENT,
-            borderRadius: 12,
-            padding: 18,
-            alignItems: "center",
-            marginBottom: 24,
-            opacity: (loading || cooldownTime > 0) ? 0.7 : 1,
-            shadowColor: ACCENT,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            elevation: 6,
-          }}
-          activeOpacity={0.8}
-        >
-          {loading ? (
-            <ActivityIndicator color={BG} size="small" />
-          ) : (
-            <Text style={{ 
-              color: BG, 
-              fontWeight: "600", 
-              fontSize: 16,
-              letterSpacing: 0.5
-            }}>
-              {cooldownTime > 0 ? `Try again in ${cooldownTime}s` : "Sign In"}
-            </Text>
-          )}
-        </TouchableOpacity>
+          loading={loading}
+          style={{ marginBottom: 16 }}
+          disabled={cooldownTime > 0}
+        />
 
         {/* Sign Up Link */}
         <View

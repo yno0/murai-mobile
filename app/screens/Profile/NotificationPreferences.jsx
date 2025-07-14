@@ -1,7 +1,8 @@
-import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
-import { ScrollView, StatusBar, Switch, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StatusBar, Switch, Text, View } from "react-native";
+import Header from "../../components/common/Header";
+import { COLORS } from "../../constants/theme";
 
 export default function NotificationPreferences() {
   const navigation = useNavigation();
@@ -27,29 +28,14 @@ export default function NotificationPreferences() {
     { key: "marketingEmails", title: "Marketing Emails" },
   ];
 
+  const BG = COLORS.BG;
+  const TEXT_MAIN = COLORS.TEXT_MAIN;
+  const ACCENT = COLORS.ACCENT;
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#0f0f0f' }}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f0f0f" />
-      
-      {/* Header */}
-      <View style={{ paddingHorizontal: 24, paddingTop: 60, paddingBottom: 32 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()} 
-            style={{ marginRight: 16 }}
-            activeOpacity={0.7}
-          >
-            <Feather name="arrow-left" size={24} color="#34d399" />
-          </TouchableOpacity>
-          <Text style={{ 
-            color: 'white', 
-            fontSize: 20, 
-            fontWeight: '600',
-          }}>
-            Notifications
-          </Text>
-        </View>
-      </View>
+    <View style={{ flex: 1, backgroundColor: BG }}>
+      <StatusBar barStyle="light-content" backgroundColor={BG} />
+      <Header title="Notifications" showBack onBack={() => navigation.goBack()} />
 
       <ScrollView style={{ flex: 1, paddingHorizontal: 24 }} showsVerticalScrollIndicator={false}>
         <View style={{
@@ -72,7 +58,7 @@ export default function NotificationPreferences() {
               }}
             >
               <Text style={{ 
-                color: 'white', 
+                color: TEXT_MAIN, 
                 fontSize: 16, 
                 flex: 1,
               }}>
@@ -81,7 +67,7 @@ export default function NotificationPreferences() {
               <Switch
                 value={preferences[option.key]}
                 onValueChange={() => togglePreference(option.key)}
-                trackColor={{ false: "#404040", true: "#34d399" }}
+                trackColor={{ false: "#404040", true: ACCENT }}
                 thumbColor="#fff"
                 ios_backgroundColor="#404040"
               />

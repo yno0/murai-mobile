@@ -1,7 +1,10 @@
-import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
-import { Alert, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import AppButton from "../../components/common/AppButton";
+import AppInput from "../../components/common/AppInput";
+import Header from "../../components/common/Header";
+import { COLORS } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 
 
@@ -80,29 +83,16 @@ export default function AccountManagement() {
     );
   }
 
+  const BG = COLORS.BG;
+  const CARD_BG = COLORS.CARD_BG;
+  const ACCENT = COLORS.ACCENT;
+  const TEXT_MAIN = COLORS.TEXT_MAIN;
+  const TEXT_SECONDARY = COLORS.TEXT_SECONDARY;
+
   return (
     <View style={{ flex: 1, backgroundColor: '#0f0f0f' }}>
       <StatusBar barStyle="light-content" backgroundColor="#0f0f0f" />
-      
-      {/* Header */}
-      <View style={{ paddingHorizontal: 24, paddingTop: 60, paddingBottom: 32 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()} 
-            style={{ marginRight: 16 }}
-            activeOpacity={0.7}
-          >
-            <Feather name="arrow-left" size={24} color="#34d399" />
-          </TouchableOpacity>
-          <Text style={{ 
-            color: 'white', 
-            fontSize: 20, 
-            fontWeight: '600',
-          }}>
-            Account Management
-          </Text>
-        </View>
-      </View>
+      <Header title="Account Management" showBack onBack={() => navigation.goBack()} />
 
       <ScrollView style={{ flex: 1, paddingHorizontal: 24 }} showsVerticalScrollIndicator={false}>
         {/* Form Fields */}
@@ -112,36 +102,39 @@ export default function AccountManagement() {
           padding: 20,
           marginBottom: 24,
         }}>
-          {[
-            { key: 'firstName', label: 'First Name' },
-            { key: 'lastName', label: 'Last Name' },
-            { key: 'email', label: 'Email Address', keyboardType: 'email-address' },
-            { key: 'phone', label: 'Phone Number', keyboardType: 'phone-pad' },
-          ].map((field, index) => (
-            <View key={field.key} style={{ marginBottom: index < 3 ? 20 : 0 }}>
-              <Text style={{ 
-                color: '#9ca3af', 
-                fontSize: 14, 
-                marginBottom: 8,
-              }}>
-                {field.label}
-              </Text>
-              <TextInput
-                value={formData[field.key]}
-                onChangeText={(value) => handleInputChange(field.key, value)}
-                style={{
-                  backgroundColor: '#262626',
-                  color: 'white',
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  borderRadius: 8,
-                  fontSize: 16,
-                }}
-                placeholderTextColor="#6b7280"
-                keyboardType={field.keyboardType}
-              />
-            </View>
-          ))}
+          <AppInput
+            value={formData.firstName}
+            onChangeText={value => handleInputChange('firstName', value)}
+            placeholder="First Name"
+            style={{ marginBottom: 16 }}
+          />
+          <AppInput
+            value={formData.lastName}
+            onChangeText={value => handleInputChange('lastName', value)}
+            placeholder="Last Name"
+            style={{ marginBottom: 16 }}
+          />
+          <AppInput
+            value={formData.email}
+            onChangeText={value => handleInputChange('email', value)}
+            placeholder="Email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={{ marginBottom: 16 }}
+          />
+          <AppInput
+            value={formData.phone}
+            onChangeText={value => handleInputChange('phone', value)}
+            placeholder="Phone"
+            keyboardType="phone-pad"
+            style={{ marginBottom: 16 }}
+          />
+          <AppButton
+            title={saving ? "Saving..." : "Save Changes"}
+            onPress={handleSave}
+            loading={saving}
+            style={{ marginTop: 16 }}
+          />
         </View>
 
         {/* Action Buttons */}

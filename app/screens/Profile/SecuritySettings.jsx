@@ -1,7 +1,9 @@
-import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
-import { ScrollView, StatusBar, Switch, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StatusBar, Switch, Text, View } from "react-native";
+import AppButton from "../../components/common/AppButton";
+import Header from "../../components/common/Header";
+import { COLORS } from "../../constants/theme";
 
 export default function SecuritySettings() {
   const navigation = useNavigation();
@@ -34,29 +36,14 @@ export default function SecuritySettings() {
     { title: "Security Log", icon: "file-text" },
   ];
 
+  const BG = COLORS.BG;
+  const TEXT_MAIN = COLORS.TEXT_MAIN;
+  const ACCENT = COLORS.ACCENT;
+
   return (
     <View style={{ flex: 1, backgroundColor: '#0f0f0f' }}>
       <StatusBar barStyle="light-content" backgroundColor="#0f0f0f" />
-      
-      {/* Header */}
-      <View style={{ paddingHorizontal: 24, paddingTop: 60, paddingBottom: 32 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()} 
-            style={{ marginRight: 16 }}
-            activeOpacity={0.7}
-          >
-            <Feather name="arrow-left" size={24} color="#34d399" />
-          </TouchableOpacity>
-          <Text style={{ 
-            color: 'white', 
-            fontSize: 20, 
-            fontWeight: '600',
-          }}>
-            Security Settings
-          </Text>
-        </View>
-      </View>
+      <Header title="Security Settings" showBack onBack={() => navigation.goBack()} />
 
       <ScrollView style={{ flex: 1, paddingHorizontal: 24 }} showsVerticalScrollIndicator={false}>
         {/* Security Options */}
@@ -123,29 +110,13 @@ export default function SecuritySettings() {
           overflow: 'hidden',
           marginBottom: 40,
         }}>
-          {actionItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: 16,
-                paddingHorizontal: 20,
-                borderBottomWidth: index < actionItems.length - 1 ? 1 : 0,
-                borderBottomColor: '#262626',
-              }}
-              activeOpacity={0.7}
-            >
-              <Feather name={item.icon} size={20} color="#9ca3af" style={{ marginRight: 16 }} />
-              <Text style={{ 
-                color: 'white', 
-                fontSize: 16, 
-                flex: 1,
-              }}>
-                {item.title}
-              </Text>
-              <Feather name="chevron-right" size={16} color="#666" />
-            </TouchableOpacity>
+          {actionItems.map((item, idx) => (
+            <AppButton
+              key={item.title}
+              title={item.title}
+              onPress={() => {}}
+              style={{ marginBottom: 12 }}
+            />
           ))}
         </View>
       </ScrollView>

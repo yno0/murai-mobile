@@ -1,27 +1,29 @@
 import { Feather } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Dimensions,
-    PanResponder,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Animated,
+  Dimensions,
+  PanResponder,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
+import { COLORS } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 
-const BG = "#0f0f0f";
-const CARD_BG = "#1a1a1a";
-const ACCENT = "#34d399";
-const TEXT_MAIN = "#fff";
-const TEXT_SECONDARY = "#a0a0a0";
+const BG = COLORS.BG;
+const CARD_BG = COLORS.CARD_BG;
+const ACCENT = COLORS.ACCENT;
+const TEXT_MAIN = COLORS.TEXT_MAIN;
+const TEXT_SECONDARY = COLORS.TEXT_SECONDARY;
 const CIRCLE_OUTER = "rgba(52,211,153,0.12)";
 const CIRCLE_INNER = "rgba(52,211,153,0.22)";
 const GRAY_OUTER = "rgba(120,120,120,0.12)";
 const GRAY_INNER = "rgba(120,120,120,0.22)";
-const GRAY_BTN = "#444";
+const GRAY_BTN = COLORS.GRAY_BTN;
 const WIDTH = Dimensions.get('window').width;
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -60,8 +62,106 @@ const stats = {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  // Mock data
+  const navigation = useNavigation();
+  // Add state for actual user name
+  const [actualName, setActualName] = useState(user?.name || '');
   const [extensionEnabled, setExtensionEnabled] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [activeTime, setActiveTime] = useState('0h 0m');
+
+  useEffect(() => {
+    // Fetch user info from backend if token exists
+    const fetchUserInfo = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token || !user?.email) return;
+        const response = await fetch(`http://localhost:3000/api/users/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setActualName(data.name || user.email || 'User');
+        } else {
+          setActualName(user.email || 'User');
+        }
+      } catch (e) {
+        setActualName(user.email || 'User');
+      }
+    };
+    fetchUserInfo();
+  }, [user]);
+
+  // Start session and fetch active time on mount
+  useEffect(() => {
+    const startSessionAndFetchTime = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        // Start a new session
+        await fetch(`http://localhost:3000/api/users/start-session`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        // Fetch current active time
+        const response = await fetch(`http://localhost:3000/api/users/active-time`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setActiveTime(data.totalActiveTime);
+        }
+      } catch (e) {
+        console.error('Failed to start session or fetch active time:', e);
+      }
+    };
+    startSessionAndFetchTime();
+  }, []);
+
+  // Update active time every minute
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        const response = await fetch(`http://localhost:3000/api/users/active-time`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setActiveTime(data.totalActiveTime);
+        }
+      } catch (e) {
+        console.error('Failed to update active time:', e);
+      }
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch extension status on mount
+  useEffect(() => {
+    const fetchExtensionStatus = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const response = await fetch(`http://localhost:3000/api/users/preferences`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setExtensionEnabled(data.extensionEnabled ?? true);
+        }
+      } catch (e) {
+        console.error('Failed to fetch extension status:', e);
+      }
+    };
+    fetchExtensionStatus();
+  }, []);
+
+  // Mock data
   const analytics = {
     detectedText: 12,
     detectedSites: 5,
@@ -195,7 +295,12 @@ export default function Dashboard() {
   const powerIconColor = TEXT_MAIN;
 
   // Handle power button press with animation
-  const handlePowerPress = () => {
+  const handlePowerPress = async () => {
+    if (loading) return;
+    
+    setLoading(true);
+    const newStatus = !extensionEnabled;
+    
     Animated.sequence([
       Animated.timing(pulseAnim, {
         toValue: 0.95,
@@ -209,7 +314,33 @@ export default function Dashboard() {
       }),
     ]).start();
 
-    setExtensionEnabled(prev => !prev);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+      
+      const response = await fetch(`http://localhost:3000/api/users/preferences`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          extensionEnabled: newStatus,
+        })
+      });
+      
+      if (response.ok) {
+        setExtensionEnabled(newStatus);
+      } else {
+        throw new Error('Failed to update extension status');
+      }
+    } catch (error) {
+      console.error('Failed to toggle extension:', error);
+      // Revert the UI state if the backend update failed
+      setExtensionEnabled(extensionEnabled);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Get time of day for greeting
@@ -226,20 +357,14 @@ export default function Dashboard() {
     return `Good ${timeOfDay}`;
   };
 
+  // Quick Action handlers
+  const handleCreateGroup = () => navigation.navigate('Group', { screen: 'CreateGroup' });
+  const handleInviteMember = () => navigation.navigate('Group', { screen: 'CreateGroup', params: { openJoin: true } });
+  const handleConfigure = () => navigation.navigate('Extension', { screen: 'ConfigurationPanel' });
+
   return (
     <View style={styles.container}>
       <View style={styles.mainContent}>
-        {/* Top Bar */}
-        <View style={styles.topBar}>
-          <View style={styles.topBarLeft}>
-            <Feather name="shield" size={18} color={extensionEnabled ? ACCENT : TEXT_SECONDARY} />
-            <Text style={styles.topBarText}>{extensionEnabled ? 'Protection Active' : 'Protection Off'}</Text>
-          </View>
-          <TouchableOpacity style={styles.topBarButton}>
-            <Feather name="bell" size={18} color={TEXT_SECONDARY} />
-          </TouchableOpacity>
-        </View>
-
         <ScrollView 
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
@@ -248,10 +373,10 @@ export default function Dashboard() {
           {/* Greeting Section */}
           <View style={styles.greetingContainer}>
             <Text style={styles.timeGreeting}>{getGreeting()}</Text>
-            <Text style={styles.userName}>{user?.name || 'User'}</Text>
+            <Text style={styles.userName}>{actualName || 'User'}</Text>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.activeTime}</Text>
+                <Text style={styles.statValue}>{activeTime}</Text>
                 <Text style={styles.statLabel}>Active Time</Text>
               </View>
               <View style={styles.statDivider} />
@@ -338,19 +463,19 @@ export default function Dashboard() {
               
               <Text style={styles.sectionTitle}>Quick Actions</Text>
               <View style={styles.quickActionsGrid}>
-                <TouchableOpacity style={styles.actionButton}>
+                <TouchableOpacity style={styles.actionButton} onPress={handleCreateGroup}>
                   <View style={styles.actionIcon}>
                     <Feather name="users" size={20} color={ACCENT} />
               </View>
                   <Text style={styles.actionText}>Create Group</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton}>
+                <TouchableOpacity style={styles.actionButton} onPress={handleInviteMember}>
                   <View style={styles.actionIcon}>
                     <Feather name="user-plus" size={20} color={ACCENT} />
                     </View>
                   <Text style={styles.actionText}>Invite Member</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton}>
+                <TouchableOpacity style={styles.actionButton} onPress={handleConfigure}>
                   <View style={styles.actionIcon}>
                     <Feather name="settings" size={20} color={ACCENT} />
                   </View>

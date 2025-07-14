@@ -27,20 +27,24 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const API_BASE_URL = 'http://localhost:3000/api'; // Adjust if needed
+
   const login = async (email, password) => {
     try {
-      // Mock login - replace with your own auth logic
-      const mockUser = {
-        $id: 'mock-user-id',
-        email: email,
-        name: 'Mock User',
-        // Add other user properties as needed
-      };
-      
-      // Store user in localStorage (or your preferred storage)
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      setUser(mockUser);
-      router.replace("/(app)");
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw { code: response.status, message: data.message || 'Login failed' };
+      }
+      // Store token and user info
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify({ email }));
+      setUser({ email });
+      router.replace('/(app)');
     } catch (error) {
       throw error;
     }
@@ -48,11 +52,17 @@ export function AuthProvider({ children }) {
 
   const register = async (email, password, name) => {
     try {
-      // Mock registration - replace with your own auth logic
-      console.log('Mock registration:', { email, password, name });
-      
-      // After registration, redirect to login page
-      router.replace("/(auth)/login");
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, confirmPassword: password })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw { code: response.status, message: data.message || 'Registration failed' };
+      }
+      // Registration step 1: OTP sent, redirect to login or OTP page
+      router.replace('/(auth)/login');
     } catch (error) {
       throw error;
     }
@@ -85,3 +95,5 @@ export function AuthProvider({ children }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
+
+export default AuthProvider;
