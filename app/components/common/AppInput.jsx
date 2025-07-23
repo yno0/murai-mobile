@@ -1,6 +1,6 @@
 import React from "react";
 import { TextInput } from "react-native";
-import { COLORS, FONT, SPACING } from "../../constants/theme";
+import { COLORS, globalStyles } from "../../constants/theme";
 
 export default function AppInput({
   value,
@@ -8,6 +8,8 @@ export default function AppInput({
   placeholder,
   secureTextEntry = false,
   style = {},
+  accessibilityLabel,
+  accessibilityHint,
   ...props
 }) {
   return (
@@ -15,16 +17,14 @@ export default function AppInput({
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
-      placeholderTextColor={COLORS.TEXT_SECONDARY}
+      placeholderTextColor={COLORS.TEXT_MUTED}
       secureTextEntry={secureTextEntry}
+      accessibilityRole="text"
+      accessibilityLabel={accessibilityLabel || placeholder}
+      accessibilityHint={accessibilityHint || `Enter your ${placeholder?.toLowerCase() || 'text'}`}
+      accessibilityState={{ disabled: props.editable === false }}
       style={[
-        {
-          backgroundColor: COLORS.INPUT_BG,
-          borderRadius: SPACING.sm,
-          padding: SPACING.md,
-          color: COLORS.TEXT_MAIN,
-          fontSize: FONT.regular,
-        },
+        globalStyles.input,
         style,
       ]}
       {...props}

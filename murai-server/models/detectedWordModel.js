@@ -29,6 +29,19 @@ const detectedWordSchema = new Schema({
         type: Number,
         required: true,
     },
+    patternType: {
+        type: String, // e.g. 'Profanity', 'Hate Speech', etc.
+    },
+    language: {
+        type: String, // e.g. 'English', 'Tagalog', etc.
+    },
+    severity: {
+        type: String,
+        enum: ['low', 'medium', 'high'],
+    },
+    siteType: {
+        type: String, // e.g. 'Social Media', 'Forum', etc.
+    },
     createdAt: {
         type: Date,
         default: Date.now,

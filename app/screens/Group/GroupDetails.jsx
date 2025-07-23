@@ -1,182 +1,125 @@
-import { Feather } from "@expo/vector-icons";
-import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
-import { Alert, Clipboard, FlatList, Modal, Pressable, SafeAreaView, Text, View } from "react-native";
-import AppButton from "../../components/common/AppButton";
-import AppInput from "../../components/common/AppInput";
-import Header from "../../components/common/Header";
-import { COLORS } from "../../constants/theme";
+import { useNavigation, useRoute } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Clipboard,
+  Dimensions,
+  FlatList,
+  Modal,
+  Platform,
+  ScrollView,
+  Share,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import Header from '../../components/common/Header';
+import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
 
+const { width } = Dimensions.get('window');
 
-export default function GroupDetails() {
+// Mock data for group details
+const MOCK_GROUP_DATA = {
+  id: '1',
+  name: 'Family Group',
+  shortCode: 'FAM123',
+  description: 'Family safety monitoring and content filtering',
+  memberCount: 5,
+  createdAt: 'March 15, 2024',
+  isAdmin: true,
+  members: [
+    { id: '1', name: 'John Doe', role: 'admin', joinedAt: 'March 15, 2024', status: 'online' },
+    { id: '2', name: 'Jane Smith', role: 'member', joinedAt: 'March 16, 2024', status: 'offline' },
+    { id: '3', name: 'Mike Johnson', role: 'member', joinedAt: 'March 17, 2024', status: 'online' },
+    { id: '4', name: 'Sarah Wilson', role: 'member', joinedAt: 'March 18, 2024', status: 'offline' },
+    { id: '5', name: 'Tom Brown', role: 'member', joinedAt: 'March 19, 2024', status: 'online' },
+  ],
+  recentActivity: [
+    { id: '1', type: 'detection', message: 'Profanity detected on Facebook', time: '2 hours ago' },
+    { id: '2', type: 'member', message: 'Sarah joined the group', time: '1 day ago' },
+    { id: '3', type: 'settings', message: 'Group settings updated', time: '3 days ago' },
+  ]
+};
+
+export default function GroupDetailsScreen() {
   const navigation = useNavigation();
   const route = useRoute();
+  const { user } = useAuth();
   const { groupId, groupName } = route.params || {};
-  const [members, setMembers] = useState([]);
+  const [groupData, setGroupData] = useState(null);
+  const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
-  const [group, setGroup] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState(null);
+  const [error, setError] = useState('');
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editGroupName, setEditGroupName] = useState("");
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [editGroupName, setEditGroupName] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [inviteModalVisible, setInviteModalVisible] = useState(false);
 
-  // Fix: pass groupData to checkCurrentUser and update admin logic
-  const checkCurrentUser = async (groupData) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      const res = await fetch('http://localhost:3000/api/users/me', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCurrentUserId(data.id || data._id || null);
-        // Find admin in group members
-        if (groupData && groupData.members) {
-          const admin = groupData.members.find(m => m.role === 'admin');
-          setIsAdmin(admin && (admin.id === (data.id || data._id)));
-        }
-      }
-    } catch (error) {
-      console.error('Error checking current user:', error);
+  // Helper to check if current user is admin
+  const isAdmin = groupData && user && (
+    (groupData.adminId && (groupData.adminId === user.id || groupData.adminId === user._id)) ||
+    (groupData.members && groupData.members.find(m => m.role === 'admin' && (m.id === user.id || m.id === user._id)))
+  );
+  console.log('user:', user);
+  console.log('groupData:', groupData);
+  console.log('isAdmin:', isAdmin);
+
+  useEffect(() => {
+    if (groupId) {
+      fetchGroupDetails(groupId);
     }
-  };
+  }, [groupId]);
 
-  const loadGroupDetails = async () => {
+  const fetchGroupDetails = async (id) => {
+    setLoading(true);
+    setError('');
     try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Not authenticated');
-      const response = await fetch(`http://localhost:3000/api/users/groups/${groupId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to load group details');
-      }
-      const groupData = await response.json();
-      setGroup(groupData);
-      setMembers(groupData.members || []);
-      checkCurrentUser(groupData);
-    } catch (error) {
-      console.error('Error loading group details:', error);
-      Alert.alert('Error', error.message || 'Failed to load group details');
+      const res = await api.get(`/users/groups/${id}`);
+      setGroupData(res.data);
+    } catch (err) {
+      setError('Failed to load group details');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (groupId) {
-      loadGroupDetails();
-    }
-  }, [groupId]);
-
-  const handleCopyCode = () => {
-    if (group?.shortCode) {
-      Clipboard.setString(group.shortCode);
-      Alert.alert('Copied!', 'Group code has been copied to clipboard.');
-    }
-  };
-
-  const handleEditGroup = () => {
-    setEditGroupName(group?.name || '');
-    setEditModalVisible(true);
-  };
-
-  const handleUpdateGroupName = async () => {
-    if (!editGroupName.trim()) {
-      Alert.alert('Error', 'Please enter a group name');
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Not authenticated');
-      const response = await fetch(`http://localhost:3000/api/users/groups/${groupId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: editGroupName.trim() })
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to update group name');
-      }
-      await loadGroupDetails();
-      setEditModalVisible(false);
-      setEditGroupName("");
-      Alert.alert('Success', 'Group name updated successfully!');
-    } catch (error) {
-      console.error('Error updating group name:', error);
-      Alert.alert('Update Failed', error.message || 'Failed to update group name.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDeleteGroup = () => {
-    setDeleteModalVisible(true);
-  };
-
-  const confirmDeleteGroup = async () => {
-    setActionLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Not authenticated');
-      const response = await fetch(`http://localhost:3000/api/users/groups/${groupId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to delete group');
-      }
-      setDeleteModalVisible(false);
-      navigation.navigate('CreateGroup');
-      setTimeout(() => {
-        Alert.alert('Success', 'Group deleted successfully!');
-      }, 100);
-    } catch (error) {
-      console.error('Error deleting group:', error);
-      setDeleteModalVisible(false);
-      Alert.alert('Delete Failed', error.message || 'Failed to delete group.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleRemoveMember = async (memberId, memberName) => {
+  const handleInviteMember = () => {
+    if (!groupData) return;
     Alert.alert(
-      'Remove Member',
-      `Are you sure you want to remove ${memberName} from the group?`,
+      'Invite Member',
+      `Share this code with someone to invite them to "${groupData.name}":\n\n${groupData.shortCode}`,
+      [
+        { text: 'Copy Code', onPress: () => console.log('Copy code') },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!groupData || !user) return;
+    Alert.alert(
+      'Leave Group',
+      `Are you sure you want to leave "${groupData.name}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Remove',
+          text: 'Leave',
           style: 'destructive',
           onPress: async () => {
             try {
-              const token = localStorage.getItem('token');
-              if (!token) throw new Error('Not authenticated');
-              const response = await fetch(`http://localhost:3000/api/users/groups/${groupId}/members/${memberId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-              });
-              if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || 'Failed to remove member');
-              }
-              setMembers(prev => prev.filter(member => member.id !== memberId));
-              Alert.alert('Success', `${memberName} has been removed from the group.`);
-            } catch (error) {
-              console.error('Error removing member:', error);
-              Alert.alert('Error', error.message || 'Failed to remove member from group.');
+              await api.delete(`/users/groups/${groupData.id}/members/${user.id}`);
+              navigation.goBack();
+            } catch (err) {
+              Alert.alert('Error', 'Failed to leave group');
             }
           }
         }
@@ -184,253 +127,893 @@ export default function GroupDetails() {
     );
   };
 
-  // Debug log for admin state
-  console.log('isAdmin:', isAdmin, 'currentUserId:', currentUserId, 'group:', group);
-
-  if (loading) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.BG }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: COLORS.TEXT_MAIN, fontSize: 16 }}>Loading...</Text>
-        </View>
-      </SafeAreaView>
+  const handleDeleteGroup = async () => {
+    if (!groupData) return;
+    Alert.alert(
+      'Delete Group',
+      `Are you sure you want to delete "${groupData.name}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/users/groups/${groupData.id}`);
+              navigation.goBack();
+            } catch (err) {
+              Alert.alert('Error', 'Failed to delete group');
+            }
+          }
+        }
+      ]
     );
-  }
+  };
 
-  if (!group) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.BG }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: COLORS.TEXT_MAIN, fontSize: 16 }}>Group not found</Text>
+  const openEditModal = () => {
+    setEditGroupName(groupData?.name || '');
+    setEditError('');
+    setEditModalVisible(true);
+  };
+
+  const handleEditGroup = async () => {
+    if (!editGroupName.trim()) {
+      setEditError('Group name cannot be empty');
+      return;
+    }
+    setEditLoading(true);
+    setEditError('');
+    try {
+      await api.put(`/users/groups/${groupData.id}`, { name: editGroupName.trim() });
+      setEditModalVisible(false);
+      fetchGroupDetails(groupData.id);
+    } catch (err) {
+      setEditError('Failed to update group name');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleCopyCode = (code) => {
+    if (!code) return;
+    Clipboard.setString(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
+
+  const handleShare = async (code) => {
+    if (!code) return;
+    try {
+      const result = await Share.share({
+        message: `Join my group on Murai! Use code: ${code} or click this link: https://yourapp.com/join/${code}`,
+        url: `https://yourapp.com/join/${code}`,
+        title: 'Join my group on Murai',
+      });
+    } catch (error) {
+      // Optionally handle error
+    }
+  };
+
+  const renderMemberItem = ({ item }) => (
+    <View style={styles.memberItem}>
+      <View style={styles.memberInfo}>
+        <View style={styles.memberAvatar}>
+          <Text style={styles.memberInitial}>{item.name.charAt(0)}</Text>
         </View>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.BG }}>
-      <Header
-        title={group?.name || "Group"}
-        showBack
-        onBack={() => navigation.goBack()}
-        rightIcon={isAdmin ? "edit-3" : undefined}
-        onRightPress={isAdmin ? handleEditGroup : undefined}
-      />
-
-      {/* Group Info Row */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 28, marginHorizontal: 18, marginBottom: 4 }}>
-        <Text style={{ color: COLORS.TEXT_MAIN, fontSize: 28, fontWeight: '900', flex: 1, letterSpacing: 0.2 }} numberOfLines={1}>
-          {group?.name || 'Group'}
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 12 }}>
-          <View style={{ backgroundColor: '#f3f3f3', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6, marginRight: 6, borderWidth: 1, borderColor: '#111' }}>
-            <Text style={{ color: '#111', fontSize: 16, fontWeight: 'bold', letterSpacing: 1 }}>{group.shortCode}</Text>
-          </View>
-          <Pressable onPress={handleCopyCode} style={{ padding: 4 }}>
-            <Feather name="copy" size={18} color={COLORS.ACCENT} />
-          </Pressable>
+        <View style={styles.memberDetails}>
+          <Text style={styles.memberName}>{item.name}</Text>
+          <Text style={styles.memberRole}>{item.role}</Text>
         </View>
       </View>
-      {/* Admin-only delete button for testing */}
-      {isAdmin && (
-        <AppButton
-          title="Delete Group"
-          onPress={handleDeleteGroup}
-          style={{ backgroundColor: COLORS.ERROR, marginHorizontal: 18, marginBottom: 10 }}
-          textStyle={{ color: COLORS.BG }}
+      <View style={styles.memberStatus}>
+        <View style={[styles.statusDot, { backgroundColor: item.status === 'online' ? '#10B981' : '#9CA3AF' }]} />
+        <Text style={styles.memberJoined}>Joined {item.joinedAt}</Text>
+      </View>
+    </View>
+  );
+
+  const renderActivityItem = ({ item }) => (
+    <View style={styles.activityItem}>
+      <View style={styles.activityIcon}>
+        <MaterialCommunityIcons 
+          name={
+            item.type === 'detection' ? 'alert-circle' :
+            item.type === 'member' ? 'account-plus' :
+            'settings'
+          } 
+          size={20} 
+          color="#6B7280" 
         />
-      )}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 18, marginBottom: 14 }}>
-        <View style={{ backgroundColor: '#f3f3f3', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#111' }}>
-          <Text style={{ color: '#111', fontSize: 13 }}>
-            Created: <Text style={{ color: '#111', fontWeight: 'bold' }}>{new Date(group.createdAt).toLocaleDateString()}</Text>
-          </Text>
+      </View>
+      <View style={styles.activityContent}>
+        <Text style={styles.activityMessage}>{item.message}</Text>
+        <Text style={styles.activityTime}>{item.time}</Text>
+      </View>
+    </View>
+  );
+
+  const renderTabContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading group details...</Text>
         </View>
-      </View>
-      <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: 18, marginBottom: 10 }} />
+      );
+    }
 
-      {/* Members Section Header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 18, marginBottom: 10, paddingHorizontal: 22 }}>
-        <Text style={{ color: COLORS.TEXT_MAIN, fontSize: 18, fontWeight: 'bold', flex: 1, letterSpacing: 0.2 }}>Members ({members.length})</Text>
-      </View>
+    if (error) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      );
+    }
 
-      {/* Members List */}
-      <View style={{ flex: 1, paddingHorizontal: 8 }}>
-        <FlatList
-          data={members}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 40 }}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => isAdmin && item.id !== currentUserId ? handleRemoveMember(item.id, item.name) : undefined}
-              style={({ pressed }) => ([
-                {
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: COLORS.CARD_BG,
-                  paddingVertical: 16,
-                  paddingHorizontal: 18,
-                  borderRadius: 14,
-                  marginBottom: 12,
-                  shadowColor: '#000',
-                  shadowOpacity: 0.06,
-                  shadowRadius: 6,
-                  shadowOffset: { width: 0, height: 2 },
-                  elevation: 2,
-                  opacity: pressed ? 0.85 : 1,
-                }
-              ])}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: COLORS.TEXT_MAIN, fontWeight: 'bold', fontSize: 16, marginBottom: 2 }}>
-                  {item.name}{item.id === currentUserId && ' (You)'}
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                  <Text style={{ color: COLORS.TEXT_SECONDARY, fontSize: 12, marginRight: 10 }}>
-                    Joined {new Date(item.joinedAt).toLocaleDateString()}
-                  </Text>
-                  {item.role === 'admin' && (
-                    <View style={{ backgroundColor: '#f3f3f3', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3, marginLeft: 2, borderWidth: 1, borderColor: COLORS.ACCENT }}>
-                      <Text style={{ color: '#111', fontSize: 12, fontWeight: 'bold', letterSpacing: 0.5 }}>Admin</Text>
-                    </View>
-                  )}
-                  {item.role === 'member' && (
-                    <View style={{ backgroundColor: '#f3f3f3', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3, marginLeft: 2, borderWidth: 1, borderColor: '#bbb' }}>
-                      <Text style={{ color: '#111', fontSize: 12, fontWeight: 'bold', letterSpacing: 0.5 }}>Member</Text>
-                    </View>
-                  )}
+    if (!groupData) {
+      return null; // Should not happen if loading and error are handled
+    }
+
+    switch (activeTab) {
+      case 'members':
+        return (
+          <FlatList
+            data={groupData.members}
+            renderItem={renderMemberItem}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContainer}
+          />
+        );
+      case 'activity':
+        return (
+          <FlatList
+            data={groupData.recentActivity}
+            renderItem={renderActivityItem}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContainer}
+          />
+        );
+      default:
+        return (
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.overviewContainer}>
+            <View style={styles.statsCardBetter}>
+              <Text style={styles.infoTitle}>Statistics</Text>
+              <View style={styles.statsGridBetter}>
+                <View style={styles.statItemBetter}>
+                  <Text style={styles.statNumberBetter}>{typeof groupData.memberCount === 'number' ? groupData.memberCount : (groupData.members ? groupData.members.length : 0)}</Text>
+                  <Text style={styles.statLabelBetter}>Members</Text>
+                </View>
+                <View style={styles.statItemBetter}>
+                  <Text style={styles.statNumberBetter}>3</Text>
+                  <Text style={styles.statLabelBetter}>Online</Text>
+                </View>
+                <View style={styles.statItemBetter}>
+                  <Text style={styles.statNumberBetter}>12</Text>
+                  <Text style={styles.statLabelBetter}>Detections</Text>
                 </View>
               </View>
-              {isAdmin && item.id !== currentUserId && (
-                <View style={{ marginLeft: 10 }}>
-                  <Feather name="user-x" size={18} color={COLORS.ERROR} />
-                </View>
-              )}
-            </Pressable>
-          )}
-          ListEmptyComponent={
-            <Text style={{ color: COLORS.TEXT_SECONDARY, textAlign: 'center', marginTop: 20 }}>
-              No members found
-            </Text>
-          }
-        />
-      </View>
+            </View>
+          </ScrollView>
+        );
+    }
+  };
 
+  // Add a helper function for date formatting
+  const formatDateTime = (isoString) => {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: '2-digit',
+    });
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       {/* Edit Group Modal */}
-      <Modal visible={editModalVisible} transparent animationType="slide">
-        <View style={{ 
-          flex: 1, 
-          backgroundColor: 'rgba(0,0,0,0.8)', 
-          justifyContent: 'center', 
-          alignItems: 'center' 
-        }}>
-          <View style={{ 
-            backgroundColor: COLORS.CARD_BG, 
-            borderRadius: 20, 
-            padding: 24, 
-            width: '85%',
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.05)'
-          }}>
-            <Text style={{ 
-              fontWeight: 'bold', 
-              fontSize: 20, 
-              color: COLORS.TEXT_MAIN, 
-              textAlign: 'center',
-              marginBottom: 24 
-            }}>
-              Edit Group Name
-            </Text>
-
-            <Text style={{ fontWeight: 'bold', fontSize: 15, color: COLORS.TEXT_MAIN, marginBottom: 12 }}>
-              Group Name
-            </Text>
-            <AppInput
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Group Name</Text>
+            <TextInput
+              style={styles.input}
               value={editGroupName}
               onChangeText={setEditGroupName}
-              placeholder="Edit Group Name"
-              style={{ marginBottom: 16 }}
+              placeholder="Group name"
+              placeholderTextColor="#9CA3AF"
             />
-
-            <AppButton
-              title={actionLoading ? "Updating..." : "Update Name"}
-              onPress={handleUpdateGroupName}
-              loading={actionLoading}
-              style={{ marginBottom: 16 }}
-            />
-
-            <Pressable
-              onPress={() => {
-                setEditModalVisible(false);
-                setEditGroupName("");
-              }}
-              disabled={actionLoading}
-              style={{ alignItems: 'center', padding: 12, opacity: actionLoading ? 0.5 : 1 }}
-            >
-              <Text style={{ color: COLORS.TEXT_SECONDARY, fontWeight: 'bold' }}>
-                {actionLoading ? 'Please wait...' : 'Cancel'}
-              </Text>
-            </Pressable>
+            {editError ? <Text style={styles.errorText}>{editError}</Text> : null}
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: '#F3F4F6' }]}
+                onPress={() => setEditModalVisible(false)}
+                disabled={editLoading}
+              >
+                <Text style={{ color: '#374151' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: '#3B82F6' }]}
+                onPress={handleEditGroup}
+                disabled={editLoading}
+              >
+                {editLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={{ color: '#fff' }}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
-
-      {/* Delete Confirmation Modal */}
-      <Modal visible={deleteModalVisible} transparent animationType="slide">
-        <View style={{ 
-          flex: 1, 
-          backgroundColor: 'rgba(0,0,0,0.8)', 
-          justifyContent: 'center', 
-          alignItems: 'center' 
-        }}>
-          <View style={{ 
-            backgroundColor: COLORS.CARD_BG, 
-            borderRadius: 20, 
-            padding: 24, 
-            width: '85%',
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.05)'
-          }}>
-            <Text style={{ 
-              fontWeight: 'bold', 
-              fontSize: 20, 
-              color: COLORS.TEXT_MAIN, 
-              textAlign: 'center',
-              marginBottom: 16 
-            }}>
-              Delete Group
-            </Text>
-
-            <Text style={{ 
-              fontSize: 16, 
-              color: COLORS.TEXT_SECONDARY, 
-              textAlign: 'center',
-              marginBottom: 24,
-              lineHeight: 22
-            }}>
-              Are you sure you want to delete &quot;{group?.name}&quot;? This action cannot be undone and will remove all members from the group.
-            </Text>
-
-            <AppButton
-              title={actionLoading ? "Deleting..." : "Delete Group"}
-              onPress={confirmDeleteGroup}
-              loading={actionLoading}
-              style={{ backgroundColor: COLORS.ERROR, marginBottom: 16 }}
-              textStyle={{ color: COLORS.BG }}
-            />
-
-            <Pressable
-              onPress={() => setDeleteModalVisible(false)}
-              disabled={actionLoading}
-              style={{ alignItems: 'center', padding: 12, opacity: actionLoading ? 0.5 : 1 }}
-            >
-              <Text style={{ color: COLORS.TEXT_SECONDARY, fontWeight: 'bold' }}>
-                {actionLoading ? 'Please wait...' : 'Cancel'}
-              </Text>
-            </Pressable>
+      {/* Info Modal */}
+      <Modal
+        visible={infoModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setInfoModalVisible(false)}
+      >
+        <View style={[styles.modalOverlay, { justifyContent: 'flex-end' }]}> 
+          <View style={styles.bottomSheetModalContent}> 
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <Text style={[styles.infoTitle, { marginBottom: 0 }]}>Group Information</Text>
+              <TouchableOpacity onPress={() => setInfoModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ height: 12 }} />
+            <View style={styles.infoCardBetter}>
+              <View style={styles.infoRowBetterClean}>
+                <Text style={styles.infoLabelBetter}>Name</Text>
+                <Text style={styles.infoValueBetter}>{groupData?.name}</Text>
+              </View>
+              <View style={[styles.infoRowBetterClean, { alignItems: 'center' }]}> 
+                <Text style={styles.infoLabelBetter}>Code</Text>
+                <View style={styles.codeCopyRow}>
+                  <Text style={styles.codeBox}>{groupData?.shortCode || '-'}</Text>
+                  {groupData?.shortCode && (
+                    <TouchableOpacity style={styles.copyBtn} onPress={() => handleCopyCode(groupData.shortCode)}>
+                      <MaterialCommunityIcons name="content-copy" size={20} color="#3B82F6" />
+                    </TouchableOpacity>
+                  )}
+                  {copied && <Text style={styles.copiedText}>Copied!</Text>}
+                </View>
+              </View>
+              <View style={styles.infoRowBetterClean}>
+                <Text style={styles.infoLabelBetter}>Created</Text>
+                <Text style={styles.infoValueBetter}>{formatDateTime(groupData?.createdAt)}</Text>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+      {/* Invite Modal */}
+      <Modal
+        visible={inviteModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setInviteModalVisible(false)}
+      >
+        <View style={[styles.modalOverlay, { justifyContent: 'flex-end' }]}> 
+          <View style={styles.bottomSheetModalContent}> 
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <Text style={[styles.infoTitle, { marginBottom: 0 }]}>Invite to Group</Text>
+              <TouchableOpacity onPress={() => setInviteModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ height: 12 }} />
+            <View style={styles.infoCardBetter}>
+              <View style={[styles.infoRowBetterClean, { alignItems: 'center' }]}> 
+                <Text style={styles.infoLabelBetter}>Code</Text>
+                <View style={styles.codeCopyRow}>
+                  <Text style={styles.codeBox}>{groupData?.shortCode || '-'}</Text>
+                  {groupData?.shortCode && (
+                    <TouchableOpacity style={styles.copyBtn} onPress={() => handleCopyCode(groupData.shortCode)}>
+                      <MaterialCommunityIcons name="content-copy" size={20} color="#3B82F6" />
+                    </TouchableOpacity>
+                  )}
+                  {copied && <Text style={styles.copiedText}>Copied!</Text>}
+                </View>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.shareBtn} onPress={() => handleShare(groupData?.shortCode)}>
+              <MaterialCommunityIcons name="share-variant" size={20} color="#fff" />
+              <Text style={styles.shareBtnText}>Share Link</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      {/* Header */}
+      <Header 
+        title={groupData?.name || 'Group Details'}
+        showBackButton={true}
+        onBackPress={() => navigation.goBack()}
+        rightContent={
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {isAdmin && (
+              <TouchableOpacity style={styles.headerBtn} onPress={openEditModal}>
+                <MaterialCommunityIcons name="pencil" size={20} color="#374151" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.headerBtn} onPress={() => setInviteModalVisible(true)}>
+              <MaterialCommunityIcons name="account-plus" size={20} color="#10B981" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerBtn} onPress={() => setInfoModalVisible(true)}>
+              <MaterialCommunityIcons name="information-outline" size={20} color="#3B82F6" />
+            </TouchableOpacity>
+          </View>
+        }
+        style={{ paddingHorizontal: 0 }}
+      />
+      {/* Member count subtitle */}
+      <View style={styles.subtitleContainer}>
+        <Text style={styles.memberCountText}>{groupData?.memberCount || (groupData?.members?.length || 0)} members</Text>
+      </View>
+
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
+          onPress={() => setActiveTab('overview')}
+        >
+          <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>
+            Overview
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'members' && styles.activeTab]}
+          onPress={() => setActiveTab('members')}
+        >
+          <Text style={[styles.tabText, activeTab === 'members' && styles.activeTabText]}>
+            Members
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'activity' && styles.activeTab]}
+          onPress={() => setActiveTab('activity')}
+        >
+          <Text style={[styles.tabText, activeTab === 'activity' && styles.activeTabText]}>
+            Activity
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
+      <View style={styles.content}>
+        {renderTabContent()}
+      </View>
+
+      {/* Action Buttons */}
+      {isAdmin && (
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={styles.inviteButton} onPress={handleInviteMember}>
+            <MaterialCommunityIcons name="account-plus" size={20} color="#FFFFFF" />
+            <Text style={styles.inviteButtonText}>Invite Member</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteGroup}>
+            <MaterialCommunityIcons name="delete" size={20} color="#EF4444" />
+            <Text style={styles.deleteButtonText}>Delete Group</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {!isAdmin && (
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveGroup}>
+            <MaterialCommunityIcons name="exit-to-app" size={20} color="#EF4444" />
+            <Text style={styles.leaveButtonText}>Leave Group</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
-} 
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  headerBtn: {
+    padding: 8,
+    marginLeft: 4,
+  },
+  subtitleContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  memberCountText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#fff',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  activeTab: {
+    backgroundColor: '#374151',
+  },
+  tabText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+  },
+  activeTabText: {
+    color: '#fff',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+    backgroundColor: '#fff',
+  },
+  overviewContainer: {
+    paddingTop: 20,
+  },
+  infoCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 0,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#374151',
+    marginBottom: 16,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  infoLabel: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    flex: 1,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#374151',
+    flex: 2,
+    textAlign: 'right',
+  },
+  statsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 0,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: '#374151',
+  },
+  statLabel: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    marginTop: 4,
+  },
+  listContainer: {
+    paddingTop: 20,
+  },
+  memberItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#f8fafc',
+  },
+  memberInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  memberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(54,220,166,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  memberInitial: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#36DCA6',
+  },
+  memberDetails: {
+    flex: 1,
+  },
+  memberName: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#374151',
+  },
+  memberRole: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  memberStatus: {
+    alignItems: 'flex-end',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  memberJoined: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#f8fafc',
+  },
+  activityIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(54,220,166,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityMessage: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  activityTime: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    gap: 12,
+    backgroundColor: '#f8fafc',
+  },
+  inviteButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#36DCA6',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+    shadowColor: '#36DCA6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  inviteButtonText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#fff',
+  },
+  deleteButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  deleteButtonText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#ef4444',
+  },
+  leaveButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  leaveButtonText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#ef4444',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#ef4444',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '80%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#374151',
+    marginBottom: 16,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#374151',
+    fontFamily: 'Poppins-Regular',
+    width: '100%',
+    marginBottom: 8,
+    backgroundColor: '#f8fafc',
+  },
+  button: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  // Add improved styles for info/statistics cards
+  infoRowBetter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingVertical: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  infoLabelBetter: {
+    fontSize: 15,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    flex: 1.2,
+  },
+  infoValueBetter: {
+    fontSize: 15,
+    fontFamily: 'Poppins-Regular',
+    color: '#374151',
+    flex: 2,
+    textAlign: 'right',
+  },
+  statsCardBetter: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 0,
+  },
+  statsGridBetter: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 8,
+  },
+  statItemBetter: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statNumberBetter: {
+    fontSize: 22,
+    fontFamily: 'Poppins-Medium',
+    color: '#374151',
+  },
+  statLabelBetter: {
+    fontSize: 13,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  infoBtn: {
+    padding: 8,
+    marginLeft: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomSheetModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  infoCardBetter: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    marginTop: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  infoRowBetterClean: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 18,
+  },
+  codeCopyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  codeBox: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    backgroundColor: 'rgba(54,220,166,0.08)',
+    color: '#36DCA6',
+    fontSize: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 4,
+    minWidth: 60,
+    textAlign: 'center',
+    letterSpacing: 1.5,
+  },
+  copyBtn: {
+    padding: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(54,220,166,0.08)',
+    marginLeft: 2,
+  },
+  copiedText: {
+    marginLeft: 8,
+    color: '#36DCA6',
+    fontSize: 13,
+    fontFamily: 'Poppins-Medium',
+  },
+  inviteBtn: {
+    padding: 8,
+    marginLeft: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#36DCA6',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginTop: 12,
+    width: '100%',
+    gap: 8,
+    shadowColor: '#36DCA6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  shareBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    marginLeft: 8,
+  },
+}); 

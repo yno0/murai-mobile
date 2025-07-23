@@ -11,6 +11,8 @@ import User from './models/userModel.js';
 // Import routes
 import { findOrCreateGoogleUser } from './controller/authController.js';
 import authRoutes from './routes/authRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,6 +26,8 @@ app.use(cors());
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use(session({ secret: 'your_secret', resave: false, saveUninitialized: true }));
 app.use(passport.initialize());

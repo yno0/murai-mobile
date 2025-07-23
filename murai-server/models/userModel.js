@@ -24,8 +24,20 @@ const userSchema = new Schema({
     },
     role: {
         type: String,
-        enum: ['admin', 'user'],
+        enum: ['admin', 'user', 'premium', 'suspended'],
         default: 'user',
+    },
+    status: {
+        type: String,
+        enum: ['active', 'inactive', 'suspended'],
+        default: 'active',
+    },
+    lastActive: {
+        type: Date,
+    },
+    joinedAt: {
+        type: Date,
+        default: Date.now,
     },
     isActive: {
         type: Boolean,

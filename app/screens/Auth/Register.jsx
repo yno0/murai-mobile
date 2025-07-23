@@ -1,16 +1,9 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
 import React, { useState } from "react";
 import { Image, Text, View } from "react-native";
 import AppButton from "../../components/common/AppButton";
 import AppInput from "../../components/common/AppInput";
-import { COLORS } from "../../constants/theme";
-
-const BG = COLORS.BG;
-const CARD_BG = COLORS.CARD_BG;
-const ACCENT = COLORS.ACCENT;
-const TEXT = COLORS.TEXT_MAIN;
-const SUBTLE = COLORS.SUBTLE;
+import { COLORS, globalStyles } from "../../constants/theme";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -23,29 +16,30 @@ export default function Register() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG, padding: 20 }}>
+    <View style={globalStyles.container}>
       <View style={{ alignItems: "center", marginTop: 60, marginBottom: 40 }}>
         <Image
           source={require("../../../assets/images/logo.png")}
           style={{ width: 120, height: 120, marginBottom: 20 }}
           resizeMode="contain"
         />
-        <Text style={{ color: TEXT, fontSize: 28, fontWeight: "bold" }}>
+        <Text style={{ 
+          color: COLORS.TEXT_MAIN, 
+          fontSize: 28, 
+          fontFamily: "Poppins-Bold" 
+        }}>
           Create Account
         </Text>
-        <Text style={{ color: SUBTLE, marginTop: 8 }}>
+        <Text style={{ 
+          color: COLORS.TEXT_MUTED, 
+          marginTop: 8,
+          fontFamily: "Poppins-Regular"
+        }}>
           Join Murai to get started
         </Text>
       </View>
 
-      <LinearGradient
-        colors={[CARD_BG, `${CARD_BG}cc`]}
-        style={{
-          borderRadius: 12,
-          padding: 20,
-          marginBottom: 20,
-        }}
-      >
+      <View style={globalStyles.card}>
         <View style={{ gap: 16 }}>
           <AppInput
             value={name}
@@ -71,7 +65,7 @@ export default function Register() {
             style={{ marginBottom: 16 }}
           />
         </View>
-      </LinearGradient>
+      </View>
 
       <AppButton
         title="Sign Up"
@@ -86,8 +80,8 @@ export default function Register() {
           gap: 4,
         }}
       >
-        <Text style={{ color: SUBTLE }}>Already have an account?</Text>
-        <Link href="/login" style={{ color: ACCENT }}>
+        <Text style={{ color: COLORS.TEXT_MUTED, fontFamily: "Poppins-Regular" }}>Already have an account?</Text>
+        <Link href="/login" style={{ color: COLORS.PRIMARY, fontFamily: "Poppins-SemiBold" }}>
           Sign In
         </Link>
       </View>

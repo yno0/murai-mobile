@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from "expo-router";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
@@ -13,8 +14,8 @@ export function AuthProvider({ children }) {
 
   const checkUser = async () => {
     try {
-      // Mock user check - you can replace this with your own auth logic
-      const storedUser = localStorage.getItem('user');
+      // Use AsyncStorage for React Native
+      const storedUser = await AsyncStorage.getItem('user');
       if (storedUser) {
         setUser(JSON.parse(storedUser));
       } else {
@@ -40,11 +41,11 @@ export function AuthProvider({ children }) {
       if (!response.ok) {
         throw { code: response.status, message: data.message || 'Login failed' };
       }
-      // Store token and user info
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify({ email }));
-      setUser({ email });
-      router.replace('/(app)');
+      // Store token and user info in AsyncStorage
+      await AsyncStorage.setItem('token', data.token);
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      setUser(data.user);
+      // Do not redirect here; let the login screen handle it
     } catch (error) {
       throw error;
     }
@@ -69,13 +70,52 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    console.log('🔄 AuthContext logout function called');
     try {
-      // Mock logout
-      localStorage.removeItem('user');
+      // Get current user role and token before clearing storage
+      const currentUser = user || JSON.parse(await AsyncStorage.getItem('user') || 'null');
+      const token = await AsyncStorage.getItem('token');
+      console.log('📋 Current user:', currentUser);
+      console.log('🔑 Token exists:', !!token);
+
+      // Optional: Notify server about logout (if API endpoint exists)
+      if (token) {
+        try {
+          console.log('🔄 Notifying server about logout...');
+          await fetch(`${API_BASE_URL}/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          console.log('✅ Server logout notification successful');
+        } catch (apiError) {
+          console.warn('⚠️ Server logout notification failed:', apiError);
+          // Continue with local logout even if server notification fails
+        }
+      }
+
+      // Clear all authentication data
+      console.log('🔄 Clearing storage...');
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('refreshToken'); // Clear refresh token if exists
+
+      // Clear user state
+      console.log('🔄 Clearing user state...');
       setUser(null);
+
+      // Redirect to login (same for both admin and regular users)
+      console.log('🔄 Redirecting to login...');
       router.replace("/(auth)/login");
+
+      console.log('✅ Logout successful');
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("❌ Logout error:", error);
+      // Fallback: still redirect to login even if there's an error
+      console.log('🔄 Fallback redirect to login...');
+      router.replace("/(auth)/login");
     }
   };
 

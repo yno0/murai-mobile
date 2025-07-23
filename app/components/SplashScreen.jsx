@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, Dimensions, View } from "react-native";
+import { COLORS } from "../constants/theme";
 
-const BG = "#0f0f0f";
-const ACCENT = "#34d399";
+const BG = COLORS.BG;
+const ACCENT = COLORS.ACCENT;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function SplashScreen({ onFinish }) {

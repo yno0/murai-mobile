@@ -1,4 +1,4 @@
-import {Schema, model} from "mongoose";
+import { Schema, model } from "mongoose";
 
 const userActivitySchema = new Schema({
     userId: {
@@ -14,6 +14,9 @@ const userActivitySchema = new Schema({
     activityDetails:{
         type: String,
     },    
+    activityCategory: {
+        type: String, // e.g. 'security', 'content', 'system', etc.
+    },
     createdAt: {
         type: Date,
         default: Date.now,

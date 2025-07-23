@@ -1,4 +1,4 @@
-import {Schema, model } from "mongoose"
+import { Schema, model } from "mongoose";
 
 
 const groupSchema = new Schema({
@@ -25,7 +25,21 @@ const groupSchema = new Schema({
     isActive:{
         type: Boolean,
         default: true,
-    }
+    },
+    // New fields for dashboard analytics
+    memberCount: {
+        type: Number, // Can be updated via aggregation or denormalization
+        default: 0,
+    },
+    status: {
+        type: String,
+        enum: ['active', 'inactive', 'pending'],
+        default: 'active',
+    },
+    type: {
+        type: String, // e.g. 'public', 'private'
+        default: 'public',
+    },
 })
 
 export default model('Group', groupSchema);

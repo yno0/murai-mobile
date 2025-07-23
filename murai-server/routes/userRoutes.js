@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import GroupCode from '../models/groupCode.js';
@@ -26,7 +27,7 @@ router.get('/me', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('name email');
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json({ name: user.name, email: user.email });
+    res.json({ id: user._id, name: user.name, email: user.email });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -232,7 +233,8 @@ router.get('/groups/:id', authenticateToken, async (req, res) => {
       name: group.name,
       shortCode: groupCode ? groupCode.code : '',
       createdAt: group.createAt,
-      members
+      members,
+      adminId: group.userId // Add this line
     });
   } catch (err) {
     console.error('Get group details error:', err);
@@ -311,6 +313,29 @@ router.post('/groups/join', authenticateToken, async (req, res) => {
     res.json(group);
   } catch (err) {
     console.error('Join group error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Change password endpoint
+router.post('/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current and new password required' });
+    }
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) return res.status(401).json({ message: 'Current password is incorrect' });
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });

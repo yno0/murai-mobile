@@ -1,30 +1,22 @@
-import { Stack } from "expo-router";
-import React from "react";
-import Login from "../screens/Auth/Login";
-import Register from "../screens/Auth/Register";
+import { createStackNavigator } from '@react-navigation/stack';
+import React from 'react';
+import LoginScreen from '../screens/Auth/Login';
+import RegisterScreen from '../screens/Auth/Register';
 
-export default function AuthStack() {
+const Stack = createStackNavigator();
+
+function AuthStack() {
   return (
-    <Stack
+    <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        animation: "fade",
+        cardStyle: { backgroundColor: '#FFFFFF' },
       }}
     >
-      <Stack.Screen
-        name="login"
-        component={Login}
-        options={{
-          gestureEnabled: false,
-        }}
-      />
-      <Stack.Screen
-        name="register"
-        component={Register}
-        options={{
-          gestureEnabled: true,
-        }}
-      />
-    </Stack>
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+    </Stack.Navigator>
   );
-} 
+}
+
+export default AuthStack; 

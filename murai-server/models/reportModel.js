@@ -1,4 +1,4 @@
-import {Schema, model} from "mongoose";
+import { Schema, model } from "mongoose";
 
 
 const reportSchema = new Schema({
@@ -13,6 +13,20 @@ const reportSchema = new Schema({
     },
     description:{
         type: String,
+    },
+    // New fields for dashboard/report analytics
+    category: {
+        type: String, // e.g. 'harassment', 'profanity', etc.
+    },
+    reportedText: {
+        type: String, // The actual text that was reported
+    },
+    reviewedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+    },
+    reviewedAt: {
+        type: Date,
     },
     status:{
         type: String,

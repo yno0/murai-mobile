@@ -1,13 +1,20 @@
-import { createStackNavigator } from "@react-navigation/stack";
-import React from "react";
-import Dashboard from "../screens/Home/Dashboard";
+import { createStackNavigator } from '@react-navigation/stack';
+import React from 'react';
+import HomeScreen from '../screens/Home';
 
 const Stack = createStackNavigator();
 
-export default function HomeStack() {
+function HomeStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Dashboard" component={Dashboard} />
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        cardStyle: { backgroundColor: '#FFFFFF' },
+      }}
+    >
+      <Stack.Screen name="HomeMain" component={HomeScreen} />
     </Stack.Navigator>
   );
 }
+
+export default HomeStack; 

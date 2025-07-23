@@ -1,16 +1,9 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
 import React, { useState } from "react";
 import { Image, Text, View } from "react-native";
 import AppButton from "../../components/common/AppButton";
 import AppInput from "../../components/common/AppInput";
-import { COLORS } from "../../constants/theme";
-
-const BG = COLORS.BG;
-const CARD_BG = COLORS.CARD_BG;
-const ACCENT = COLORS.ACCENT;
-const TEXT = COLORS.TEXT_MAIN;
-const SUBTLE = COLORS.SUBTLE;
+import { COLORS, globalStyles } from "../../constants/theme";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -22,54 +15,108 @@ export default function Login() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG, padding: 20 }}>
-      <View style={{ alignItems: "center", marginTop: 60, marginBottom: 40 }}>
+    <View style={globalStyles.container}>
+      <View style={{ alignItems: "center", marginBottom: 40 }}>
         <Image
           source={require("../../../assets/images/logo.png")}
-          style={{ width: 120, height: 120, marginBottom: 20 }}
+          style={{ width: 120, height: 120, marginBottom: 20, opacity: 0.92 }}
           resizeMode="contain"
         />
-        <Text style={{ color: TEXT, fontSize: 28, fontWeight: "bold" }}>
+        <Text style={{ 
+          color: COLORS.TEXT_MAIN, 
+          fontSize: 32, 
+          fontFamily: "Poppins-Bold", 
+          letterSpacing: 0.5, 
+          marginBottom: 4 
+        }}>
           Welcome Back
         </Text>
-        <Text style={{ color: SUBTLE, marginTop: 8 }}>
+        <Text style={{ 
+          color: COLORS.TEXT_MUTED, 
+          fontSize: 16, 
+          fontFamily: "Poppins-Regular",
+          marginBottom: 8, 
+          letterSpacing: 0.2 
+        }}>
           Sign in to continue to Murai
         </Text>
+        
+        {/* Font Test Section */}
+        <View style={{ marginTop: 20, alignItems: 'center' }}>
+          <Text style={{ 
+            color: COLORS.TEXT_MAIN, 
+            fontSize: 14, 
+            fontFamily: "Poppins-Thin",
+            marginBottom: 4 
+          }}>
+            Poppins Thin
+          </Text>
+          <Text style={{ 
+            color: COLORS.TEXT_MAIN, 
+            fontSize: 14, 
+            fontFamily: "Poppins-Light",
+            marginBottom: 4 
+          }}>
+            Poppins Light
+          </Text>
+          <Text style={{ 
+            color: COLORS.TEXT_MAIN, 
+            fontSize: 14, 
+            fontFamily: "Poppins-Regular",
+            marginBottom: 4 
+          }}>
+            Poppins Regular
+          </Text>
+          <Text style={{ 
+            color: COLORS.TEXT_MAIN, 
+            fontSize: 14, 
+            fontFamily: "Poppins-Medium",
+            marginBottom: 4 
+          }}>
+            Poppins Medium
+          </Text>
+          <Text style={{ 
+            color: COLORS.TEXT_MAIN, 
+            fontSize: 14, 
+            fontFamily: "Poppins-SemiBold",
+            marginBottom: 4 
+          }}>
+            Poppins SemiBold
+          </Text>
+          <Text style={{ 
+            color: COLORS.TEXT_MAIN, 
+            fontSize: 14, 
+            fontFamily: "Poppins-Bold",
+            marginBottom: 4 
+          }}>
+            Poppins Bold
+          </Text>
+        </View>
       </View>
 
-      <LinearGradient
-        colors={[CARD_BG, `${CARD_BG}cc`]}
-        style={{
-          borderRadius: 12,
-          padding: 20,
-          marginBottom: 20,
-        }}
-      >
-        <View style={{ gap: 16 }}>
-          <AppInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Enter your email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={{ marginBottom: 16 }}
-          />
-
-          <AppInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Enter your password"
-            secureTextEntry
-            style={{ marginBottom: 16 }}
-          />
-        </View>
-      </LinearGradient>
-
-      <AppButton
-        title="Sign In"
-        onPress={handleLogin}
-        style={{ marginBottom: 16 }}
-      />
+      <View style={globalStyles.card}>
+        <AppInput
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Enter your email"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          style={{ marginBottom: 18 }}
+        />
+        <AppInput
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Enter your password"
+          secureTextEntry
+          style={{ marginBottom: 18 }}
+        />
+        <View style={{ height: 1, backgroundColor: COLORS.BORDER, marginVertical: 10, borderRadius: 1 }} />
+        <AppButton
+          title="Sign In"
+          onPress={handleLogin}
+          style={{ marginBottom: 0, marginTop: 8 }}
+        />
+      </View>
 
       <View
         style={{
@@ -78,8 +125,8 @@ export default function Login() {
           gap: 4,
         }}
       >
-        <Text style={{ color: SUBTLE }}>Don&apos;t have an account?</Text>
-        <Link href="/register" style={{ color: ACCENT }}>
+        <Text style={{ color: COLORS.TEXT_MUTED, fontFamily: "Poppins-Regular" }}>Don&apos;t have an account?</Text>
+        <Link href="/register" style={{ color: COLORS.PRIMARY, fontFamily: "Poppins-SemiBold" }}>
           Sign Up
         </Link>
       </View>

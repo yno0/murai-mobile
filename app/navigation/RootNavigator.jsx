@@ -1,8 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React from "react";
-import { View } from "react-native";
-import DetectionStack from "./DetectionStack";
+import DashboardStack from "./DashboardStack";
 import ExtensionStack from "./ExtensionStack";
 import GroupStack from "./GroupStack";
 import HomeStack from "./HomeStack";
@@ -10,29 +9,27 @@ import ProfileStack from "./ProfileStack";
 
 const Tab = createBottomTabNavigator();
 
-// Theme colors
-const ACCENT = "#34d399";
-const BG = "#0f0f0f";
-const INACTIVE = "#666666";
-const NAV_BG = "#1a1a1a"; 
-
-
 export default function RootNavigator() {
   return (
     <Tab.Navigator
       initialRouteName="Home"
       screenOptions={({ route }) => ({
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
         tabBarStyle: {
-          backgroundColor: NAV_BG,
-          borderTopWidth: 0, // Removed border
-          elevation: 0, // Remove Android shadow
-          shadowOpacity: 0, 
-          height: 60,
-          paddingBottom: 8,
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: '#F3F4F6',
+          height: 70,
+          paddingBottom: 10,
           paddingTop: 8,
-          marginBottom: 0,
-          borderRadius: 0,
+          shadowColor: '#000',
+          shadowOffset: {
+            width: 0,
+            height: -2,
+          },
+          shadowOpacity: 0.05,
+          shadowRadius: 8,
+          elevation: 8,
         },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
@@ -41,11 +38,11 @@ export default function RootNavigator() {
             case "Home":
               iconName = "home";
               break;
-            case "Extension":
-              iconName = "box";
+            case "Dashboard":
+              iconName = "bar-chart-2";
               break;
-            case "Detection":
-              iconName = "radio";
+            case "Extension":
+              iconName = "package";
               break;
             case "Group":
               iconName = "users";
@@ -57,34 +54,21 @@ export default function RootNavigator() {
               iconName = "circle";
           }
 
-          return (
-            <View style={{
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 48,
-              height: 48,
-              borderRadius: 24,
-              backgroundColor: focused ? 'rgba(52,211,153,0.1)' : 'transparent'
-            }}>
-              <Feather 
-                name={iconName} 
-                size={focused ? 24 : 22} 
-                color={focused ? ACCENT : INACTIVE}
-                style={{
-                  opacity: focused ? 1 : 0.8
-                }}
-              />
-            </View>
-          );
+          return <Feather name={iconName} size={24} color={color} />;
         },
-        tabBarActiveTintColor: ACCENT,
-        tabBarInactiveTintColor: INACTIVE,
+        tabBarActiveTintColor: '#374151',
+        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontFamily: 'Poppins-Medium',
+          marginTop: 4,
+        },
         headerShown: false,
       })}
     >
       <Tab.Screen name="Home" component={HomeStack} />
+      <Tab.Screen name="Dashboard" component={DashboardStack} />
       <Tab.Screen name="Extension" component={ExtensionStack} />
-      <Tab.Screen name="Detection" component={DetectionStack} />
       <Tab.Screen name="Group" component={GroupStack} />
       <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>

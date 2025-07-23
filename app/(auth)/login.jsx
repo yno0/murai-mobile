@@ -1,11 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Link, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Image, StatusBar, Text, View } from "react-native";
+import { Image, StatusBar, Text, TouchableOpacity, View } from "react-native";
 import AppButton from "../components/common/AppButton";
 import AppInput from "../components/common/AppInput";
 import { COLORS } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
-
 
 const BG = COLORS.BG;
 const CARD_BG = COLORS.CARD_BG;
@@ -25,6 +25,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [cooldownTime, setCooldownTime] = useState(0);
 
   useEffect(() => {
@@ -72,12 +73,15 @@ export default function Login() {
       setLoading(true);
       console.log('🔄 Starting login process...');
       
-      // Check for existing session (mock implementation)
-      console.log('🔄 Starting login process...');
-
       await login(email.trim(), password);
-      console.log('✅ Login successful, navigating to app...');
-      router.replace('/(app)');
+      // Get user from AsyncStorage
+      const storedUser = await AsyncStorage.getItem('user');
+      const user = storedUser ? JSON.parse(storedUser) : null;
+      if (user?.role === 'admin') {
+        router.replace('/(admin)'); // Change to your admin route if needed
+      } else {
+        router.replace('/(app)');
+      }
     } catch (err) {
       console.error('❌ Login error:', {
         code: err.code,
@@ -106,51 +110,81 @@ export default function Login() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      setError("");
+      setGoogleLoading(true);
+      console.log('🔄 Starting Google login...');
+      
+      // TODO: Implement Google OAuth
+      // await loginWithGoogle();
+      
+      console.log('✅ Google login successful');
+      router.replace('/(app)');
+    } catch (err) {
+      console.error('❌ Google login error:', err);
+      setError("Google sign-in failed. Please try again.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
-      <StatusBar barStyle="light-content" backgroundColor={BG} />
+      <StatusBar barStyle="dark-content" backgroundColor={BG} />
       
       {/* Header Section */}
       <View style={{ 
         alignItems: "center", 
         paddingTop: 80, 
-        paddingBottom: 48,
+        paddingBottom: 40,
         paddingHorizontal: 24
       }}>
-        <Image
-          source={require("../../assets/images/logo.png")}
-          style={{ width: 100, height: 100, marginBottom: 24 }}
-          resizeMode="contain"
-        />
+        <View style={{
+          width: 80,
+          height: 80,
+          borderRadius: 20,
+          backgroundColor: '#F3F4F6',
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginBottom: 24
+        }}>
+          <Image
+            source={require("../../assets/images/logo.png")}
+            style={{ width: 50, height: 50 }}
+            resizeMode="contain"
+          />
+        </View>
         <Text style={{ 
           color: TEXT, 
-          fontSize: 32, 
-          fontWeight: "700",
+          fontSize: 28, 
+          fontFamily: 'Poppins-Medium',
           marginBottom: 8,
           textAlign: 'center'
         }}>
           Welcome Back
         </Text>
         <Text style={{ 
-          color: SUBTLE, 
+          color: '#6B7280', 
           fontSize: 16,
+          fontFamily: 'Poppins-Regular',
           textAlign: 'center',
           lineHeight: 22
         }}>
-          Sign in to continue to Murai
+          Sign in to continue to MURAi
         </Text>
       </View>
 
       {/* Form Section */}
       <View style={{ flex: 1, paddingHorizontal: 24 }}>
-        <View style={{ gap: 20, marginBottom: 24 }}>
+        <View style={{ gap: 16, marginBottom: 24 }}>
           <AppInput
             value={email}
             onChangeText={setEmail}
             placeholder="Enter your email"
             keyboardType="email-address"
             autoCapitalize="none"
-            style={{ marginBottom: 16 }}
+            style={{ marginBottom: 0 }}
           />
 
           <AppInput
@@ -158,22 +192,22 @@ export default function Login() {
             onChangeText={setPassword}
             placeholder="Enter your password"
             secureTextEntry
-            style={{ marginBottom: 16 }}
+            style={{ marginBottom: 0 }}
           />
 
           {error ? (
             <View style={{ 
-              backgroundColor: cooldownTime > 0 ? `${WARNING}15` : `${ERROR}15`,
+              backgroundColor: cooldownTime > 0 ? `${WARNING}10` : `${ERROR}10`,
               padding: 16,
               borderRadius: 12,
-              borderLeftWidth: 4,
-              borderLeftColor: cooldownTime > 0 ? WARNING : ERROR
+              borderWidth: 1,
+              borderColor: cooldownTime > 0 ? `${WARNING}30` : `${ERROR}30`
             }}>
               <Text style={{ 
                 color: cooldownTime > 0 ? WARNING : ERROR,
                 marginBottom: cooldownTime > 0 ? 6 : 0,
                 fontSize: 14,
-                fontWeight: '500'
+                fontFamily: 'Poppins-Medium'
               }}>
                 {error}
               </Text>
@@ -181,6 +215,7 @@ export default function Login() {
                 <Text style={{ 
                   color: WARNING, 
                   fontSize: 13,
+                  fontFamily: 'Poppins-Regular',
                   opacity: 0.8
                 }}>
                   Try again in {cooldownTime} seconds
@@ -199,6 +234,65 @@ export default function Login() {
           disabled={cooldownTime > 0}
         />
 
+        {/* Divider */}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginVertical: 24
+        }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: '#E5E7EB' }} />
+          <Text style={{
+            marginHorizontal: 16,
+            color: '#9CA3AF',
+            fontSize: 14,
+            fontFamily: 'Poppins-Regular'
+          }}>
+            or continue with
+          </Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: '#E5E7EB' }} />
+        </View>
+
+        {/* Google Sign In Button */}
+        <TouchableOpacity
+          onPress={handleGoogleLogin}
+          disabled={googleLoading}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#FFFFFF',
+            borderWidth: 1,
+            borderColor: '#E5E7EB',
+            borderRadius: 12,
+            paddingVertical: 16,
+            marginBottom: 24,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 2,
+            elevation: 1,
+          }}
+        >
+          <View style={{
+            width: 20,
+            height: 20,
+            backgroundColor: '#4285F4',
+            borderRadius: 2,
+            marginRight: 12,
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>G</Text>
+          </View>
+          <Text style={{
+            color: '#374151',
+            fontSize: 16,
+            fontFamily: 'Poppins-Medium'
+          }}>
+            {googleLoading ? "Signing in..." : "Continue with Google"}
+          </Text>
+        </TouchableOpacity>
+
         {/* Sign Up Link */}
         <View
           style={{
@@ -206,34 +300,27 @@ export default function Login() {
             justifyContent: "center",
             alignItems: "center",
             gap: 6,
-            marginBottom: 32,
+            marginBottom: 16,
           }}
         >
           <Text style={{ 
-            color: SUBTLE,
-            fontSize: 15
+            color: '#6B7280',
+            fontSize: 15,
+            fontFamily: 'Poppins-Regular'
           }}>
             Don&apos;t have an account?
           </Text>
           <Link href="/(auth)/register" style={{ 
             color: ACCENT,
             fontSize: 15,
-            fontWeight: '600'
+            fontFamily: 'Poppins-Medium'
           }}>
             Sign Up
           </Link>
         </View>
 
-        {/* Test Connection Link */}
-        <Link href="/(auth)/test" style={{ 
-          color: SUBTLE,
-          textAlign: "center",
-          fontSize: 14,
-          textDecorationLine: "underline",
-          opacity: 0.7
-        }}>
-          Test Connection
-        </Link>
+         
+         
       </View>
     </View>
   );
