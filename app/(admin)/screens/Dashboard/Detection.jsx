@@ -1,45 +1,153 @@
-import { useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Dimensions,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { LineChart, PieChart } from 'react-native-chart-kit';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MainHeader from '../../../components/common/MainHeader';
+
+const API_BASE_URL = 'http://localhost:3000/api';
+
+const detectionService = {
+  getFlaggedWords: async (timeRange) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/dashboard/flagged-words?timeRange=${encodeURIComponent(timeRange)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  getActivityChart: async (timeRange) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/dashboard/activity-chart?timeRange=${encodeURIComponent(timeRange)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  },
+};
 
 export default function AdminDetectionScreen({ navigation }) {
   const [selectedTimeRange, setSelectedTimeRange] = useState('Today');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  const [detectionData, setDetectionData] = useState({
+    flaggedWords: null,
+    chartData: null,
+  });
+
   const timeRanges = ['Today', 'Last 7 days', 'Last 30 days', 'All Time'];
   const { width } = Dimensions.get('window');
 
-  // Mock data for analytics
-  const summaryStats = [
-    { label: 'Total Detections', value: 127 },
-    { label: 'Unique Types', value: 23 },
-    { label: 'High Severity', value: 12 },
-  ];
-  const trendingPatterns = [
-    { pattern: 'Profanity', count: 45, change: '+12%', color: '#FF6384' },
-    { pattern: 'Hate Speech', count: 28, change: '+8%', color: '#36A2EB' },
-    { pattern: 'Sensitive', count: 18, change: '+3%', color: '#FFCE56' },
-    { pattern: 'Threat', count: 10, change: '+5%', color: '#4BC0C0' },
-    { pattern: 'Harassment', count: 8, change: '+2%', color: '#9966CC' },
+  const fetchDetectionData = async (timeRange) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const [flaggedWords, chartData] = await Promise.all([
+        detectionService.getFlaggedWords(timeRange),
+        detectionService.getActivityChart(timeRange),
+      ]);
+
+      setDetectionData({
+        flaggedWords,
+        chartData,
+      });
+    } catch (error) {
+      console.error("Failed to fetch detection data:", error);
+      setError("Failed to load detection data. Please try again later.");
+      setDetectionData({
+        flaggedWords: {
+          topWords: [],
+          recentDetections: [],
+          totalCount: 0,
+          summary: { avgAccuracy: 0, avgResponseTime: 0 }
+        },
+        chartData: {
+          labels: ['', '', '', '', '', '', ''],
+          datasets: [{ label: 'Detections', data: [0, 0, 0, 0, 0, 0, 0] }],
+        },
+      });
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setIsRefreshing(true);
+    fetchDetectionData(selectedTimeRange);
+  };
+
+  useEffect(() => {
+    fetchDetectionData(selectedTimeRange);
+  }, [selectedTimeRange]);
+
+  // Process data for charts and display
+  const summaryStats = detectionData.flaggedWords ? [
+    { label: 'Total Detections', value: detectionData.flaggedWords.totalCount || 0 },
+    { label: 'Unique Words', value: detectionData.flaggedWords.topWords?.length || 0 },
+    { label: 'Avg Accuracy', value: `${(detectionData.flaggedWords.summary?.avgAccuracy || 0).toFixed(1)}%` },
+  ] : [
+    { label: 'Total Detections', value: 0 },
+    { label: 'Unique Words', value: 0 },
+    { label: 'Avg Accuracy', value: '0%' },
   ];
 
-  const detectedWords = [
-    { id: '1', word: 'damn', type: 'Profanity', timestamp: '2025-07-21T10:30:00Z', context: 'User A said "damn it" in chat.' },
-    { id: '2', word: 'idiot', type: 'Insult', timestamp: '2025-07-21T11:05:00Z', context: 'User B called User C an "idiot".' },
-    { id: '3', word: 'kill', type: 'Threat', timestamp: '2025-07-21T12:15:00Z', context: 'User D mentioned "I will kill you" in a private message.' },
-    { id: '4', word: 'hate', type: 'Hate Speech', timestamp: '2025-07-21T13:40:00Z', context: 'User E expressed "I hate this group".' },
-    { id: '5', word: 'sex', type: 'Sensitive', timestamp: '2025-07-21T14:00:00Z', context: 'User F discussed "sex education".' },
-    { id: '6', word: 'bitch', type: 'Profanity', timestamp: '2025-07-20T09:00:00Z', context: 'User G used the word "bitch" in a comment.' },
-    { id: '7', word: 'nazi', type: 'Hate Speech', timestamp: '2025-07-20T10:00:00Z', context: 'User H made a reference to "nazi ideology".' },
-    { id: '8', word: 'suicide', type: 'Sensitive', timestamp: '2025-07-20T11:00:00Z', context: 'User I talked about "suicide prevention".' },
-  ];
+  // Create trending patterns from top words
+  const trendingPatterns = detectionData.flaggedWords?.topWords?.slice(0, 5).map((word, index) => ({
+    pattern: word.word,
+    count: word.count,
+    change: '+' + Math.floor(Math.random() * 15 + 1) + '%', // Mock change data
+    color: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966CC'][index] || '#FF6384',
+    severity: word.severity
+  })) || [];
+
+  const detectedWords = detectionData.flaggedWords?.recentDetections?.slice(0, 8).map(detection => ({
+    id: detection.id,
+    word: detection.word,
+    type: detection.severity || 'Unknown',
+    timestamp: detection.timestamp,
+    context: detection.context,
+    user: detection.user
+  })) || [];
+
+  // Chart data processing
+  const chartLabels = detectionData.chartData?.labels || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const chartDetections = detectionData.chartData?.datasets?.[0]?.data || [0, 0, 0, 0, 0, 0, 0];
 
   const lineChartData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    labels: chartLabels,
     datasets: [
       {
-        data: [45, 52, 38, 67, 89, 74, 92],
+        data: chartDetections,
         strokeWidth: 2,
-        color: (opacity = 1) => `rgba(79, 70, 229, ${opacity})`, // Indigo 600
+        color: (opacity = 1) => `rgba(79, 70, 229, ${opacity})`,
         fillShadowGradient: 'rgba(79, 70, 229, 0.1)',
         fillShadowGradientOpacity: 0.1,
       },
@@ -80,7 +188,18 @@ export default function AdminDetectionScreen({ navigation }) {
 
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
+          colors={['#3b82f6']}
+          tintColor={'#3b82f6'}
+        />
+      }
+    >
       <MainHeader
         title="Detection"
         subtitle="Detection analytics and details"
@@ -117,89 +236,158 @@ export default function AdminDetectionScreen({ navigation }) {
         ))}
       </View>
 
-      {/* Summary Stats */}
-      <View style={styles.overallStatsContainer}>
-        {summaryStats.map((item, idx) => (
-          <View key={idx} style={styles.statCard}>
-            <Text style={styles.statValue}>{item.value}</Text>
-            <Text style={styles.statLabel}>{item.label}</Text>
+      {error ? (
+        <View style={styles.errorContainer}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#ef4444" />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <Text style={styles.loadingText}>Loading detection data...</Text>
+        </View>
+      ) : (
+        <>
+          {/* Summary Stats */}
+          <View style={styles.overallStatsContainer}>
+            {summaryStats.map((item, idx) => (
+              <View key={idx} style={styles.statCard}>
+                <Text style={styles.statValue}>{item.value}</Text>
+                <Text style={styles.statLabel}>{item.label}</Text>
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
 
-      {/* Trending Patterns */}
-      <View style={styles.analyticsSectionContainer}>
-        <Text style={styles.analyticsSectionTitle}>Trending Patterns</Text>
-        <View style={styles.analyticsList}>
-          {trendingPatterns.map((item, idx) => (
-            <View key={idx} style={styles.analyticsListItem}>
-              <View style={styles.trendingInfo}>
-                <Text style={styles.analyticsListItemText}>{item.pattern}</Text>
-                <Text style={styles.trendingCount}>{item.count} detections</Text>
-              </View>
-              <View style={[styles.changeBadge, { backgroundColor: item.change.startsWith('+') ? '#e8f5f0' : '#fee2e2' }]}>
-                <Text style={[styles.changeText, { color: item.change.startsWith('+') ? '#01B97F' : '#dc2626' }]}>{item.change}</Text>
+          {/* Detection Trend Chart */}
+          <View style={styles.chartContainer}>
+            <View style={styles.chartHeader}>
+              <Text style={styles.chartTitle}>Detection Trend ({selectedTimeRange})</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <LineChart
+                data={{
+                  labels: chartLabels,
+                  datasets: [
+                    {
+                      data: chartDetections,
+                      color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
+                      strokeWidth: 3,
+                      withDots: true,
+                      fillShadowGradient: 'rgba(1, 185, 127, 0.6)',
+                      fillShadowGradientOpacity: 0.6,
+                    },
+                  ],
+                }}
+                width={Math.max((chartLabels.length * 80), width - 40)}
+                height={220}
+                chartConfig={{
+                  backgroundColor: 'transparent',
+                  backgroundGradientFrom: '#ffffff',
+                  backgroundGradientTo: '#ffffff',
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => '#01B97F',
+                  labelColor: (opacity = 1) => `rgba(75, 85, 99, ${opacity})`,
+                  style: { borderRadius: 16 },
+                  propsForBackgroundLines: {
+                    strokeWidth: 1,
+                    stroke: '#f3f4f6',
+                    strokeDasharray: '5,5'
+                  },
+                  propsForLabels: {
+                    fontSize: 11,
+                    fontFamily: 'Poppins-Medium'
+                  },
+                }}
+                bezier
+                style={styles.chart}
+                withDots={true}
+                withShadow={false}
+                withInnerLines={true}
+                withHorizontalLabels={true}
+                withVerticalLabels={true}
+                withVerticalLines={false}
+                withFill={true}
+                getDotColor={() => '#01B97F'}
+                getDotProps={() => ({
+                  r: '4',
+                  strokeWidth: '2',
+                  stroke: '#ffffff',
+                  fill: '#01B97F'
+                })}
+              />
+            </ScrollView>
+            <View style={styles.chartLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#01B97F' }]} />
+                <Text style={styles.legendText}>Detection Count</Text>
               </View>
             </View>
-          ))}
-        </View>
-      </View>
+          </View>
 
-      {/* Weekly Trend Chart */}
-      <View style={styles.chartContainer}>
-        <View style={styles.chartHeader}>
-          <Text style={styles.chartTitle}>Weekly Trend</Text>
-        </View>
-        <LineChart
-          data={lineChartData}
-          width={width - 40}
-          height={180}
-          chartConfig={lineChartConfig}
-          bezier
-          style={styles.chart}
-          withDots={true}
-          withShadow={false}
-          withInnerLines={true}
-          withHorizontalLabels={true}
-          withVerticalLabels={true}
-        />
-      </View>
-
-      {/* Detection Types Distribution Pie Chart */}
-      <View style={styles.chartContainer}>
-        <View style={styles.chartHeader}>
-          <Text style={styles.chartTitle}>Detection Types Distribution</Text>
-        </View>
-        <PieChart
-          data={pieChartData}
-          width={width - 40}
-          height={200}
-          chartConfig={pieChartConfig}
-          accessor="population"
-          backgroundColor="transparent"
-          paddingLeft="15"
-          absolute
-        />
-      </View>
-
-      {/* Detected Words List */}
-      <View style={styles.analyticsSectionContainer}>
-        <Text style={styles.analyticsSectionTitle}>Recently Detected Words</Text>
-        <View style={styles.analyticsList}>
-          {detectedWords.map((item) => (
-            <View key={item.id} style={styles.analyticsListItem}>
-              <View style={styles.wordInfo}>
-                <Text style={styles.analyticsListItemText}>{item.word}</Text>
-                <Text style={styles.wordType}>{item.type}</Text>
-              </View>
-              <View style={styles.wordDetails}>
-                <Text style={styles.wordTimestamp}>{new Date(item.timestamp).toLocaleString()}</Text>
-                <Text style={styles.wordContext}>{item.context}</Text>
-              </View>
+          {/* Trending Patterns */}
+          <View style={styles.analyticsSectionContainer}>
+            <Text style={styles.analyticsSectionTitle}>Trending Patterns</Text>
+            <View style={styles.analyticsList}>
+              {trendingPatterns.map((item, idx) => (
+                <View key={idx} style={styles.analyticsListItem}>
+                  <View style={styles.trendingInfo}>
+                    <Text style={styles.analyticsListItemText}>{item.pattern}</Text>
+                    <Text style={styles.trendingCount}>{item.count} detections</Text>
+                  </View>
+                  <View style={[styles.changeBadge, { backgroundColor: item.change.startsWith('+') ? '#e8f5f0' : '#fee2e2' }]}>
+                    <Text style={[styles.changeText, { color: item.change.startsWith('+') ? '#01B97F' : '#dc2626' }]}>{item.change}</Text>
+                  </View>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
-      </View>
+          </View>
+
+          {/* Detection Types Distribution Pie Chart */}
+          {trendingPatterns.length > 0 && (
+            <View style={styles.chartContainer}>
+              <View style={styles.chartHeader}>
+                <Text style={styles.chartTitle}>Detection Types Distribution</Text>
+              </View>
+              <PieChart
+                data={trendingPatterns.map(item => ({
+                  name: item.pattern,
+                  population: item.count,
+                  color: item.color,
+                  legendFontColor: '#7F7F7F',
+                  legendFontSize: 12,
+                }))}
+                width={width - 40}
+                height={200}
+                chartConfig={pieChartConfig}
+                accessor="population"
+                backgroundColor="transparent"
+                paddingLeft="15"
+                absolute
+              />
+            </View>
+          )}
+
+          {/* Recently Detected Words */}
+          <View style={styles.analyticsSectionContainer}>
+            <Text style={styles.analyticsSectionTitle}>Recently Detected Words</Text>
+            <View style={styles.analyticsList}>
+              {detectedWords.map((item) => (
+                <View key={item.id} style={styles.analyticsListItem}>
+                  <View style={styles.wordInfo}>
+                    <Text style={styles.analyticsListItemText}>{item.word}</Text>
+                    <Text style={styles.wordType}>{item.type}</Text>
+                    {item.user && <Text style={styles.wordUser}>by {item.user}</Text>}
+                  </View>
+                  <View style={styles.wordDetails}>
+                    <Text style={styles.wordTimestamp}>{new Date(item.timestamp).toLocaleString()}</Text>
+                    <Text style={styles.wordContext}>{item.context}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -355,5 +543,42 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'right',
     marginTop: 2,
+  },
+  wordUser: {
+    fontSize: 11,
+    fontFamily: 'Poppins-Regular',
+    color: '#9ca3af',
+    marginTop: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    marginTop: 12,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    marginBottom: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#ef4444',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

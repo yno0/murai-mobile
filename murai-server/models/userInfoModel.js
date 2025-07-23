@@ -1,4 +1,4 @@
-import  { Schema, model } from "mongoose";
+import { Schema, model } from "mongoose";
 
 
 const UserInfoSchema = new Schema(
@@ -24,6 +24,34 @@ const UserInfoSchema = new Schema(
         phoneNumber: {
             type: String,
             required: false,
+        },
+        phone: {
+            type: String,
+            default: ''
+        },
+        address: {
+            type: String,
+            default: ''
+        },
+        emergencyContact: {
+            type: String,
+            default: ''
+        },
+        emergencyPhone: {
+            type: String,
+            default: ''
+        },
+        department: {
+            type: String,
+            default: 'Administration'
+        },
+        position: {
+            type: String,
+            default: 'System Administrator'
+        },
+        employeeId: {
+            type: String,
+            default: ''
         },
         profilePicture: {
             type: String,

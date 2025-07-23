@@ -1,51 +1,129 @@
-import { useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+    Dimensions,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import MainHeader from '../../../components/common/MainHeader';
 
+const API_BASE_URL = 'http://localhost:3000/api';
+
+const groupsService = {
+  getGroups: async (timeRange) => {
+    try {
+      console.log(`Fetching groups data for timeRange: ${timeRange}`);
+      const response = await fetch(`${API_BASE_URL}/dashboard/groups?timeRange=${encodeURIComponent(timeRange)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log(`API Response status: ${response.status}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`API Error: ${response.status} - ${errorText}`);
+        throw new Error(`Failed to fetch groups data: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Raw API response:', data);
+
+      return data;
+    } catch (error) {
+      console.error('Groups service error:', error);
+      throw error;
+    }
+  },
+};
+
 export default function AdminGroupsScreen({ navigation }) {
   const [selectedTimeRange, setSelectedTimeRange] = useState('Today');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  const [groupsData, setGroupsData] = useState({
+    groups: null,
+  });
+
   const timeRanges = ['Today', 'Last 7 days', 'Last 30 days', 'All Time'];
   const { width } = Dimensions.get('window');
 
-  // Mock data for analytics
-  const groupStats = [
-    { label: 'Total Groups', value: 18 },
-    { label: 'Active Groups', value: 14 },
-    { label: 'Inactive Groups', value: 4 },
-  ];
-  const groupSizes = [32, 28, 24, 20, 18, 12];
-  const groupLabels = ['Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F'];
-  const largestGroups = [
-    { name: 'Group A', members: 32 },
-    { name: 'Group B', members: 28 },
-    { name: 'Group C', members: 24 },
-    { name: 'Group D', members: 20 },
-    { name: 'Group E', members: 18 },
-  ];
+  const fetchGroupsData = async (timeRange) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const groups = await groupsService.getGroups(timeRange);
 
-  const groupStatusData = [
-    { name: 'Active', population: 14, color: '#4CAF50', legendFontColor: '#7F7F7F', legendFontSize: 12 },
-    { name: 'Inactive', population: 4, color: '#F44336', legendFontColor: '#7F7F7F', legendFontSize: 12 },
-    { name: 'Pending', population: 2, color: '#FFEB3B', legendFontColor: '#7F7F7F', legendFontSize: 12 },
-  ];
-
-  const barChartData = {
-    labels: groupLabels,
-    datasets: [
-      {
-        data: groupSizes,
-        colors: [
-          (opacity = 1) => `rgba(79, 70, 229, ${opacity})`,
-          (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
-          (opacity = 1) => `rgba(129, 140, 248, ${opacity})`,
-          (opacity = 1) => `rgba(165, 180, 252, ${opacity})`,
-          (opacity = 1) => `rgba(199, 210, 254, ${opacity})`,
-          (opacity = 1) => `rgba(224, 231, 255, ${opacity})`,
-        ],
-      },
-    ],
+      setGroupsData({
+        groups,
+      });
+    } catch (error) {
+      console.error("Failed to fetch groups data:", error);
+      setError("Failed to load groups data. Please try again later.");
+      setGroupsData({
+        groups: {
+          totalGroups: 0,
+          activeGroups: 0,
+          inactiveGroups: 0,
+          largestGroups: [],
+          statusDistribution: [],
+          groupsWithMembers: []
+        },
+      });
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   };
+
+  const onRefresh = () => {
+    setIsRefreshing(true);
+    fetchGroupsData(selectedTimeRange);
+  };
+
+  // Process data for display
+  const groupStats = groupsData.groups ? [
+    { label: 'Total Groups', value: groupsData.groups.totalGroups || 0 },
+    { label: 'Active Groups', value: groupsData.groups.activeGroups || 0 },
+    { label: 'Inactive Groups', value: groupsData.groups.inactiveGroups || 0 },
+  ] : [
+    { label: 'Total Groups', value: 0 },
+    { label: 'Active Groups', value: 0 },
+    { label: 'Inactive Groups', value: 0 },
+  ];
+
+  // Get largest groups for charts
+  const largestGroups = groupsData.groups?.largestGroups?.slice(0, 6) || [];
+  const groupLabels = largestGroups.map(group => group.name.length > 10 ? group.name.substring(0, 10) + '...' : group.name);
+  const groupSizes = largestGroups.map(group => group.memberCount);
+
+  // Create balanced colors for pie chart
+  const balancedColors = [
+    '#34D399', // Medium emerald
+    '#F87171', // Medium red
+    '#FBBF24', // Medium amber
+  ];
+
+  const groupStatusData = groupsData.groups?.statusDistribution?.map((status, index) => ({
+    name: status.status.charAt(0).toUpperCase() + status.status.slice(1),
+    population: status.count,
+    color: balancedColors[index % balancedColors.length],
+    legendFontColor: '#374151',
+    legendFontSize: 11,
+    legendFontFamily: 'Poppins-Medium',
+  })) || [];
+
+  // Fetch data when component mounts or time range changes
+  useEffect(() => {
+    fetchGroupsData(selectedTimeRange);
+  }, [selectedTimeRange]);
 
   const barChartConfig = {
     backgroundColor: 'transparent',
@@ -67,7 +145,18 @@ export default function AdminGroupsScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
+          colors={['#01B97F']}
+          tintColor={'#01B97F'}
+        />
+      }
+    >
       <MainHeader
         title="Groups"
         subtitle="Groups analytics and details"
@@ -104,63 +193,129 @@ export default function AdminGroupsScreen({ navigation }) {
         ))}
       </View>
 
-      {/* Group Stats */}
-      <View style={styles.overallStatsContainer}>
-        {groupStats.map((item, idx) => (
-          <View key={idx} style={styles.statCard}>
-            <Text style={styles.statValue}>{item.value}</Text>
-            <Text style={styles.statLabel}>{item.label}</Text>
+      {error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : isLoading ? (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading groups data...</Text>
+        </View>
+      ) : (
+        <>
+          {/* Group Stats */}
+          <View style={styles.overallStatsContainer}>
+            {groupStats.map((item, idx) => (
+              <View key={idx} style={styles.statCard}>
+                <Text style={styles.statValue}>{item.value}</Text>
+                <Text style={styles.statLabel}>{item.label}</Text>
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
 
-      {/* Group Sizes Bar Chart */}
-      <View style={styles.chartContainer}>
-        <View style={styles.chartHeader}>
-          <Text style={styles.chartTitle}>Group Sizes</Text>
-        </View>
-        <BarChart
-          data={barChartData}
-          width={width - 40}
-          height={180}
-          chartConfig={barChartConfig}
-          style={styles.chart}
-          fromZero
-          showBarTops
-          showValuesOnTopOfBars
-          flatColor
-        />
-      </View>
-
-      {/* Group Status Distribution Pie Chart */}
-      <View style={styles.chartContainer}>
-        <View style={styles.chartHeader}>
-          <Text style={styles.chartTitle}>Group Status Distribution</Text>
-        </View>
-        <PieChart
-          data={groupStatusData}
-          width={width - 40}
-          height={200}
-          chartConfig={pieChartConfig}
-          accessor="population"
-          backgroundColor="transparent"
-          paddingLeft="15"
-          absolute
-        />
-      </View>
-
-      {/* Largest Groups */}
-      <View style={styles.analyticsSectionContainer}>
-        <Text style={styles.analyticsSectionTitle}>Largest Groups</Text>
-        <View style={styles.analyticsList}>
-          {largestGroups.map((group, idx) => (
-            <View key={idx} style={styles.analyticsListItem}>
-              <Text style={styles.analyticsListItemText}>{group.name}</Text>
-              <Text style={styles.analyticsListItemValue}>{group.members} members</Text>
+          {/* Group Sizes Bar Chart */}
+          {largestGroups.length > 0 && (
+            <View style={styles.chartContainer}>
+              <View style={styles.chartHeader}>
+                <Text style={styles.chartTitle}>Group Sizes ({selectedTimeRange})</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <BarChart
+                  data={{
+                    labels: groupLabels,
+                    datasets: [
+                      {
+                        data: groupSizes.length > 0 ? groupSizes : [0],
+                        colors: groupSizes.map((_, index) => {
+                          const colors = [
+                            '#01B97F', // Primary theme
+                            '#34D399', // Emerald variant
+                            '#10B981', // Emerald light
+                            '#065F46', // Emerald dark
+                            '#6B7280', // Gray
+                            '#374151', // Dark gray
+                          ];
+                          return (opacity = 1) => colors[index % colors.length] || '#01B97F';
+                        }),
+                      },
+                    ],
+                  }}
+                  width={Math.max((groupLabels.length * 80), width - 40)}
+                  height={200}
+                  chartConfig={{
+                    backgroundColor: 'transparent',
+                    backgroundGradientFrom: '#ffffff',
+                    backgroundGradientTo: '#ffffff',
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => '#01B97F',
+                    labelColor: (opacity = 1) => `rgba(75, 85, 99, ${opacity})`,
+                    style: { borderRadius: 16 },
+                    propsForBackgroundLines: {
+                      strokeWidth: 1,
+                      stroke: '#f3f4f6',
+                      strokeDasharray: '5,5'
+                    },
+                    propsForLabels: {
+                      fontSize: 11,
+                      fontFamily: 'Poppins-Medium'
+                    },
+                  }}
+                  style={styles.chart}
+                  fromZero
+                  showBarTops={false}
+                  showValuesOnTopOfBars
+                  withCustomBarColorFromData
+                  flatColor={false}
+                />
+              </ScrollView>
             </View>
-          ))}
-        </View>
-      </View>
+          )}
+
+          {/* Group Status Distribution Pie Chart */}
+          {groupStatusData.length > 0 && (
+            <View style={styles.chartContainer}>
+              <View style={styles.chartHeader}>
+                <Text style={styles.chartTitle}>Group Status Distribution</Text>
+              </View>
+              <PieChart
+                data={groupStatusData}
+                width={width - 40}
+                height={200}
+                chartConfig={{
+                  backgroundColor: 'transparent',
+                  color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(55, 65, 81, ${opacity})`,
+                  style: {
+                    borderRadius: 16,
+                  },
+                }}
+                accessor="population"
+                backgroundColor="transparent"
+                paddingLeft="15"
+                absolute={false}
+                hasLegend={true}
+                avoidFalseZero={true}
+              />
+            </View>
+          )}
+
+          {/* Largest Groups */}
+          <View style={styles.analyticsSectionContainer}>
+            <Text style={styles.analyticsSectionTitle}>Largest Groups</Text>
+            <View style={styles.analyticsList}>
+              {largestGroups.map((group, idx) => (
+                <View key={idx} style={styles.analyticsListItem}>
+                  <View style={styles.groupInfo}>
+                    <Text style={styles.analyticsListItemText}>{group.name}</Text>
+                    <Text style={styles.groupStatus}>Status: {group.status}</Text>
+                  </View>
+                  <Text style={styles.analyticsListItemValue}>{group.memberCount} members</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -278,5 +433,45 @@ const styles = StyleSheet.create({
   chart: {
     marginVertical: 8,
     borderRadius: 16,
+  },
+  groupInfo: {
+    flex: 1,
+  },
+  groupStatus: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    marginTop: 12,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    marginBottom: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#ef4444',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

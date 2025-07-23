@@ -2,13 +2,12 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useState } from 'react';
 import {
-    Alert,
     ScrollView,
     StyleSheet,
     Switch,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 const MainHeader = require('../../../components/common/MainHeader').default;
@@ -37,31 +36,7 @@ export default function AccountSettingsScreen() {
     navigation.navigate('ChangePassword');
   };
 
-  const handleExportData = () => {
-    Alert.alert(
-      'Export Data',
-      'This will export all your account data. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Export', onPress: () => Alert.alert('Success', 'Data export initiated') }
-      ]
-    );
-  };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'This action cannot be undone. Are you sure you want to delete your account?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => Alert.alert('Account Deletion', 'Account deletion request submitted')
-        }
-      ]
-    );
-  };
 
   const renderSettingItem = (title, description, key, icon) => (
     <View style={styles.settingItem}>
@@ -202,19 +177,6 @@ export default function AccountSettingsScreen() {
               'Update your account password',
               'key',
               handleChangePassword
-            )}
-            {renderActionItem(
-              'Export Data',
-              'Download your account data',
-              'download',
-              handleExportData
-            )}
-            {renderActionItem(
-              'Delete Account',
-              'Permanently delete your account',
-              'trash-2',
-              handleDeleteAccount,
-              true
             )}
           </View>
         </View>

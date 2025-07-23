@@ -2,17 +2,20 @@ import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useAuth } from '../../../context/AuthContext';
+
+// API configuration
+const API_BASE_URL = 'http://localhost:3000/api';
 
 export default function AdminProfileScreen() {
   const navigation = useNavigation();
@@ -20,6 +23,64 @@ export default function AdminProfileScreen() {
   const { user, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [profileData, setProfileData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // Helper function to get auth token
+  const getAuthToken = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  };
+
+  // Helper function to make authenticated API calls
+  const makeAuthenticatedRequest = useCallback(async (url, options = {}) => {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  }, []);
+
+  // Load profile data from API
+  const loadProfile = useCallback(async () => {
+    setLoading(true);
+    try {
+      console.log('🔄 Loading admin profile data...');
+      const data = await makeAuthenticatedRequest('/admin/profile');
+      console.log('✅ Profile data loaded:', data);
+      setProfileData(data);
+    } catch (error) {
+      console.error('❌ Load profile error:', error);
+      // Fallback to user data from context
+      setProfileData(user);
+    } finally {
+      setLoading(false);
+    }
+  }, [makeAuthenticatedRequest, user]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   const getCurrentTime = () => {
     const now = new Date();
@@ -36,13 +97,16 @@ export default function AdminProfileScreen() {
       await AsyncStorage.multiRemove(['user', 'token', 'refreshToken']);
       if (logout) logout();
       router.replace('/(auth)/login');
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'There was an issue logging out. Please try again.');
     } finally {
       setIsLoggingOut(false);
       setShowLogoutModal(false);
     }
   };
+
+  // Get display data (prefer profileData over user context)
+  const displayData = profileData || user || {};
 
   const profileOptions = [
     {
@@ -71,7 +135,20 @@ export default function AdminProfileScreen() {
     <View style={styles.container}>
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <Text style={styles.headerTitle}>My Profile</Text>
+        <View style={styles.headerContainer}>
+          <Text style={styles.headerTitle}>My Profile</Text>
+          <TouchableOpacity
+            style={styles.refreshButton}
+            onPress={loadProfile}
+            disabled={loading}
+          >
+            <Feather
+              name={loading ? 'loader' : 'refresh-cw'}
+              size={20}
+              color={loading ? '#A8AAB0' : '#01B97F'}
+            />
+          </TouchableOpacity>
+        </View>
 
         {/* Profile Card */}
         <View style={styles.profileCard}>
@@ -92,13 +169,19 @@ export default function AdminProfileScreen() {
             <Text style={styles.timeText}>{getCurrentTime()}, Philippine Time</Text>
           </View>
 
-          <Text style={styles.profileName}>{user?.name || 'Admin User'}</Text>
+          <Text style={styles.profileName}>
+            {loading ? 'Loading...' : (displayData?.name || 'Admin User')}
+          </Text>
 
           <View style={styles.roleContainer}>
             <View style={styles.roleDot} />
-            <Text style={styles.roleText}>System Administrator</Text>
+            <Text style={styles.roleText}>
+              {loading ? 'Loading...' : (displayData?.position || 'System Administrator')}
+            </Text>
             <Text style={styles.separator}>•</Text>
-            <Text style={styles.roleText}>MURAi Admin</Text>
+            <Text style={styles.roleText}>
+              {loading ? 'Loading...' : (displayData?.department || 'MURAi Admin')}
+            </Text>
           </View>
 
           <View style={styles.managerSection}>
@@ -109,7 +192,9 @@ export default function AdminProfileScreen() {
             <View style={styles.managerItem}>
               <Text style={styles.managerLabel}>Department</Text>
               <View style={styles.departmentContainer}>
-                <Text style={styles.departmentText}>Administration</Text>
+                <Text style={styles.departmentText}>
+                  {loading ? 'Loading...' : (displayData?.department || 'Administration')}
+                </Text>
                 <Feather name="chevron-right" size={16} color="#A8AAB0" />
               </View>
             </View>
@@ -204,11 +289,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
   },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
   headerTitle: {
     fontSize: 24,
     fontFamily: 'Poppins-Bold',
     color: '#1D1D1F',
-    marginBottom: 24,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   profileCard: {
     backgroundColor: '#ffffff',

@@ -24,6 +24,7 @@ function HomeScreen({ navigation }) {
   const [notifications, setNotifications] = React.useState([]);
   const [notifModalVisible, setNotifModalVisible] = React.useState(false);
   const [notifLoading, setNotifLoading] = React.useState(false);
+  const [timeRange, setTimeRange] = React.useState('today');
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -51,27 +52,35 @@ function HomeScreen({ navigation }) {
     } catch (err) {}
   };
 
+  const fetchData = React.useCallback(async (selectedTimeRange = timeRange) => {
+    setLoading(true);
+    setError('');
+    try {
+      // Map time range to API format
+      const apiTimeRange = selectedTimeRange === 'week' ? 'last 7 days' :
+                          selectedTimeRange === 'month' ? 'last 30 days' :
+                          selectedTimeRange === 'year' ? 'all time' :
+                          'today';
+
+      const [statsRes, chartRes, activityRes] = await Promise.all([
+        api.get(`/dashboard/overview?timeRange=${apiTimeRange}`),
+        api.get(`/dashboard/activity-chart?timeRange=${apiTimeRange}`),
+        api.get(`/dashboard/user-activity?timeRange=${apiTimeRange}`),
+      ]);
+      setStats(statsRes.data);
+      setChartData(chartRes.data);
+      setRecentActivity(activityRes.data.recentActivity || []);
+    } catch (err) {
+      console.error('Dashboard API Error:', err);
+      setError('Failed to load dashboard data. Please check server connection.');
+    } finally {
+      setLoading(false);
+    }
+  }, [timeRange]);
+
   React.useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const [statsRes, chartRes, activityRes] = await Promise.all([
-          api.get('/dashboard/overview?timeRange=today'),
-          api.get('/dashboard/activity-chart?timeRange=last 7 days'),
-          api.get('/dashboard/user-activity?timeRange=last 7 days'),
-        ]);
-        setStats(statsRes.data);
-        setChartData(chartRes.data);
-        setRecentActivity(activityRes.data.recentActivity || []);
-      } catch (err) {
-        setError('Failed to load dashboard data');
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // Prepare chart data for LineChart
   const preparedChartData = chartData ? {
@@ -136,6 +145,32 @@ function HomeScreen({ navigation }) {
             </View>
           )}
         </TouchableOpacity>
+      </View>
+
+      {/* Time Filter Options */}
+      <View style={styles.timeFilterContainer}>
+        {['today', 'week', 'month', 'year'].map((filter) => (
+          <TouchableOpacity
+            key={filter}
+            style={[
+              styles.timeFilterButton,
+              timeRange === filter && styles.timeFilterButtonActive
+            ]}
+            onPress={() => {
+              setTimeRange(filter);
+              fetchData(filter);
+            }}
+          >
+            <Text style={[
+              styles.timeFilterText,
+              timeRange === filter && styles.timeFilterTextActive
+            ]}>
+              {filter === 'today' ? 'Today' :
+               filter === 'week' ? 'Week' :
+               filter === 'month' ? 'Month' : 'Year'}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Notification Modal */}
@@ -282,18 +317,28 @@ function HomeScreen({ navigation }) {
               renderItem={({ item }) => (
                 <View style={styles.activityItem}>
                   <View style={[styles.activityIcon, { backgroundColor: '#f3f4f6' }]}> {/* You can color by type if you want */}
-                    <MaterialCommunityIcons 
+                    <MaterialCommunityIcons
                       name={
-                        item.type === 'detection' ? 'alert-circle-outline' :
-                        item.type === 'member' ? 'account-plus-outline' :
-                        item.type === 'settings' ? 'cog-outline' :
+                        item.type === 'flagged' ? 'alert-circle-outline' :
+                        item.type === 'group_join' ? 'account-plus-outline' :
+                        item.type === 'group_leave' ? 'account-minus-outline' :
+                        item.type === 'login' ? 'login' :
+                        item.type === 'logout' ? 'logout' :
+                        item.type === 'update' ? 'cog-outline' :
+                        item.type === 'report' ? 'file-document-outline' :
+                        item.type === 'visit' ? 'web' :
                         'information-outline'
                       }
                       size={20}
                       color={
-                        item.type === 'detection' ? 'rgba(81, 7, 192, 1)' :
-                        item.type === 'member' ? 'rgba(81, 7, 192, 0.7)' :
-                        item.type === 'settings' ? 'rgba(81, 7, 192, 0.5)' :
+                        item.type === 'flagged' ? 'rgba(239, 68, 68, 1)' :
+                        item.type === 'group_join' ? 'rgba(34, 197, 94, 1)' :
+                        item.type === 'group_leave' ? 'rgba(245, 158, 11, 1)' :
+                        item.type === 'login' ? 'rgba(59, 130, 246, 1)' :
+                        item.type === 'logout' ? 'rgba(107, 114, 128, 1)' :
+                        item.type === 'update' ? 'rgba(139, 92, 246, 1)' :
+                        item.type === 'report' ? 'rgba(239, 68, 68, 1)' :
+                        item.type === 'visit' ? 'rgba(16, 185, 129, 1)' :
                         'rgba(1, 82, 55, 1)'
                       }
                     />
@@ -617,6 +662,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'Poppins-Regular',
     color: '#6b7280',
+  },
+  timeFilterContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 30,
+    marginHorizontal: 5,
+  },
+  timeFilterButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  timeFilterButtonActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  timeFilterText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+  },
+  timeFilterTextActive: {
+    color: '#1f2937',
+    fontFamily: 'Poppins-SemiBold',
   },
 });
 

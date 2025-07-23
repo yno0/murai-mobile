@@ -444,4 +444,252 @@ router.get('/insights', /* authenticateToken, */ async (req, res) => {
   }
 });
 
-export default router; 
+// GET /api/dashboard/groups - groups analytics
+router.get('/groups', /* authenticateToken, */ async (req, res) => {
+  try {
+    const { timeRange = 'today' } = req.query;
+    const now = new Date();
+    let dateFilter = {};
+
+    // Set date filter based on time range
+    switch (timeRange.toLowerCase()) {
+      case 'today':
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        dateFilter = { createAt: { $gte: today } };
+        break;
+      case 'last 7 days':
+        dateFilter = { createAt: { $gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } };
+        break;
+      case 'last 30 days':
+        dateFilter = { createAt: { $gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } };
+        break;
+      case 'all time':
+      default:
+        dateFilter = {};
+        break;
+    }
+
+    // Import models here to avoid issues
+    const Group = (await import('../models/groupModel.js')).default;
+    const GroupMember = (await import('../models/groupUserModel.js')).default;
+
+    // Get group statistics
+    const [
+      totalGroups,
+      activeGroups,
+      inactiveGroups,
+      allGroups,
+      groupMembers
+    ] = await Promise.all([
+      Group.countDocuments({ ...dateFilter, isActive: true }),
+      Group.countDocuments({ ...dateFilter, isActive: true, status: 'active' }),
+      Group.countDocuments({ ...dateFilter, isActive: false }),
+      Group.find(dateFilter).sort({ createAt: -1 }),
+      GroupMember.find({})
+    ]);
+
+    // Calculate member counts for each group
+    const memberCounts = {};
+    groupMembers.forEach(member => {
+      const groupId = member.groupId.toString();
+      memberCounts[groupId] = (memberCounts[groupId] || 0) + 1;
+    });
+
+    // Process groups with member counts
+    const groupsWithMembers = allGroups.map(group => {
+      const memberCount = memberCounts[group._id.toString()] || 0;
+      return {
+        id: group._id,
+        name: group.name,
+        memberCount,
+        status: group.status || 'active',
+        isActive: group.isActive,
+        createdAt: group.createAt,
+        type: group.type || 'public'
+      };
+    });
+
+    // Get largest groups (top 10)
+    const largestGroups = groupsWithMembers
+      .sort((a, b) => b.memberCount - a.memberCount)
+      .slice(0, 10);
+
+    // Calculate group growth trend (last 7 days)
+    const growthTrend = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+
+      const dayGroups = await Group.countDocuments({
+        createAt: { $gte: dayStart, $lt: dayEnd }
+      });
+
+      growthTrend.push({
+        date: dayStart.toISOString().split('T')[0],
+        count: dayGroups
+      });
+    }
+
+    // Group status distribution
+    const statusDistribution = [
+      { status: 'active', count: activeGroups },
+      { status: 'inactive', count: inactiveGroups },
+      { status: 'pending', count: Math.max(0, totalGroups - activeGroups - inactiveGroups) }
+    ];
+
+    res.json({
+      totalGroups,
+      activeGroups,
+      inactiveGroups,
+      largestGroups,
+      growthTrend,
+      statusDistribution,
+      groupsWithMembers: groupsWithMembers.slice(0, 20) // Return top 20 for charts
+    });
+  } catch (err) {
+    console.error('Groups analytics error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/dashboard/patterns - patterns over time analytics
+router.get('/patterns', /* authenticateToken, */ async (req, res) => {
+  try {
+    const { timeRange = 'today' } = req.query;
+    const now = new Date();
+    let dateFilter = {};
+
+    // Set date filter based on time range
+    switch (timeRange.toLowerCase()) {
+      case 'today':
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        dateFilter = { createdAt: { $gte: today } };
+        break;
+      case 'last 7 days':
+        dateFilter = { createdAt: { $gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } };
+        break;
+      case 'last 30 days':
+        dateFilter = { createdAt: { $gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } };
+        break;
+      case 'all time':
+      default:
+        dateFilter = {};
+        break;
+    }
+
+    // Get pattern analytics from detected words
+    const [
+      totalPatterns,
+      patternsByWord,
+      hourlyActivity,
+      dailyTrend
+    ] = await Promise.all([
+      DetectedWord.distinct('word', dateFilter).then(words => words.length),
+      DetectedWord.aggregate([
+        { $match: dateFilter },
+        { $group: { _id: '$word', count: { $sum: 1 }, avgSentiment: { $avg: '$sentimentScore' } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ]),
+      DetectedWord.aggregate([
+        { $match: dateFilter },
+        {
+          $group: {
+            _id: { $hour: '$createdAt' },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { '_id': 1 } }
+      ]),
+      DetectedWord.aggregate([
+        { $match: dateFilter },
+        {
+          $group: {
+            _id: {
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' },
+              day: { $dayOfMonth: '$createdAt' }
+            },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } },
+        { $limit: 30 }
+      ])
+    ]);
+
+    // Find peak and lowest activity hours
+    const peakHour = hourlyActivity.reduce((max, current) =>
+      current.count > max.count ? current : max, { _id: 0, count: 0 });
+    const lowestHour = hourlyActivity.reduce((min, current) =>
+      current.count < min.count ? current : min, { _id: 23, count: Infinity });
+
+    // Process top patterns with severity classification
+    const topPatterns = patternsByWord.map(pattern => {
+      let severity = 'low';
+      if (pattern.avgSentiment < -0.7) severity = 'high';
+      else if (pattern.avgSentiment < -0.3) severity = 'medium';
+
+      return {
+        word: pattern._id,
+        count: pattern.count,
+        severity,
+        sentimentScore: pattern.avgSentiment
+      };
+    });
+
+    // Create time series data for charts
+    const timeSeriesData = [];
+    const labels = [];
+
+    if (timeRange.toLowerCase() === 'today') {
+      // Hourly data for today
+      for (let hour = 0; hour < 24; hour++) {
+        const hourData = hourlyActivity.find(h => h._id === hour);
+        timeSeriesData.push(hourData ? hourData.count : 0);
+        labels.push(`${hour}:00`);
+      }
+    } else {
+      // Daily data for other ranges
+      const days = timeRange.toLowerCase() === 'last 7 days' ? 7 :
+                   timeRange.toLowerCase() === 'last 30 days' ? 30 :
+                   Math.min(dailyTrend.length, 30);
+
+      for (let i = days - 1; i >= 0; i--) {
+        const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const dayData = dailyTrend.find(d =>
+          d._id.year === date.getFullYear() &&
+          d._id.month === date.getMonth() + 1 &&
+          d._id.day === date.getDate()
+        );
+        timeSeriesData.push(dayData ? dayData.count : 0);
+        labels.push(date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric'
+        }));
+      }
+    }
+
+    res.json({
+      totalPatterns,
+      peakActivity: `${peakHour._id}:00`,
+      lowestActivity: `${lowestHour._id}:00`,
+      topPatterns: topPatterns.slice(0, 5),
+      timeSeriesData,
+      labels,
+      hourlyActivity,
+      summary: {
+        totalDetections: await DetectedWord.countDocuments(dateFilter),
+        avgSentiment: patternsByWord.length > 0 ?
+          patternsByWord.reduce((sum, p) => sum + p.avgSentiment, 0) / patternsByWord.length : 0,
+        uniquePatterns: totalPatterns
+      }
+    });
+  } catch (err) {
+    console.error('Patterns analytics error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+export default router;

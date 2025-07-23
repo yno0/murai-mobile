@@ -1,16 +1,20 @@
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Platform,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View
+    Alert,
+    FlatList,
+    Platform,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
+
+// API configuration
+const API_BASE_URL = 'http://localhost:3000/api';
 
 const MainHeader = require('../../../components/common/MainHeader').default;
 
@@ -19,6 +23,43 @@ export default function SystemLogsScreen() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Helper function to get auth token
+  const getAuthToken = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  };
+
+  // Helper function to make authenticated API calls
+  const makeAuthenticatedRequest = useCallback(async (url, options = {}) => {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  }, []);
 
   // Mock system logs data
   const mockLogs = [
@@ -78,26 +119,60 @@ export default function SystemLogsScreen() {
     },
   ];
 
-  const loadLogs = useCallback(async () => {
+  const loadLogs = useCallback(async (refresh = false) => {
+    if (refresh) {
+      setPage(1);
+      setHasMore(true);
+    }
+
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch('/api/admin/logs');
-      // const data = await response.json();
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setLogs(mockLogs);
+      console.log('🔄 Loading admin activity logs...');
+      const currentPage = refresh ? 1 : page;
+
+      const data = await makeAuthenticatedRequest(`/admin/profile/activity?page=${currentPage}&limit=20`);
+      console.log('✅ Activity logs loaded:', data);
+
+      // Transform API data to match our log format
+      const transformedLogs = data.activities.map(activity => ({
+        id: activity._id,
+        timestamp: new Date(activity.timestamp),
+        action: activity.action,
+        user: activity.adminId?.email || activity.adminId?.name || 'System',
+        details: activity.details || 'No details available',
+        level: activity.status === 'failed' ? 'error' : 'info',
+        category: activity.activityType || 'system'
+      }));
+
+      if (refresh) {
+        setLogs(transformedLogs);
+      } else {
+        setLogs(prev => [...prev, ...transformedLogs]);
+      }
+
+      setHasMore(data.pagination.hasNextPage);
+      setPage(currentPage + 1);
+
     } catch (error) {
-      Alert.alert('Error', 'Failed to load system logs');
+      console.error('❌ Load logs error:', error);
+      Alert.alert('Error', error.message || 'Failed to load system logs');
+
+      // Fallback to mock data on error
+      if (logs.length === 0) {
+        setLogs(mockLogs);
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [makeAuthenticatedRequest, page, logs.length]);
 
   useEffect(() => {
-    loadLogs();
-  }, [loadLogs]);
+    loadLogs(true);
+  }, []);
+
+  const handleRefresh = () => {
+    loadLogs(true);
+  };
 
   const getFilteredLogs = () => {
     if (selectedFilter === 'all') return logs;
@@ -177,9 +252,10 @@ export default function SystemLogsScreen() {
         ]}
         rightActions={[
           {
-            icon: 'refresh-cw',
+            icon: loading ? 'loader' : 'refresh-cw',
             iconType: 'feather',
-            onPress: loadLogs
+            onPress: loading ? undefined : handleRefresh,
+            disabled: loading
           }
         ]}
         style={{ paddingHorizontal: 0 }}
@@ -219,7 +295,7 @@ export default function SystemLogsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={loading}
-            onRefresh={loadLogs}
+            onRefresh={handleRefresh}
             colors={['#01B97F']}
             tintColor="#01B97F"
           />

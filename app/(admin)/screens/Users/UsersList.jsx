@@ -1,13 +1,13 @@
 import { Feather } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 const ITEMS_PER_PAGE = 10;
@@ -25,29 +25,16 @@ export default function UsersList({
   const [currentPage, setCurrentPage] = useState(1);
   const [paginatedUsers, setPaginatedUsers] = useState([]);
 
-  // Filter users based on search and filter
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = !searchQuery || 
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.role.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesFilter = selectedFilter === 'all' || 
-      (selectedFilter === 'active' && user.status === 'Active') ||
-      (selectedFilter === 'inactive' && user.status === 'Inactive');
-    
-    return matchesSearch && matchesFilter;
-  });
-
+  // Since filtering is done on the server side, we just use the users directly
   // Calculate pagination
-  const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
 
   useEffect(() => {
-    const paginated = filteredUsers.slice(startIndex, endIndex);
+    const paginated = users.slice(startIndex, endIndex);
     setPaginatedUsers(paginated);
-  }, [filteredUsers, currentPage]);
+  }, [users, currentPage, startIndex, endIndex]);
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -91,16 +78,23 @@ export default function UsersList({
             <Text style={styles.userItemEmail}>{item.email}</Text>
             <View style={styles.userItemMeta}>
               <View style={[
-                styles.roleBadge, 
+                styles.roleBadge,
                 { backgroundColor: item.role === 'Admin' ? '#e8f5f0' : '#f3f4f6' }
               ]}>
                 <Text style={[
-                  styles.roleText, 
+                  styles.roleText,
                   { color: item.role === 'Admin' ? '#01B97F' : '#6b7280' }
                 ]}>
                   {item.role}
                 </Text>
               </View>
+              {item.isPremium && (
+                <View style={[styles.roleBadge, { backgroundColor: '#fef3c7', marginLeft: 8 }]}>
+                  <Text style={[styles.roleText, { color: '#d97706' }]}>
+                    Premium
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -174,7 +168,7 @@ export default function UsersList({
       <View style={styles.paginationContainer}>
         <View style={styles.paginationInfo}>
           <Text style={styles.paginationInfoText}>
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length} users
+            Showing {startIndex + 1}-{Math.min(endIndex, users.length)} of {users.length} users
           </Text>
         </View>
         <View style={styles.paginationButtons}>
@@ -192,13 +186,21 @@ export default function UsersList({
           <Feather name="search" size={20} color="#01B97F" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search users by name, email, or role..."
+            placeholder="Search by name, email, or role (@admin, @user)..."
             placeholderTextColor="#9CA3AF"
             value={searchQuery}
             onChangeText={onSearchChange}
             selectionColor="#01B97F"
           />
         </View>
+        {searchQuery && (searchQuery.toLowerCase().startsWith('@admin') || searchQuery.toLowerCase().startsWith('@user')) && (
+          <View style={styles.searchHint}>
+            <Feather name="info" size={12} color="#01B97F" />
+            <Text style={styles.searchHintText}>
+              Searching for {searchQuery.toLowerCase().startsWith('@admin') ? 'Admin' : 'User'} role
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Filters */}
@@ -268,6 +270,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Poppins-Regular',
     color: '#111827',
+  },
+  searchHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#e8f5f0',
+    borderRadius: 6,
+  },
+  searchHintText: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#01B97F',
+    marginLeft: 6,
   },
   filterSection: {
     paddingHorizontal: 20,

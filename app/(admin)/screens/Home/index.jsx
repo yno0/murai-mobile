@@ -1,13 +1,13 @@
 import React from 'react';
 import {
-  Dimensions,
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    FlatList,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -31,8 +31,8 @@ function AdminHomeScreen({ navigation }) {
   const fetchNotifications = async () => {
     setNotifLoading(true);
     try {
-      // Assuming an admin-specific notification endpoint
-      const res = await api.get('/admin/notifications'); 
+      // Use the regular notifications endpoint
+      const res = await api.get('/notifications');
       setNotifications(res.data);
     } catch (err) {
       console.error("Failed to fetch admin notifications:", err);
@@ -48,7 +48,7 @@ function AdminHomeScreen({ navigation }) {
 
   const markAsRead = async (id) => {
     try {
-      await api.put(`/admin/notifications/${id}/read`);
+      await api.put(`/notifications/${id}/read`);
       setNotifications((prev) => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
     } catch (err) {
       console.error("Failed to mark admin notification as read:", err);
@@ -60,11 +60,11 @@ function AdminHomeScreen({ navigation }) {
       setLoading(true);
       setError('');
       try {
-        // Fetch admin-specific dashboard data
+        // Fetch dashboard data using working endpoints
         const [statsRes, chartRes, activityRes] = await Promise.all([
-          api.get('/admin/dashboard/overview?timeRange=today'),
-          api.get('/admin/dashboard/activity-chart?timeRange=last 7 days'),
-          api.get('/admin/dashboard/recent-activity?timeRange=last 7 days'),
+          api.get('/dashboard/overview?timeRange=today'),
+          api.get('/dashboard/activity-chart?timeRange=last 7 days'),
+          api.get('/dashboard/user-activity?timeRange=last 7 days'),
         ]);
         setStats(statsRes.data);
         setChartData(chartRes.data);
@@ -122,12 +122,12 @@ function AdminHomeScreen({ navigation }) {
     withOuterLines: false,
   };
 
-  // Mock KPI data for now
+  // KPI data from API response
   const kpiData = {
-    totalUsers: { value: stats?.totalUsers?.value || '2,450', change: stats?.totalUsers?.change || '+12%' },
-    totalDetections: { value: stats?.totalDetections?.value || '15,000', change: stats?.totalDetections?.change || '+10%' },
-    flaggedContent: { value: stats?.flaggedContent?.value || '8,765', change: stats?.flaggedContent?.change || '+18%' },
-    systemHealth: { value: stats?.systemHealth?.value || 'Operational', statusColor: COLORS.SUCCESS },
+    totalUsers: { value: '2,450', change: '+12%' }, // Static for now since not in API
+    harmfulContent: { value: stats?.harmfulContentDetected?.value || '...', change: stats?.harmfulContentDetected?.change || '...' },
+    websitesMonitored: { value: stats?.websitesMonitored?.value || '...', change: stats?.websitesMonitored?.change || '...' },
+    protectionEffectiveness: { value: stats?.protectionEffectiveness?.value || '...', change: stats?.protectionEffectiveness?.change || '...', statusColor: COLORS.SUCCESS },
   };
 
   const criticalEvents = [
@@ -221,19 +221,19 @@ function AdminHomeScreen({ navigation }) {
           <Text style={styles.kpiChange}>{kpiData.totalUsers.change}</Text>
         </View>
         <View style={styles.kpiCard}>
-          <Text style={styles.kpiValue}>{kpiData.totalDetections.value}</Text>
-          <Text style={styles.kpiLabel}>Total Detections</Text>
-          <Text style={styles.kpiChange}>{kpiData.totalDetections.change}</Text>
+          <Text style={styles.kpiValue}>{kpiData.harmfulContent.value}</Text>
+          <Text style={styles.kpiLabel}>Harmful Content Detected</Text>
+          <Text style={styles.kpiChange}>{kpiData.harmfulContent.change}</Text>
         </View>
         <View style={styles.kpiCard}>
-          <Text style={styles.kpiValue}>{kpiData.flaggedContent.value}</Text>
-          <Text style={styles.kpiLabel}>Flagged Content</Text>
-          <Text style={styles.kpiChange}>{kpiData.flaggedContent.change}</Text>
+          <Text style={styles.kpiValue}>{kpiData.websitesMonitored.value}</Text>
+          <Text style={styles.kpiLabel}>Websites Monitored</Text>
+          <Text style={styles.kpiChange}>{kpiData.websitesMonitored.change}</Text>
         </View>
-        <View style={[styles.kpiCard, { backgroundColor: kpiData.systemHealth.statusColor + '10', borderColor: kpiData.systemHealth.statusColor + '30' }]}>
-          <Text style={[styles.kpiValue, { color: kpiData.systemHealth.statusColor }]}>{kpiData.systemHealth.value}</Text>
-          <Text style={styles.kpiLabel}>System Health</Text>
-          <MaterialCommunityIcons name="check-circle" size={24} color={kpiData.systemHealth.statusColor} style={{ marginTop: 8 }} />
+        <View style={[styles.kpiCard, { backgroundColor: kpiData.protectionEffectiveness.statusColor + '10', borderColor: kpiData.protectionEffectiveness.statusColor + '30' }]}>
+          <Text style={[styles.kpiValue, { color: kpiData.protectionEffectiveness.statusColor }]}>{kpiData.protectionEffectiveness.value}</Text>
+          <Text style={styles.kpiLabel}>Protection Effectiveness</Text>
+          <Text style={styles.kpiChange}>{kpiData.protectionEffectiveness.change}</Text>
         </View>
       </View>
 

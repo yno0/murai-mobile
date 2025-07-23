@@ -1,39 +1,170 @@
-import { useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Dimensions,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { LineChart, PieChart } from 'react-native-chart-kit';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MainHeader from '../../../components/common/MainHeader';
+
+const API_BASE_URL = 'http://localhost:3000/api';
+
+const languagesService = {
+  getLanguages: async (timeRange) => {
+    try {
+      console.log(`Fetching languages data for timeRange: ${timeRange}`);
+      const response = await fetch(`${API_BASE_URL}/dashboard/flagged-words?timeRange=${encodeURIComponent(timeRange)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log(`API Response status: ${response.status}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`API Error: ${response.status} - ${errorText}`);
+        throw new Error(`Failed to fetch languages data: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Raw API response:', data);
+
+      // Process data to extract language information
+      return {
+        detections: data.recentDetections || [],
+        totalCount: data.totalCount || 0,
+        summary: data.summary || {}
+      };
+    } catch (error) {
+      console.error('Languages service error:', error);
+      throw error;
+    }
+  },
+};
 
 export default function AdminLanguagesScreen({ navigation }) {
   const [selectedTimeRange, setSelectedTimeRange] = useState('Today');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  const [languagesData, setLanguagesData] = useState({
+    languages: null,
+  });
+
   const timeRanges = ['Today', 'Last 7 days', 'Last 30 days', 'All Time'];
   const { width } = Dimensions.get('window');
 
-  // Mock data for analytics
-  const languageData = [
-    { name: 'English', population: 70, color: '#10b981', legendFontColor: '#7F7F7F', legendFontSize: 12 },
-    { name: 'Filipino/Tagalog', population: 22, color: '#3b82f6', legendFontColor: '#7F7F7F', legendFontSize: 12 },
-    { name: 'Cebuano', population: 5, color: '#f59e0b', legendFontColor: '#7F7F7F', legendFontSize: 12 },
-    { name: 'Other', population: 3, color: '#ef4444', legendFontColor: '#7F7F7F', legendFontSize: 12 },
-  ];
-  const languageBreakdown = [
-    { language: 'English', count: 89, percentage: '70%' },
-    { language: 'Filipino/Tagalog', count: 28, percentage: '22%' },
-    { language: 'Cebuano', count: 7, percentage: '5%' },
-    { language: 'Other', count: 3, percentage: '3%' },
-  ];
+  const fetchLanguagesData = async (timeRange) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const languages = await languagesService.getLanguages(timeRange);
 
-  const languageTrendData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    datasets: [
-      {
-        data: [120, 150, 130, 180, 160, 200, 190],
-        strokeWidth: 2,
-        color: (opacity = 1) => `rgba(79, 70, 229, ${opacity})`, // Indigo 600
-        fillShadowGradient: 'rgba(79, 70, 229, 0.1)',
-        fillShadowGradientOpacity: 0.1,
-      },
-    ],
+      setLanguagesData({
+        languages,
+      });
+    } catch (error) {
+      console.error("Failed to fetch languages data:", error);
+      setError("Failed to load languages data. Please try again later.");
+      setLanguagesData({
+        languages: {
+          detections: [],
+          totalCount: 0,
+          summary: {}
+        },
+      });
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   };
+
+  const onRefresh = () => {
+    setIsRefreshing(true);
+    fetchLanguagesData(selectedTimeRange);
+  };
+
+  useEffect(() => {
+    fetchLanguagesData(selectedTimeRange);
+  }, [selectedTimeRange]);
+
+  // Process language data from detections
+  const processLanguageData = () => {
+    if (!languagesData.languages?.detections) return { languageData: [], languageBreakdown: [], trendData: [] };
+
+    // Simple language detection based on common words/patterns
+    const languageMap = {};
+    const trendMap = {};
+
+    languagesData.languages.detections.forEach(detection => {
+      const text = detection.context || detection.word || '';
+      let detectedLanguage = 'Other';
+
+      // Basic language detection (you can enhance this with a proper language detection library)
+      if (/[a-zA-Z]/.test(text) && !/[ñáéíóúü]/i.test(text)) {
+        detectedLanguage = 'English';
+      } else if (/[ñáéíóúü]|ang|ng|sa|mga|ako|ikaw|siya/i.test(text)) {
+        detectedLanguage = 'Filipino/Tagalog';
+      } else if (/ug|og|sa|ang|mga|ako|ikaw|siya/i.test(text)) {
+        detectedLanguage = 'Cebuano';
+      }
+
+      languageMap[detectedLanguage] = (languageMap[detectedLanguage] || 0) + 1;
+
+      // Create trend data (simplified)
+      const date = new Date(detection.timestamp).toLocaleDateString();
+      trendMap[date] = (trendMap[date] || 0) + 1;
+    });
+
+    const totalDetections = Object.values(languageMap).reduce((sum, count) => sum + count, 0);
+
+    // Create balanced colors for pie chart
+    const balancedColors = [
+      '#34D399', // Medium emerald
+      '#60A5FA', // Medium blue
+      '#A78BFA', // Medium purple
+      '#FBBF24', // Medium amber
+      '#F87171', // Medium red
+    ];
+
+    const languageData = Object.entries(languageMap).map(([language, count], index) => {
+      const percentage = totalDetections > 0 ? ((count / totalDetections) * 100).toFixed(1) : 0;
+      return {
+        name: `${language} (${percentage}%)`,
+        population: count,
+        color: balancedColors[index % balancedColors.length],
+        legendFontColor: '#374151',
+        legendFontSize: 11,
+        legendFontFamily: 'Poppins-Medium',
+      };
+    });
+
+    const languageBreakdown = Object.entries(languageMap).map(([language, count]) => {
+      const percentage = totalDetections > 0 ? ((count / totalDetections) * 100).toFixed(0) : 0;
+      return {
+        language,
+        count,
+        percentage: `${percentage}%`
+      };
+    });
+
+    // Create trend data for chart
+    const trendEntries = Object.entries(trendMap).slice(-7); // Last 7 days
+    const trendData = trendEntries.map(([date, count]) => count);
+    const trendLabels = trendEntries.map(([date]) => new Date(date).toLocaleDateString('en-US', { weekday: 'short' }));
+
+    return { languageData, languageBreakdown, trendData, trendLabels, totalDetections };
+  };
+
+  const { languageData, languageBreakdown, trendData, trendLabels, totalDetections } = processLanguageData();
 
   const lineChartConfig = {
     backgroundColor: 'transparent',
@@ -59,7 +190,18 @@ export default function AdminLanguagesScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
+          colors={['#01B97F']}
+          tintColor={'#01B97F'}
+        />
+      }
+    >
       <MainHeader
         title="Languages"
         subtitle="Languages analytics and details"
@@ -96,60 +238,139 @@ export default function AdminLanguagesScreen({ navigation }) {
         ))}
       </View>
 
-      {/* Language Distribution Pie Chart */}
-      <View style={styles.chartContainer}>
-        <View style={styles.chartHeader}>
-          <Text style={styles.chartTitle}>Language Distribution</Text>
+      {error ? (
+        <View style={styles.errorContainer}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#ef4444" />
+          <Text style={styles.errorText}>{error}</Text>
         </View>
-        <PieChart
-          data={languageData}
-          width={width - 40}
-          height={200}
-          chartConfig={pieChartConfig}
-          accessor="population"
-          backgroundColor="transparent"
-          paddingLeft="15"
-          absolute
-        />
-      </View>
-
-      {/* Language Detection Trend Line Chart */}
-      <View style={styles.chartContainer}>
-        <View style={styles.chartHeader}>
-          <Text style={styles.chartTitle}>Language Detection Trend</Text>
+      ) : isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#01B97F" />
+          <Text style={styles.loadingText}>Loading languages data...</Text>
         </View>
-        <LineChart
-          data={languageTrendData}
-          width={width - 40}
-          height={180}
-          chartConfig={lineChartConfig}
-          bezier
-          style={styles.chart}
-          withDots={true}
-          withShadow={false}
-          withInnerLines={true}
-          withHorizontalLabels={true}
-          withVerticalLabels={true}
-        />
-      </View>
-
-      {/* Language Breakdown */}
-      <View style={styles.analyticsSectionContainer}>
-        <Text style={styles.analyticsSectionTitle}>Language Breakdown</Text>
-        <View style={styles.analyticsList}>
-          {languageBreakdown.map((item, idx) => (
-            <View key={idx} style={styles.analyticsListItem}>
-              <View style={styles.languageInfo}>
-                <Text style={styles.analyticsListItemText}>{item.language}</Text>
-                <Text style={styles.languageCount}>{item.count} threats detected</Text>
+      ) : (
+        <View>
+          {/* Language Detection Trend Chart */}
+          {trendData.length > 0 && (
+            <View style={styles.chartContainer}>
+              <View style={styles.chartHeader}>
+                <Text style={styles.chartTitle}>Language Detection Trend ({selectedTimeRange})</Text>
               </View>
-              <View style={styles.percentageBadge}>
-                <Text style={styles.percentageText}>{item.percentage}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <LineChart
+                  data={{
+                    labels: trendLabels.length > 0 ? trendLabels : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [
+                      {
+                        data: trendData.length > 0 ? trendData : [0, 0, 0, 0, 0, 0, 0],
+                        color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
+                        strokeWidth: 3,
+                        withDots: true,
+                        fillShadowGradient: 'rgba(1, 185, 127, 0.6)',
+                        fillShadowGradientOpacity: 0.6,
+                      },
+                    ],
+                  }}
+                  width={Math.max((trendLabels.length * 80), width - 40)}
+                  height={220}
+                  chartConfig={{
+                    backgroundColor: 'transparent',
+                    backgroundGradientFrom: '#ffffff',
+                    backgroundGradientTo: '#ffffff',
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => '#01B97F',
+                    labelColor: (opacity = 1) => `rgba(75, 85, 99, ${opacity})`,
+                    style: { borderRadius: 16 },
+                    propsForBackgroundLines: {
+                      strokeWidth: 1,
+                      stroke: '#f3f4f6',
+                      strokeDasharray: '5,5'
+                    },
+                    propsForLabels: {
+                      fontSize: 11,
+                      fontFamily: 'Poppins-Medium'
+                    },
+                  }}
+                  bezier
+                  style={styles.chart}
+                  withDots={true}
+                  withShadow={false}
+                  withInnerLines={true}
+                  withHorizontalLabels={true}
+                  withVerticalLabels={true}
+                  withVerticalLines={false}
+                  withFill={true}
+                  getDotColor={() => '#01B97F'}
+                  getDotProps={() => ({
+                    r: '4',
+                    strokeWidth: '2',
+                    stroke: '#ffffff',
+                    fill: '#01B97F'
+                  })}
+                />
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Language Distribution Pie Chart */}
+          {languageData.length > 0 && (
+            <View style={styles.chartContainer}>
+              <View style={styles.chartHeader}>
+                <Text style={styles.chartTitle}>Language Distribution</Text>
+                <Text style={styles.chartSubtitle}>Based on detection activity</Text>
+              </View>
+              <View style={styles.pieChartWrapper}>
+                <PieChart
+                  data={languageData}
+                  width={width - 40}
+                  height={240}
+                  chartConfig={{
+                    backgroundColor: 'transparent',
+                    color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(55, 65, 81, ${opacity})`,
+                    style: {
+                      borderRadius: 16,
+                    },
+                  }}
+                  accessor="population"
+                  backgroundColor="transparent"
+                  paddingLeft="15"
+                  center={[0, 10]}
+                  absolute={false}
+                  hasLegend={true}
+                  avoidFalseZero={true}
+                />
+              </View>
+              <View style={styles.pieChartSummary}>
+                <Text style={styles.summaryText}>
+                  Total Detections: <Text style={styles.summaryValue}>{totalDetections}</Text>
+                </Text>
+                <Text style={styles.summarySubtext}>
+                  Across {languageData.length} detected languages
+                </Text>
               </View>
             </View>
-          ))}
+          )}
+
+          {/* Language Breakdown */}
+          <View style={styles.analyticsSectionContainer}>
+            <Text style={styles.analyticsSectionTitle}>Language Breakdown</Text>
+            <View style={styles.analyticsList}>
+              {languageBreakdown.map((item, idx) => (
+                <View key={idx} style={styles.analyticsListItem}>
+                  <View style={styles.languageInfo}>
+                    <Text style={styles.analyticsListItemText}>{item.language}</Text>
+                    <Text style={styles.languageCount}>{item.count} detections</Text>
+                  </View>
+                  <View style={styles.percentageBadge}>
+                    <Text style={styles.percentageText}>{item.percentage}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
         </View>
-      </View>
+      )}
     </ScrollView>
   );
 }
@@ -178,7 +399,73 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Poppins-SemiBold',
     color: '#111827',
+    marginBottom: 4,
+  },
+  chartSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
     marginBottom: 15,
+  },
+  pieChartWrapper: {
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  pieChartSummary: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    alignItems: 'center',
+  },
+  summaryText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#01B97F',
+  },
+  summarySubtext: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    marginTop: 12,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    marginBottom: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#ef4444',
+    marginTop: 8,
+    textAlign: 'center',
   },
   analyticsSectionContainer: {
     backgroundColor: '#ffffff',

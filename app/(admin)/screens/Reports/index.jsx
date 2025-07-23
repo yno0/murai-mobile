@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 import {
     Alert,
@@ -14,66 +15,299 @@ const ReportsOverview = require('./ReportsOverview').default;
 const ReportsList = require('./ReportsList').default;
 const MainHeader = require('../../../components/common/MainHeader').default;
 
+// API configuration
+const API_BASE_URL = 'http://localhost:3000/api';
+
 export default function AdminReportsScreen() {
-  const [reports, setReports] = useState([
-    { id: '1', reportedText: 'This is inappropriate content', reportType: 'false_positive', category: 'harassment', status: 'pending', reportedBy: 'user123', reportedAt: new Date('2024-01-20'), reviewedBy: null, reviewedAt: null },
-    { id: '2', reportedText: 'Missed toxic language here', reportType: 'false_negative', category: 'toxicity', status: 'reviewed', reportedBy: 'user456', reportedAt: new Date('2024-01-19'), reviewedBy: 'admin1', reviewedAt: new Date('2024-01-20') },
-    { id: '3', reportedText: 'System flagged this incorrectly', reportType: 'false_positive', category: 'spam', status: 'in_progress', reportedBy: 'user789', reportedAt: new Date('2024-01-18'), reviewedBy: 'admin2', reviewedAt: null },
-    { id: '4', reportedText: 'Should have been detected', reportType: 'false_negative', category: 'hate_speech', status: 'pending', reportedBy: 'user101', reportedAt: new Date('2024-01-17'), reviewedBy: null, reviewedAt: null },
-    { id: '5', reportedText: 'Wrong classification', reportType: 'false_positive', category: 'profanity', status: 'reviewed', reportedBy: 'user202', reportedAt: new Date('2024-01-16'), reviewedBy: 'admin1', reviewedAt: new Date('2024-01-18') },
-  ]);
+  const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedReport, setSelectedReport] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentView, setCurrentView] = useState('overview'); // 'overview' or 'list'
+  const [confirmationModal, setConfirmationModal] = useState({
+    visible: false,
+    action: null,
+    reportId: null,
+    title: '',
+    message: '',
+    confirmText: '',
+    confirmColor: '',
+    loading: false
+  });
 
-  const loadReports = useCallback(async () => {
-    // Mock data loading - replace with actual API calls
-    setLoading(true);
+
+  // Debug function to check auth state
+  const checkAuthState = useCallback(async () => {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch('/api/reports');
-      // const data = await response.json();
-      // For now, just refresh the existing reports
-      setReports(prevReports => [...prevReports]);
-    } catch (_error) {
-      Alert.alert('Error', 'Failed to load reports');
-    } finally {
-      setLoading(false);
+      const token = await AsyncStorage.getItem('token');
+      const user = await AsyncStorage.getItem('user');
+      const parsedUser = user ? JSON.parse(user) : null;
+
+      const authState = {
+        hasToken: !!token,
+        tokenPreview: token ? token.substring(0, 20) + '...' : 'None',
+        user: parsedUser,
+        isAdmin: parsedUser?.role === 'admin'
+      };
+
+      console.log('🔍 Auth State Check:', authState);
+
+      if (!token) {
+        Alert.alert('Authentication Required', 'Please log in as admin first to access reports management.');
+      } else if (!parsedUser || parsedUser.role !== 'admin') {
+        Alert.alert('Admin Access Required', 'You need admin privileges to access this feature.');
+      }
+
+      return authState;
+    } catch (error) {
+      console.error('Auth state check error:', error);
+      return null;
     }
   }, []);
 
+  // Helper function to get auth token
+  const getAuthToken = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  };
+
+  // Helper function to make authenticated API calls
+  const makeAuthenticatedRequest = useCallback(async (url, options = {}) => {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  }, []);
+
+  const loadReports = useCallback(async () => {
+    console.log('🔄 Loading reports...');
+    setLoading(true);
+    try {
+      const token = await getAuthToken();
+      console.log('🔑 Token exists:', !!token);
+
+      if (!token) {
+        console.error('❌ No token found');
+        Alert.alert('Error', 'Please log in as admin first');
+        return;
+      }
+
+      const params = new URLSearchParams({
+        page: '1',
+        limit: '50',
+        search: searchQuery,
+        status: selectedFilter === 'all' ? '' : selectedFilter,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
+
+      console.log('📡 Making API call to:', `${API_BASE_URL}/admin/reports?${params}`);
+      const data = await makeAuthenticatedRequest(`/admin/reports?${params}`);
+      console.log('✅ API response:', data);
+
+      // Handle empty response
+      if (!data.reports || data.reports.length === 0) {
+        console.log('📊 No reports found');
+        setReports([]);
+        return;
+      }
+
+      // Transform the data to match the expected format
+      const transformedReports = data.reports.map(report => {
+        console.log('🔄 Transforming report:', report);
+        return {
+          id: report._id,
+          reportedText: report.reportedText || report.description || 'No content provided',
+          reportType: report.type || 'unknown',
+          category: report.category || 'uncategorized',
+          status: report.status,
+          reportedBy: report.userId?.name || report.userId?.email || 'Unknown User',
+          reportedAt: new Date(report.createdAt),
+          reviewedBy: report.reviewedBy?.name || report.reviewedBy?.email || null,
+          reviewedAt: report.reviewedAt ? new Date(report.reviewedAt) : null,
+          description: report.description
+        };
+      });
+
+      console.log('📊 Transformed reports:', transformedReports.length, 'reports');
+      setReports(transformedReports);
+    } catch (error) {
+      console.error('❌ Load reports error:', error);
+      Alert.alert('Error', error.message || 'Failed to load reports');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, selectedFilter, makeAuthenticatedRequest]);
+
+  // Show confirmation modal for actions
+  const showConfirmation = (action, reportId, reportText) => {
+    let title, message, confirmText, confirmColor;
+
+    switch (action) {
+      case 'approve':
+        title = 'Approve Report';
+        message = `Are you sure you want to approve this report?\n\nReported content:\n"${reportText?.substring(0, 120)}${reportText?.length > 120 ? '...' : ''}"`;
+        confirmText = 'Approve Report';
+        confirmColor = '#01B97F';
+        break;
+      case 'decline':
+        title = 'Decline Report';
+        message = `Are you sure you want to decline this report?\n\nReported content:\n"${reportText?.substring(0, 120)}${reportText?.length > 120 ? '...' : ''}"`;
+        confirmText = 'Decline Report';
+        confirmColor = '#EF4444';
+        break;
+      case 'reopen':
+        title = 'Reopen Report';
+        message = `Are you sure you want to reopen this report for review?\n\nReported content:\n"${reportText?.substring(0, 120)}${reportText?.length > 120 ? '...' : ''}"`;
+        confirmText = 'Reopen Report';
+        confirmColor = '#F59E0B';
+        break;
+      default:
+        return;
+    }
+
+    setConfirmationModal({
+      visible: true,
+      action,
+      reportId,
+      title,
+      message,
+      confirmText,
+      confirmColor
+    });
+  };
+
+  // Handle confirmed action
+  const handleConfirmedAction = async () => {
+    const { action, reportId } = confirmationModal;
+
+    // Show loading state
+    setConfirmationModal({ ...confirmationModal, loading: true });
+
+    try {
+      await handleReportAction(reportId, action);
+      setModalVisible(false);
+      setConfirmationModal({ ...confirmationModal, visible: false, loading: false });
+    } catch (_error) {
+      // Reset loading state on error
+      setConfirmationModal({ ...confirmationModal, loading: false });
+    }
+  };
+
+  // Cancel confirmation
+  const cancelConfirmation = () => {
+    setConfirmationModal({ ...confirmationModal, visible: false });
+  };
+
+  useEffect(() => {
+    checkAuthState(); // Check auth state first
+    loadReports();
+  }, [loadReports, checkAuthState]);
+
+  // Debounce search to avoid too many API calls
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadReports();
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, loadReports]);
+
+  // Reload reports immediately when filter changes (no debounce needed)
   useEffect(() => {
     loadReports();
-  }, [loadReports]);
+  }, [selectedFilter, loadReports]);
 
   const openReportModal = (report) => {
     setSelectedReport(report);
     setModalVisible(true);
   };
 
-  const handleReportAction = (reportId, action) => {
-    setReports(prevReports =>
-      prevReports.map(report => {
+  const handleReportAction = async (reportId, action) => {
+    try {
+      let updateData = {};
+      let successMessage = '';
+
+      switch (action) {
+        case 'approve':
+        case 'complete':
+          updateData.status = 'resolved';
+          successMessage = 'Report approved and resolved successfully';
+          break;
+        case 'reject':
+        case 'decline':
+          updateData.status = 'rejected';
+          successMessage = 'Report declined successfully';
+          break;
+        case 'reopen':
+          updateData.status = 'pending';
+          successMessage = 'Report reopened successfully';
+          break;
+        default:
+          throw new Error('Invalid action');
+      }
+
+      await makeAuthenticatedRequest(`/admin/reports/${reportId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      });
+
+      // Update local state
+      const updatedReports = reports.map(report => {
         if (report.id === reportId) {
-          switch (action) {
-            case 'approve':
-              return { ...report, status: 'reviewed', reviewedBy: 'admin1', reviewedAt: new Date() };
-            case 'reject':
-              return { ...report, status: 'reviewed', reviewedBy: 'admin1', reviewedAt: new Date() };
-            case 'complete':
-              return { ...report, status: 'reviewed', reviewedBy: 'admin1', reviewedAt: new Date() };
-            case 'reopen':
-              return { ...report, status: 'pending', reviewedBy: null, reviewedAt: null };
-            default:
-              return report;
+          const updatedReport = { ...report };
+          updatedReport.status = updateData.status;
+
+          if (updateData.status === 'resolved' || updateData.status === 'rejected') {
+            updatedReport.reviewedBy = 'Current Admin'; // Will be updated from server response
+            updatedReport.reviewedAt = new Date();
+          } else if (updateData.status === 'pending') {
+            updatedReport.reviewedBy = null;
+            updatedReport.reviewedAt = null;
           }
+
+          return updatedReport;
         }
         return report;
-      })
-    );
+      });
+
+      setReports(updatedReports);
+
+      // Update selected report for modal
+      if (selectedReport && selectedReport.id === reportId) {
+        const updatedSelectedReport = updatedReports.find(r => r.id === reportId);
+        setSelectedReport(updatedSelectedReport);
+      }
+
+      Alert.alert('Success', successMessage);
+
+    } catch (error) {
+      console.error('Report action error:', error);
+      Alert.alert('Error', error.message || 'Failed to update report');
+    }
   };
 
   const renderOverviewContent = () => (
@@ -105,6 +339,11 @@ export default function AdminReportsScreen() {
         title="Reports Management"
         subtitle="Review and manage user reports"
         rightActions={[
+          {
+            icon: 'info',
+            iconType: 'feather',
+            onPress: checkAuthState
+          },
           {
             icon: 'refresh-cw',
             iconType: 'feather',
@@ -147,54 +386,110 @@ export default function AdminReportsScreen() {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalContainer}>
+          {/* Enhanced Header */}
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Report Details</Text>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Feather name="x" size={24} color="#6B7280" />
+            <View style={styles.modalHeaderLeft}>
+              <View style={styles.modalHeaderIcon}>
+                <Feather name="flag" size={20} color="#01B97F" />
+              </View>
+              <View>
+                <Text style={styles.modalTitle}>Report Details</Text>
+                <Text style={styles.modalSubtitle}>Review and manage report information</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Feather name="x" size={20} color="#6B7280" />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             {selectedReport && (
               <>
-                <View style={styles.modalSection}>
-                  <Text style={styles.modalSectionTitle}>Reported Content</Text>
-                  <Text style={styles.reportedText}>&ldquo;{selectedReport.reportedText}&rdquo;</Text>
+                {/* Report Content Section */}
+                <View style={styles.reportSection}>
+                  <View style={styles.reportHeader}>
+                    <View style={styles.reportIconContainer}>
+                      <Feather
+                        name={selectedReport.reportType === 'false_positive' ? 'alert-triangle' : 'eye-off'}
+                        size={20}
+                        color="#01B97F"
+                      />
+                    </View>
+                    <View style={styles.reportInfo}>
+                      <Text style={styles.reportType}>{selectedReport.reportType.replace('_', ' ').toUpperCase()}</Text>
+                      <Text style={styles.reportCategory}>{selectedReport.category}</Text>
+                      <View style={styles.reportBadges}>
+                        <View style={[styles.badge, styles.statusBadge, {
+                          backgroundColor: selectedReport.status === 'pending' ? '#fef3c7' :
+                                         selectedReport.status === 'resolved' ? '#e8f5f0' :
+                                         selectedReport.status === 'rejected' ? '#fee2e2' : '#f3f4f6'
+                        }]}>
+                          <Feather
+                            name={selectedReport.status === 'pending' ? 'clock' :
+                                  selectedReport.status === 'resolved' ? 'check-circle' :
+                                  selectedReport.status === 'rejected' ? 'x-circle' : 'help-circle'}
+                            size={12}
+                            color={selectedReport.status === 'pending' ? '#d97706' :
+                                   selectedReport.status === 'resolved' ? '#01B97F' :
+                                   selectedReport.status === 'rejected' ? '#EF4444' : '#6b7280'}
+                          />
+                          <Text style={[styles.badgeText, {
+                            color: selectedReport.status === 'pending' ? '#d97706' :
+                                   selectedReport.status === 'resolved' ? '#01B97F' :
+                                   selectedReport.status === 'rejected' ? '#EF4444' : '#6b7280'
+                          }]}>
+                            {selectedReport.status}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Reported Content */}
+                  <View style={styles.contentCard}>
+                    <Text style={styles.contentLabel}>Reported Content:</Text>
+                    <Text style={styles.reportedText}>&ldquo;{selectedReport.reportedText}&rdquo;</Text>
+                  </View>
                 </View>
 
+                {/* Report Information */}
                 <View style={styles.modalSection}>
-                  <Text style={styles.modalSectionTitle}>Report Information</Text>
-                  <View style={styles.detailsCard}>
+                  <View style={styles.sectionHeader}>
+                    <Feather name="info" size={16} color="#01B97F" />
+                    <Text style={styles.sectionTitle}>Report Information</Text>
+                  </View>
+                  <View style={styles.infoCard}>
                     <View style={styles.infoRow}>
-                      <Text style={styles.infoLabel}>Type:</Text>
-                      <Text style={styles.infoValue}>{selectedReport.reportType.replace('_', ' ')}</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.infoLabel}>Category:</Text>
-                      <Text style={styles.infoValue}>{selectedReport.category}</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.infoLabel}>Status:</Text>
-                      <Text style={[styles.infoValue, { color: selectedReport.status === 'pending' ? '#F59E0B' : selectedReport.status === 'reviewed' ? '#01B97F' : '#3B82F6' }]}>
-                        {selectedReport.status}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.infoLabel}>Reported By:</Text>
+                      <View style={styles.infoRowLeft}>
+                        <Feather name="user" size={16} color="#6B7280" />
+                        <Text style={styles.infoLabel}>Reported By</Text>
+                      </View>
                       <Text style={styles.infoValue}>{selectedReport.reportedBy}</Text>
                     </View>
                     <View style={styles.infoRow}>
-                      <Text style={styles.infoLabel}>Reported At:</Text>
+                      <View style={styles.infoRowLeft}>
+                        <Feather name="calendar" size={16} color="#6B7280" />
+                        <Text style={styles.infoLabel}>Reported Date</Text>
+                      </View>
                       <Text style={styles.infoValue}>{selectedReport.reportedAt.toLocaleDateString()}</Text>
                     </View>
                     {selectedReport.reviewedBy && (
                       <>
                         <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Reviewed By:</Text>
+                          <View style={styles.infoRowLeft}>
+                            <Feather name="user-check" size={16} color="#6B7280" />
+                            <Text style={styles.infoLabel}>Reviewed By</Text>
+                          </View>
                           <Text style={styles.infoValue}>{selectedReport.reviewedBy}</Text>
                         </View>
                         <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Reviewed At:</Text>
+                          <View style={styles.infoRowLeft}>
+                            <Feather name="clock" size={16} color="#6B7280" />
+                            <Text style={styles.infoLabel}>Reviewed Date</Text>
+                          </View>
                           <Text style={styles.infoValue}>{selectedReport.reviewedAt?.toLocaleDateString()}</Text>
                         </View>
                       </>
@@ -203,51 +498,134 @@ export default function AdminReportsScreen() {
                 </View>
 
                 {/* Action Buttons */}
-                <View style={styles.actionButtonRow}>
-                  {selectedReport.status !== 'reviewed' && (
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.approveButton]}
-                      activeOpacity={0.85}
-                      onPress={() => {
-                        handleReportAction(selectedReport.id, 'approve');
-                        setModalVisible(false);
-                      }}
-                    >
-                      <Feather name="check" size={18} color="#fff" style={{ marginRight: 8 }} />
-                      <Text style={styles.actionButtonText}>Approve</Text>
-                    </TouchableOpacity>
-                  )}
-                  {selectedReport.status !== 'reviewed' && (
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.rejectButton]}
-                      activeOpacity={0.85}
-                      onPress={() => {
-                        handleReportAction(selectedReport.id, 'reject');
-                        setModalVisible(false);
-                      }}
-                    >
-                      <Feather name="x" size={18} color="#fff" style={{ marginRight: 8 }} />
-                      <Text style={styles.actionButtonText}>Reject</Text>
-                    </TouchableOpacity>
-                  )}
-                  {selectedReport.status === 'reviewed' && (
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.reopenButton]}
-                      activeOpacity={0.85}
-                      onPress={() => {
-                        handleReportAction(selectedReport.id, 'reopen');
-                        setModalVisible(false);
-                      }}
-                    >
-                      <Feather name="refresh-cw" size={18} color="#fff" style={{ marginRight: 8 }} />
-                      <Text style={styles.actionButtonText}>Reopen</Text>
-                    </TouchableOpacity>
-                  )}
+                <View style={styles.modalSection}>
+                  <View style={styles.sectionHeader}>
+                    <Feather name="settings" size={16} color="#01B97F" />
+                    <Text style={styles.sectionTitle}>Quick Actions</Text>
+                  </View>
+                  <View style={styles.actionGrid}>
+                    {selectedReport.status === 'pending' && (
+                      <>
+                        <TouchableOpacity
+                          style={[styles.actionCard, styles.approveCard]}
+                          onPress={() => {
+                            showConfirmation('approve', selectedReport.id, selectedReport.reportedText);
+                          }}
+                        >
+                          <View style={styles.actionIconContainer}>
+                            <Feather name="check-circle" size={24} color="#01B97F" />
+                          </View>
+                          <Text style={styles.actionTitle}>Approve</Text>
+                          <Text style={styles.actionSubtitle}>Mark as resolved</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.actionCard, styles.declineCard]}
+                          onPress={() => {
+                            showConfirmation('decline', selectedReport.id, selectedReport.reportedText);
+                          }}
+                        >
+                          <View style={styles.actionIconContainer}>
+                            <Feather name="x-circle" size={24} color="#EF4444" />
+                          </View>
+                          <Text style={styles.actionTitle}>Decline</Text>
+                          <Text style={styles.actionSubtitle}>Reject this report</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+
+
+
+                    {(selectedReport.status === 'resolved' || selectedReport.status === 'rejected') && (
+                      <TouchableOpacity
+                        style={[styles.actionCard, styles.reopenCard]}
+                        onPress={() => {
+                          showConfirmation('reopen', selectedReport.id, selectedReport.reportedText);
+                        }}
+                      >
+                        <View style={styles.actionIconContainer}>
+                          <Feather name="refresh-cw" size={24} color="#f59e0b" />
+                        </View>
+                        <Text style={styles.actionTitle}>Reopen</Text>
+                        <Text style={styles.actionSubtitle}>Reopen for review</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               </>
             )}
           </ScrollView>
         </View>
+      </Modal>
+
+      {/* Confirmation Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={confirmationModal.visible}
+        onRequestClose={cancelConfirmation}
+      >
+        <TouchableOpacity
+          style={styles.confirmationOverlay}
+          activeOpacity={1}
+          onPress={cancelConfirmation}
+        >
+          <TouchableOpacity
+            style={styles.confirmationModal}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.confirmationHeader}>
+              <View style={[styles.confirmationIcon, { backgroundColor: `${confirmationModal.confirmColor}20` }]}>
+                <Feather
+                  name={confirmationModal.action === 'approve' ? 'check-circle' :
+                        confirmationModal.action === 'decline' ? 'x-circle' : 'refresh-cw'}
+                  size={24}
+                  color={confirmationModal.confirmColor}
+                />
+              </View>
+              <Text style={styles.confirmationTitle}>{confirmationModal.title}</Text>
+            </View>
+
+            <Text style={styles.confirmationMessage}>{confirmationModal.message}</Text>
+
+            <View style={styles.confirmationButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.confirmationButton,
+                  styles.cancelButton,
+                  confirmationModal.loading && styles.disabledButton
+                ]}
+                onPress={cancelConfirmation}
+                disabled={confirmationModal.loading}
+              >
+                <Text style={[
+                  styles.cancelButtonText,
+                  confirmationModal.loading && styles.disabledText
+                ]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.confirmationButton,
+                  styles.confirmButton,
+                  { backgroundColor: confirmationModal.confirmColor },
+                  confirmationModal.loading && styles.loadingButton
+                ]}
+                onPress={handleConfirmedAction}
+                disabled={confirmationModal.loading}
+              >
+                {confirmationModal.loading ? (
+                  <View style={styles.loadingContainer}>
+                    <Text style={styles.confirmButtonText}>Processing...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.confirmButtonText}>{confirmationModal.confirmText}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -297,10 +675,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     color: '#01B97F',
   },
-  // Modal Styles
+  // Modal Styles (matching Users management patterns)
   modalContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8fafc',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -313,93 +691,306 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  modalHeaderIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
   modalTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins-Bold',
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
     color: '#111827',
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalContent: {
     flex: 1,
     paddingHorizontal: 20,
+    paddingTop: 16,
   },
   modalSection: {
-    marginBottom: 30,
+    marginBottom: 20,
   },
-  modalSectionTitle: {
-    fontSize: 16,
+  // Report Section (matching overview card style)
+  reportSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+  },
+  reportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  reportIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e8f5f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  reportInfo: {
+    flex: 1,
+  },
+  reportType: {
+    fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
     color: '#111827',
-    marginBottom: 16,
+    marginBottom: 2,
   },
-  detailsCard: {
+  reportCategory: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  reportBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 3,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontFamily: 'Poppins-Medium',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  contentCard: {
     backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#01B97F',
+  },
+  contentLabel: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    marginBottom: 4,
   },
   reportedText: {
     fontSize: 14,
     fontFamily: 'Poppins-Regular',
     color: '#374151',
     fontStyle: 'italic',
-    backgroundColor: '#f8fafc',
-    padding: 16,
+    lineHeight: 20,
+  },
+  // Section Header (matching overview patterns)
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#111827',
+    marginLeft: 8,
+  },
+  // Info Card (matching overview card style)
+  infoCard: {
+    backgroundColor: '#ffffff',
     borderRadius: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#01B97F',
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: '#f3f4f6',
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#f8fafc',
   },
-  infoLabel: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    color: '#6B7280',
-  },
-  infoValue: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#111827',
-  },
-  actionButtonRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: 32,
-  },
-  actionButton: {
+  infoRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    gap: 8,
   },
-  approveButton: {
-    backgroundColor: '#01B97F',
+  infoLabel: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
   },
-  rejectButton: {
-    backgroundColor: '#EF4444',
+  infoValue: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+    color: '#111827',
   },
-  reopenButton: {
-    backgroundColor: '#3B82F6',
+  // Action Grid (matching overview status cards)
+  actionGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
-  actionButtonText: {
-    color: '#fff',
+  actionCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+    minHeight: 100,
+    width: '45%', // For 2 buttons in a row
+    minWidth: 120,
+  },
+  actionIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  actionTitle: {
+    fontSize: 12,
     fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    letterSpacing: 0.5,
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 2,
   },
+  actionSubtitle: {
+    fontSize: 10,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  approveCard: {
+    borderColor: '#f3f4f6',
+  },
+  declineCard: {
+    borderColor: '#f3f4f6',
+  },
+  reopenCard: {
+    borderColor: '#f3f4f6',
+  },
+
+  // Confirmation Modal Styles
+  confirmationOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  confirmationModal: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  confirmationHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  confirmationIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  confirmationTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#111827',
+    textAlign: 'center',
+  },
+  confirmationMessage: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  confirmationButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmationButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  confirmButton: {
+    // backgroundColor will be set dynamically
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+  },
+  confirmButtonText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    opacity: 0.5,
+  },
+  loadingButton: {
+    opacity: 0.8,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
 });

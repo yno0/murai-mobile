@@ -30,14 +30,14 @@ const reportSchema = new Schema({
     },
     status:{
         type: String,
-        enum: ['pending', 'resolved', 'in_progress'],
+        enum: ['pending', 'resolved', 'rejected'],
         default: 'pending',
     },
-    createAt:{
+    createdAt:{
         type: Date,
         default: Date.now,
     },
-    updateAt:{
+    updatedAt:{
         type: Date,
         default: Date.now,
     }

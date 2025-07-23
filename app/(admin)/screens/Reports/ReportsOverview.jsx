@@ -23,11 +23,12 @@ export default function ReportsOverview({ reports, loading, onRefresh }) {
   const getStats = () => {
     const total = reports.length;
     const pending = reports.filter(r => r.status === 'pending').length;
-    const reviewed = reports.filter(r => r.status === 'reviewed').length;
+    const resolved = reports.filter(r => r.status === 'resolved').length;
+    const rejected = reports.filter(r => r.status === 'rejected').length;
     const falsePositives = reports.filter(r => r.reportType === 'false_positive').length;
     const falseNegatives = reports.filter(r => r.reportType === 'false_negative').length;
 
-    return { total, pending, reviewed, falsePositives, falseNegatives };
+    return { total, pending, resolved, rejected, falsePositives, falseNegatives };
   };
 
   const stats = getStats();
@@ -76,10 +77,17 @@ export default function ReportsOverview({ reports, loading, onRefresh }) {
             <Text style={styles.statValue}>{stats.pending}</Text>
             <Text style={styles.statLabel}>Pending</Text>
           </View>
+        </View>
+        <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <Feather name="check" size={20} color="#01B97F" />
-            <Text style={styles.statValue}>{stats.reviewed}</Text>
-            <Text style={styles.statLabel}>Reviewed</Text>
+            <Text style={styles.statValue}>{stats.resolved}</Text>
+            <Text style={styles.statLabel}>Resolved</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Feather name="x-circle" size={20} color="#EF4444" />
+            <Text style={styles.statValue}>{stats.rejected}</Text>
+            <Text style={styles.statLabel}>Rejected</Text>
           </View>
         </View>
       </View>
@@ -352,6 +360,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
+    marginBottom: 12,
   },
   statCard: {
     flex: 1,

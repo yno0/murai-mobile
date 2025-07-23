@@ -1,103 +1,221 @@
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 const UsersOverview = require('./UsersOverview').default;
 const UsersList = require('./UsersList').default;
 const MainHeader = require('../../../components/common/MainHeader').default;
 
+// API configuration
+const API_BASE_URL = 'http://localhost:3000/api';
+
 export default function AdminUsersScreen() {
-  const [users, setUsers] = useState([
-    { id: '1', name: 'Alice Johnson', email: 'alice@example.com', role: 'Admin', status: 'Active', joinedAt: new Date('2024-01-15'), lastActive: new Date('2024-01-20') },
-    { id: '2', name: 'Bob Williams', email: 'bob@example.com', role: 'User', status: 'Inactive', joinedAt: new Date('2024-01-10'), lastActive: new Date('2024-01-18') },
-    { id: '3', name: 'Charlie Brown', email: 'charlie@example.com', role: 'User', status: 'Active', joinedAt: new Date('2024-01-12'), lastActive: new Date('2024-01-21') },
-    { id: '4', name: 'Diana Prince', email: 'diana@example.com', role: 'User', status: 'Active', joinedAt: new Date('2024-01-08'), lastActive: new Date('2024-01-19') },
-    { id: '5', name: 'Eve Adams', email: 'eve@example.com', role: 'User', status: 'Inactive', joinedAt: new Date('2024-01-05'), lastActive: new Date('2024-01-16') },
-    { id: '6', name: 'Frank White', email: 'frank@example.com', role: 'Admin', status: 'Active', joinedAt: new Date('2024-01-03'), lastActive: new Date('2024-01-21') },
-    { id: '7', name: 'Grace Lee', email: 'grace@example.com', role: 'User', status: 'Active', joinedAt: new Date('2024-01-14'), lastActive: new Date('2024-01-20') },
-    { id: '8', name: 'Henry King', email: 'henry@example.com', role: 'User', status: 'Inactive', joinedAt: new Date('2024-01-07'), lastActive: new Date('2024-01-17') },
-    { id: '9', name: 'Ivy Green', email: 'ivy@example.com', role: 'Admin', status: 'Active', joinedAt: new Date('2024-01-11'), lastActive: new Date('2024-01-21') },
-    { id: '10', name: 'Jack Black', email: 'jack@example.com', role: 'User', status: 'Active', joinedAt: new Date('2024-01-09'), lastActive: new Date('2024-01-20') },
-  ]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentView, setCurrentView] = useState('overview'); // 'overview' or 'list'
+  const [debugInfo, setDebugInfo] = useState('');
+  // Pagination state removed for simplicity - can be added later if needed
 
-  const loadUsers = useCallback(async () => {
-    // Mock data loading - replace with actual API calls
-    setLoading(true);
+  // Debug function to check auth state
+  const checkAuthState = useCallback(async () => {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch('/api/users');
-      // const data = await response.json();
-      setUsers(users);
-    } catch (_error) {
-      Alert.alert('Error', 'Failed to load users');
-    } finally {
-      setLoading(false);
+      const token = await AsyncStorage.getItem('token');
+      const user = await AsyncStorage.getItem('user');
+      const parsedUser = user ? JSON.parse(user) : null;
+
+      const authState = {
+        hasToken: !!token,
+        tokenPreview: token ? token.substring(0, 20) + '...' : 'None',
+        user: parsedUser,
+        isAdmin: parsedUser?.role === 'admin'
+      };
+
+      console.log('🔍 Auth State Check:', authState);
+      setDebugInfo(JSON.stringify(authState, null, 2));
+
+      if (!token) {
+        Alert.alert('Authentication Required', 'Please log in as admin first to access user management.');
+      } else if (!parsedUser || parsedUser.role !== 'admin') {
+        Alert.alert('Admin Access Required', 'You need admin privileges to access this feature.');
+      }
+
+      return authState;
+    } catch (error) {
+      console.error('Auth state check error:', error);
+      return null;
     }
   }, []);
 
-  const filterUsers = useCallback(() => {
-    let filtered = users;
+  // Helper function to get auth token
+  const getAuthToken = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token'); // Fixed: should be 'token' not 'authToken'
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  };
 
-    // Filter by status
-    if (selectedFilter !== 'all') {
-      filtered = filtered.filter(user => user.status.toLowerCase() === selectedFilter);
+  // Helper function to make authenticated API calls
+  const makeAuthenticatedRequest = useCallback(async (url, options = {}) => {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No authentication token found');
     }
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      filtered = filtered.filter(user =>
-        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.role.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
 
-    setFilteredUsers(filtered);
-  }, [users, selectedFilter, searchQuery]);
+    return response.json();
+  }, []);
 
+  const loadUsers = useCallback(async () => {
+    console.log('🔄 Loading users...');
+    setLoading(true);
+    try {
+      const token = await getAuthToken();
+      console.log('🔑 Token exists:', !!token);
+
+      if (!token) {
+        console.error('❌ No token found');
+        Alert.alert('Error', 'Please log in as admin first');
+        return;
+      }
+
+      const params = new URLSearchParams({
+        page: '1',
+        limit: '50',
+        search: searchQuery,
+        status: selectedFilter === 'all' ? '' : selectedFilter,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
+
+      console.log('📡 Making API call to:', `${API_BASE_URL}/admin/users?${params}`);
+      const data = await makeAuthenticatedRequest(`/admin/users?${params}`);
+      console.log('✅ API response:', data);
+
+      // Transform the data to match the expected format
+      const transformedUsers = data.users.map(user => ({
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role.charAt(0).toUpperCase() + user.role.slice(1), // Capitalize first letter
+        status: user.status.charAt(0).toUpperCase() + user.status.slice(1), // Capitalize first letter
+        isPremium: user.isPremium || false,
+        joinedAt: new Date(user.createdAt),
+        lastActive: user.lastActive ? new Date(user.lastActive) : new Date(user.createdAt)
+      }));
+
+      console.log('📊 Transformed users:', transformedUsers.length, 'users');
+      setUsers(transformedUsers);
+      // setPagination(data.pagination); // Removed for simplicity
+    } catch (error) {
+      console.error('❌ Load users error:', error);
+      Alert.alert('Error', error.message || 'Failed to load users');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, selectedFilter, makeAuthenticatedRequest]);
+
+  // Remove filterUsers since we're now filtering on the server side
+
+  useEffect(() => {
+    checkAuthState(); // Check auth state first
+    loadUsers();
+  }, [loadUsers, checkAuthState]);
+
+  // Debounce search to avoid too many API calls
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadUsers();
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, loadUsers]);
+
+  // Reload users immediately when filter changes (no debounce needed)
   useEffect(() => {
     loadUsers();
-  }, [loadUsers]);
-
-  useEffect(() => {
-    filterUsers();
-  }, [filterUsers]);
+  }, [selectedFilter, loadUsers]);
 
   const handleUserAction = async (userId, action) => {
     try {
+      let updateData = {};
+      let successMessage = '';
+
+      if (action === 'activate' || action === 'deactivate') {
+        updateData.status = action === 'activate' ? 'active' : 'inactive';
+        successMessage = `User ${action === 'activate' ? 'activated' : 'deactivated'} successfully`;
+      } else if (action === 'addPremium' || action === 'removePremium') {
+        updateData.isPremium = action === 'addPremium';
+        successMessage = `User ${action === 'addPremium' ? 'upgraded to premium' : 'downgraded from premium'} successfully`;
+      }
+
+      await makeAuthenticatedRequest(`/admin/users/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      });
+
+      // Update local state
       const updatedUsers = users.map(user => {
         if (user.id === userId) {
-          return {
-            ...user,
-            status: action === 'activate' ? 'Active' : 'Inactive',
-            lastActive: action === 'activate' ? new Date() : user.lastActive
-          };
+          const updatedUser = { ...user };
+
+          if (updateData.status) {
+            updatedUser.status = updateData.status === 'active' ? 'Active' : 'Inactive';
+            if (updateData.status === 'active') {
+              updatedUser.lastActive = new Date();
+            }
+          }
+
+          if (updateData.isPremium !== undefined) {
+            updatedUser.isPremium = updateData.isPremium;
+          }
+
+          return updatedUser;
         }
         return user;
       });
 
       setUsers(updatedUsers);
-      Alert.alert('Success', `User ${action === 'activate' ? 'activated' : 'deactivated'} successfully`);
-      setModalVisible(false);
-      setSelectedUser(null);
 
-    } catch (_error) {
-      Alert.alert('Error', 'Failed to update user');
+      // Update selected user for modal
+      if (selectedUser && selectedUser.id === userId) {
+        const updatedSelectedUser = updatedUsers.find(u => u.id === userId);
+        setSelectedUser(updatedSelectedUser);
+      }
+
+      Alert.alert('Success', successMessage);
+
+    } catch (error) {
+      console.error('User action error:', error);
+      Alert.alert('Error', error.message || 'Failed to update user');
     }
   };
 
@@ -106,50 +224,7 @@ export default function AdminUsersScreen() {
     setModalVisible(true);
   };
 
-  const renderUserItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.userItem}
-      onPress={() => openUserModal(item)}
-    >
-      <View style={styles.userItemLeft}>
-        <View style={[styles.userStatusIcon, { backgroundColor: item.status === 'Active' ? '#e8f5f0' : '#fee2e2' }]}>
-          {item.status === 'Active' && <Feather name="user-check" size={16} color="#01B97F" />}
-          {item.status === 'Inactive' && <Feather name="user-x" size={16} color="#EF4444" />}
-        </View>
-        <View style={styles.userItemContent}>
-          <Text style={styles.userItemName}>{item.name}</Text>
-          <Text style={styles.userItemEmail}>{item.email}</Text>
-          <View style={styles.userItemMeta}>
-            <View style={[styles.roleBadge, { backgroundColor: item.role === 'Admin' ? '#e8f5f0' : '#f3f4f6' }]}>
-              <Text style={[styles.roleText, { color: item.role === 'Admin' ? '#01B97F' : '#6b7280' }]}>
-                {item.role}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-      <View style={styles.userItemRight}>
-        <Feather name="chevron-right" size={16} color="#9CA3AF" />
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderFilterButton = (filter, label) => (
-    <TouchableOpacity
-      style={[
-        styles.filterButton,
-        selectedFilter === filter && styles.filterButtonActive
-      ]}
-      onPress={() => setSelectedFilter(filter)}
-    >
-      <Text style={[
-        styles.filterButtonText,
-        selectedFilter === filter && styles.filterButtonTextActive
-      ]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
+  // These render functions are now handled by the UsersList component
 
   const renderViewToggle = () => (
     <View style={styles.viewToggleContainer}>
@@ -194,17 +269,7 @@ export default function AdminUsersScreen() {
     </View>
   );
 
-  const getStats = () => {
-    const total = users.length;
-    const active = users.filter(u => u.status === 'Active').length;
-    const inactive = users.filter(u => u.status === 'Inactive').length;
-    const admins = users.filter(u => u.role === 'Admin').length;
-    const regularUsers = users.filter(u => u.role === 'User').length;
-
-    return { total, active, inactive, admins, regularUsers };
-  };
-
-  const stats = getStats();
+  // Stats are calculated in the UsersOverview component
 
   const renderOverviewContent = () => (
     <UsersOverview
@@ -234,6 +299,11 @@ export default function AdminUsersScreen() {
         subtitle="Manage users and their permissions"
         rightActions={[
           {
+            icon: 'info',
+            iconType: 'feather',
+            onPress: checkAuthState
+          },
+          {
             icon: 'refresh-cw',
             iconType: 'feather',
             onPress: loadUsers
@@ -256,70 +326,155 @@ export default function AdminUsersScreen() {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalContainer}>
+          {/* Enhanced Header */}
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>User Details</Text>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Feather name="x" size={24} color="#6B7280" />
+            <View style={styles.modalHeaderLeft}>
+              <View style={styles.modalHeaderIcon}>
+                <Feather name="user" size={20} color="#01B97F" />
+              </View>
+              <View>
+                <Text style={styles.modalTitle}>User Details</Text>
+                <Text style={styles.modalSubtitle}>Manage user information and permissions</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Feather name="x" size={20} color="#6B7280" />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             {selectedUser && (
               <>
-                <View style={styles.modalSection}>
-                  <Text style={styles.modalSectionTitle}>User Information</Text>
-                  <View style={styles.detailsCard}>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Name</Text>
-                      <Text style={styles.detailValue}>{selectedUser.name}</Text>
+                {/* User Profile Section */}
+                <View style={styles.profileSection}>
+                  <View style={styles.profileHeader}>
+                    <View style={styles.avatarContainer}>
+                      <Text style={styles.avatarText}>
+                        {selectedUser.name.charAt(0).toUpperCase()}
+                      </Text>
                     </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Email</Text>
-                      <Text style={styles.detailValue}>{selectedUser.email}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Role</Text>
-                      <View style={[styles.roleBadge, { backgroundColor: selectedUser.role === 'Admin' ? '#e8f5f0' : '#f3f4f6' }]}>
-                        <Text style={[styles.roleText, { color: selectedUser.role === 'Admin' ? '#01B97F' : '#6b7280' }]}>
-                          {selectedUser.role}
-                        </Text>
+                    <View style={styles.profileInfo}>
+                      <Text style={styles.profileName}>{selectedUser.name}</Text>
+                      <Text style={styles.profileEmail}>{selectedUser.email}</Text>
+                      <View style={styles.profileBadges}>
+                        <View style={[styles.badge, styles.roleBadge, {
+                          backgroundColor: selectedUser.role === 'Admin' ? '#e8f5f0' : '#f3f4f6'
+                        }]}>
+                          <Feather
+                            name={selectedUser.role === 'Admin' ? 'shield' : 'user'}
+                            size={12}
+                            color={selectedUser.role === 'Admin' ? '#01B97F' : '#6b7280'}
+                          />
+                          <Text style={[styles.badgeText, {
+                            color: selectedUser.role === 'Admin' ? '#01B97F' : '#6b7280'
+                          }]}>
+                            {selectedUser.role}
+                          </Text>
+                        </View>
+                        <View style={[styles.badge, styles.statusBadge, {
+                          backgroundColor: selectedUser.status === 'Active' ? '#e8f5f0' : '#fee2e2'
+                        }]}>
+                          <Feather
+                            name={selectedUser.status === 'Active' ? 'check-circle' : 'x-circle'}
+                            size={12}
+                            color={selectedUser.status === 'Active' ? '#01B97F' : '#EF4444'}
+                          />
+                          <Text style={[styles.badgeText, {
+                            color: selectedUser.status === 'Active' ? '#01B97F' : '#EF4444'
+                          }]}>
+                            {selectedUser.status}
+                          </Text>
+                        </View>
+                        {selectedUser.isPremium && (
+                          <View style={[styles.badge, styles.premiumBadge]}>
+                            <Feather name="star" size={12} color="#d97706" />
+                            <Text style={[styles.badgeText, { color: '#d97706' }]}>Premium</Text>
+                          </View>
+                        )}
                       </View>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Status</Text>
-                      <View style={[styles.statusBadge, { backgroundColor: selectedUser.status === 'Active' ? '#e8f5f0' : '#fee2e2' }]}>
-                        <Text style={[styles.statusText, { color: selectedUser.status === 'Active' ? '#01B97F' : '#EF4444' }]}>
-                          {selectedUser.status}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Joined</Text>
-                      <Text style={styles.detailValue}>{selectedUser.joinedAt.toLocaleDateString()}</Text>
                     </View>
                   </View>
                 </View>
 
+                {/* User Information */}
                 <View style={styles.modalSection}>
-                  <Text style={styles.modalSectionTitle}>Actions</Text>
-                  <View style={styles.actionButtonsContainer}>
+                  <View style={styles.sectionHeader}>
+                    <Feather name="info" size={16} color="#01B97F" />
+                    <Text style={styles.sectionTitle}>Account Information</Text>
+                  </View>
+                  <View style={styles.infoCard}>
+                    <View style={styles.infoRow}>
+                      <View style={styles.infoRowLeft}>
+                        <Feather name="calendar" size={16} color="#6B7280" />
+                        <Text style={styles.infoLabel}>Joined Date</Text>
+                      </View>
+                      <Text style={styles.infoValue}>{selectedUser.joinedAt.toLocaleDateString()}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <View style={styles.infoRowLeft}>
+                        <Feather name="clock" size={16} color="#6B7280" />
+                        <Text style={styles.infoLabel}>Last Active</Text>
+                      </View>
+                      <Text style={styles.infoValue}>{selectedUser.lastActive.toLocaleDateString()}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <View style={styles.infoRowLeft}>
+                        <Feather name="mail" size={16} color="#6B7280" />
+                        <Text style={styles.infoLabel}>Email Status</Text>
+                      </View>
+                      <Text style={[styles.infoValue, { color: '#01B97F' }]}>Verified</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Action Buttons */}
+                <View style={styles.modalSection}>
+                  <View style={styles.sectionHeader}>
+                    <Feather name="settings" size={16} color="#01B97F" />
+                    <Text style={styles.sectionTitle}>Quick Actions</Text>
+                  </View>
+                  <View style={styles.actionGrid}>
                     {selectedUser.status === 'Active' ? (
                       <TouchableOpacity
-                        style={[styles.actionButton, styles.deactivateButton]}
+                        style={[styles.actionCard, styles.deactivateCard]}
                         onPress={() => handleUserAction(selectedUser.id, 'deactivate')}
                       >
-                        <Feather name="user-x" size={20} color="#FFFFFF" />
-                        <Text style={styles.actionButtonText}>Deactivate User</Text>
+                        <View style={styles.actionIconContainer}>
+                          <Feather name="user-x" size={24} color="#EF4444" />
+                        </View>
+                        <Text style={styles.actionTitle}>Deactivate</Text>
+                        <Text style={styles.actionSubtitle}>Suspend user access</Text>
                       </TouchableOpacity>
                     ) : (
                       <TouchableOpacity
-                        style={[styles.actionButton, styles.activateButton]}
+                        style={[styles.actionCard, styles.activateCard]}
                         onPress={() => handleUserAction(selectedUser.id, 'activate')}
                       >
-                        <Feather name="user-check" size={20} color="#FFFFFF" />
-                        <Text style={styles.actionButtonText}>Activate User</Text>
+                        <View style={styles.actionIconContainer}>
+                          <Feather name="user-check" size={24} color="#01B97F" />
+                        </View>
+                        <Text style={styles.actionTitle}>Activate</Text>
+                        <Text style={styles.actionSubtitle}>Restore user access</Text>
                       </TouchableOpacity>
                     )}
+
+                    <TouchableOpacity
+                      style={[styles.actionCard, selectedUser.isPremium ? styles.removePremiumCard : styles.addPremiumCard]}
+                      onPress={() => handleUserAction(selectedUser.id, selectedUser.isPremium ? 'removePremium' : 'addPremium')}
+                    >
+                      <View style={styles.actionIconContainer}>
+                        <Feather name="star" size={24} color="#d97706" />
+                      </View>
+                      <Text style={styles.actionTitle}>
+                        {selectedUser.isPremium ? 'Remove Premium' : 'Add Premium'}
+                      </Text>
+                      <Text style={styles.actionSubtitle}>
+                        {selectedUser.isPremium ? 'Downgrade to regular' : 'Upgrade to premium'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </>
@@ -623,10 +778,10 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     textAlign: 'center',
   },
-  // Modal Styles
+  // Modal Styles (matching overview/list patterns)
   modalContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8fafc',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -639,30 +794,141 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  modalHeaderIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
   modalTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins-Bold',
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
     color: '#111827',
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalContent: {
     flex: 1,
     paddingHorizontal: 20,
+    paddingTop: 16,
   },
   modalSection: {
-    marginBottom: 30,
+    marginBottom: 20,
   },
-  modalSectionTitle: {
+  // Profile Section (matching overview card style)
+  profileSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#01B97F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  avatarText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
     fontSize: 16,
     fontFamily: 'Poppins-SemiBold',
     color: '#111827',
-    marginBottom: 16,
+    marginBottom: 2,
   },
-  detailsCard: {
-    backgroundColor: '#f8fafc',
+  profileEmail: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  profileBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 3,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontFamily: 'Poppins-Medium',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  premiumBadge: {
+    backgroundColor: '#fef3c7',
+  },
+  // Info Card (matching overview card style)
+  infoCard: {
+    backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 20,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: '#f3f4f6',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f8fafc',
+  },
+  infoRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoLabel: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+  },
+  infoValue: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+    color: '#111827',
   },
   detailRow: {
     flexDirection: 'row',
@@ -683,6 +949,56 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  // Action Grid (matching overview status cards)
+  actionGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionCard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+    minHeight: 100,
+  },
+  actionIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  actionTitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  actionSubtitle: {
+    fontSize: 10,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  activateCard: {
+    borderColor: '#f3f4f6',
+  },
+  deactivateCard: {
+    borderColor: '#f3f4f6',
+  },
+  addPremiumCard: {
+    borderColor: '#f3f4f6',
+  },
+  removePremiumCard: {
+    borderColor: '#f3f4f6',
+  },
+  // Legacy styles (keeping for compatibility)
   actionButtonsContainer: {
     gap: 12,
   },
@@ -714,6 +1030,12 @@ const styles = StyleSheet.create({
   },
   deactivateButton: {
     backgroundColor: '#EF4444',
+  },
+  addPremiumButton: {
+    backgroundColor: '#d97706',
+  },
+  removePremiumButton: {
+    backgroundColor: '#6b7280',
   },
   actionButtonText: {
     fontSize: 16,

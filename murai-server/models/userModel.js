@@ -24,8 +24,12 @@ const userSchema = new Schema({
     },
     role: {
         type: String,
-        enum: ['admin', 'user', 'premium', 'suspended'],
+        enum: ['admin', 'user', 'suspended'],
         default: 'user',
+    },
+    isPremium: {
+        type: Boolean,
+        default: false,
     },
     status: {
         type: String,

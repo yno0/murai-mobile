@@ -1,9 +1,9 @@
-import {Schema, model} from "mongoose";
+import { Schema, model } from "mongoose";
 
 const adminLogsSchema = new Schema({
     adminId: {
         type: Schema.Types.ObjectId,
-        ref: 'Admin',
+        ref: 'User',
         required: true,
     },
     action: {

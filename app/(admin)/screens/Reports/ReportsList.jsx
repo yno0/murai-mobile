@@ -77,8 +77,8 @@ export default function ReportsList({
       <View style={styles.reportItemLeft}>
         <View style={[styles.reportStatusIcon, { backgroundColor: getStatusColor(item.status) }]}>
           {item.status === 'pending' && <Feather name="clock" size={16} color="#F59E0B" />}
-          {item.status === 'reviewed' && <Feather name="check" size={16} color="#01B97F" />}
-          {item.status === 'in_progress' && <Feather name="play" size={16} color="#3B82F6" />}
+          {item.status === 'resolved' && <Feather name="check" size={16} color="#01B97F" />}
+          {item.status === 'rejected' && <Feather name="x" size={16} color="#EF4444" />}
         </View>
         <View style={styles.reportItemContent}>
           <Text style={styles.reportItemText} numberOfLines={2}>
@@ -101,8 +101,8 @@ export default function ReportsList({
   const getStatusColor = (status) => {
     switch (status) {
       case 'pending': return '#fef3c7';
-      case 'reviewed': return '#e8f5f0';
-      case 'in_progress': return '#dbeafe';
+      case 'resolved': return '#e8f5f0';
+      case 'rejected': return '#fee2e2';
       default: return '#f3f4f6';
     }
   };
@@ -211,8 +211,8 @@ export default function ReportsList({
         <View style={styles.filterContainer}>
           {renderFilterButton('all', 'All')}
           {renderFilterButton('pending', 'Pending')}
-          {renderFilterButton('reviewed', 'Reviewed')}
-          {renderFilterButton('in_progress', 'In Progress')}
+          {renderFilterButton('resolved', 'Resolved')}
+          {renderFilterButton('rejected', 'Rejected')}
         </View>
       </View>
 
