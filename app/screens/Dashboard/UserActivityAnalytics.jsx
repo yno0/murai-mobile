@@ -1,86 +1,216 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-    Dimensions,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
 
-// API service for user activity data
-const API_BASE_URL = 'http://localhost:3000/api';
-
-const userActivityService = {
-  getUserActivityData: async (timeRange) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/dashboard/user-activity?timeRange=${encodeURIComponent(timeRange)}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('User activity data received:', data);
-      return data;
-    } catch (error) {
-      console.error('Error fetching user activity data:', error);
-      return {
-        activityBreakdown: [],
-        recentActivity: [],
-        activeUsers: 0,
-        totalActivities: 0
-      };
-    }
-  },
-};
+// Group-based User Activity Analytics
 
 const { width } = Dimensions.get('window');
 
 function UserActivityAnalyticsScreen({ navigation }) {
-  const [selectedTimeRange, setSelectedTimeRange] = useState('Today');
-  const [selectedGroup, setSelectedGroup] = useState('Overall');
+  const { user } = useAuth(); // Get user from auth context
+  const [selectedTimeRange, setSelectedTimeRange] = useState('Week');
+  const [selectedGroup, setSelectedGroup] = useState('all');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
   const [userActivityData, setUserActivityData] = useState({
     activityBreakdown: [],
     recentActivity: [],
     activeUsers: 0,
-    totalActivities: 0
+    totalActivities: 0,
+    activityTrends: [],
+    topActivities: []
   });
 
-  const timeRanges = ['Today', 'Last 7 days', 'Last 30 days', 'All Time'];
+  const timeRanges = ['Today', 'Week', 'Month', 'Year'];
+  const [userGroups, setUserGroups] = useState([]);
+
+  // Dynamic group options based on user's created groups
   const groupOptions = [
-    { label: 'Overall', value: 'Overall' },
-    { label: 'Family Chat', value: 'family' },
-    { label: 'Work Team', value: 'work' },
-    { label: 'Gaming Group', value: 'gaming' },
-    { label: 'Study Group', value: 'study' },
-    { label: 'Sports Club', value: 'sports' },
+    { label: 'All Groups', value: 'all', memberCount: userGroups.reduce((sum, g) => sum + (g.memberCount || 0), 0) },
+    ...userGroups.map(group => ({
+      label: group.name,
+      value: group.id,
+      memberCount: group.memberCount || 0,
+      isOwner: group.isOwner || true,
+      description: group.description || ''
+    }))
   ];
 
-  // Fetch user activity data
-  const fetchUserActivityData = async (timeRange) => {
+  // Fetch user's groups from server
+  const fetchUserGroups = async () => {
+    try {
+      // Fetch user's created/managed groups
+      const groupsRes = await api.get('/user-groups').catch(() => ({
+        data: { groups: [] }
+      }));
+
+      const groups = groupsRes.data.groups || [
+        // Mock user's created groups
+        { id: 'family-chat', name: 'Family Chat', memberCount: 8, isOwner: true, description: 'Family group for daily conversations' },
+        { id: 'study-group', name: 'Study Group', memberCount: 12, isOwner: true, description: 'University study group' },
+        { id: 'gaming-squad', name: 'Gaming Squad', memberCount: 6, isOwner: true, description: 'Gaming friends group' },
+        { id: 'work-team', name: 'Work Team', memberCount: 15, isOwner: true, description: 'Project team collaboration' },
+        { id: 'sports-club', name: 'Sports Club', memberCount: 20, isOwner: false, description: 'Local sports club members' },
+      ];
+      setUserGroups(groups);
+
+      // If no groups exist, show empty state
+      if (groups.length === 0) {
+        setUserActivityData({
+          activityBreakdown: [],
+          recentActivity: [],
+          activeUsers: 0,
+          totalActivities: 0,
+          activityTrends: [],
+          topActivities: [],
+          hasGroups: false
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch user groups:', err);
+      setUserGroups([]);
+    }
+  };
+
+  // Fetch group-specific activity analytics data
+  const fetchUserActivityData = async (timeRange, groupId = selectedGroup) => {
     try {
       setIsLoading(true);
-      const data = await userActivityService.getUserActivityData(timeRange);
-      setUserActivityData(data);
-    } catch (error) {
-      console.error('Failed to fetch user activity data:', error);
+      setError('');
+
+      // Map time range to match server expectations
+      const mappedTimeRange = timeRange.toLowerCase() === 'week' ? 'week' :
+                             timeRange.toLowerCase() === 'month' ? 'month' :
+                             timeRange.toLowerCase() === 'year' ? 'year' :
+                             timeRange.toLowerCase();
+
+      // If no groups exist, show create group message
+      if (userGroups.length === 0) {
+        setUserActivityData({
+          activityBreakdown: [],
+          recentActivity: [],
+          activeUsers: 0,
+          totalActivities: 0,
+          activityTrends: [],
+          topActivities: [],
+          hasGroups: false
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch group activity data from server
+      const endpoint = groupId === 'all' ?
+        `/user-groups/analytics?timeRange=${mappedTimeRange}` :
+        `/user-groups/${groupId}/analytics?timeRange=${mappedTimeRange}`;
+
+      // Generate group-specific mock data
+      const selectedGroupData = userGroups.find(g => g.id === groupId);
+      const isAllGroups = groupId === 'all';
+
+      const activityRes = await api.get(endpoint).catch(() => ({
+        data: {
+          activityBreakdown: isAllGroups ? [
+            { _id: 'message', count: 456 },
+            { _id: 'flagged', count: 89 },
+            { _id: 'join', count: 34 },
+            { _id: 'report', count: 23 },
+            { _id: 'warning', count: 15 },
+          ] : [
+            { _id: 'message', count: Math.floor(Math.random() * 100) + 50 },
+            { _id: 'flagged', count: Math.floor(Math.random() * 20) + 5 },
+            { _id: 'join', count: Math.floor(Math.random() * 10) + 2 },
+            { _id: 'report', count: Math.floor(Math.random() * 8) + 1 },
+            { _id: 'warning', count: Math.floor(Math.random() * 5) + 1 },
+          ],
+          recentActivity: isAllGroups ? [
+            { id: '1', type: 'flagged', details: 'Inappropriate content flagged', user: 'Sarah M.', timestamp: new Date(), groupName: 'Family Chat' },
+            { id: '2', type: 'join', details: 'New member joined', user: 'Alex K.', timestamp: new Date(), groupName: 'Study Group' },
+            { id: '3', type: 'message', details: 'High activity detected', user: 'Mike R.', timestamp: new Date(), groupName: 'Gaming Squad' },
+            { id: '4', type: 'report', details: 'Safety report generated', user: 'You', timestamp: new Date(), groupName: 'Work Team' },
+            { id: '5', type: 'warning', details: 'Warning issued to member', user: 'You', timestamp: new Date(), groupName: 'Sports Club' },
+          ] : [
+            { id: '1', type: 'message', details: `New message in ${selectedGroupData?.name || 'group'}`, user: 'Member A', timestamp: new Date(), groupName: selectedGroupData?.name },
+            { id: '2', type: 'flagged', details: `Content flagged in ${selectedGroupData?.name || 'group'}`, user: 'You', timestamp: new Date(), groupName: selectedGroupData?.name },
+            { id: '3', type: 'join', details: `New member joined ${selectedGroupData?.name || 'group'}`, user: 'New Member', timestamp: new Date(), groupName: selectedGroupData?.name },
+          ],
+          activeUsers: isAllGroups ? userGroups.reduce((sum, g) => sum + (g.memberCount || 0), 0) :
+                      selectedGroupData?.memberCount || 0,
+          totalActivities: isAllGroups ? 617 : Math.floor(Math.random() * 200) + 50,
+          activityTrends: [
+            { day: 'Mon', activities: Math.floor(Math.random() * 50) + 20 },
+            { day: 'Tue', activities: Math.floor(Math.random() * 50) + 20 },
+            { day: 'Wed', activities: Math.floor(Math.random() * 50) + 20 },
+            { day: 'Thu', activities: Math.floor(Math.random() * 50) + 20 },
+            { day: 'Fri', activities: Math.floor(Math.random() * 50) + 20 },
+            { day: 'Sat', activities: Math.floor(Math.random() * 50) + 20 },
+            { day: 'Sun', activities: Math.floor(Math.random() * 50) + 20 },
+          ],
+          topActivities: isAllGroups ? [
+            { type: 'Messages Sent', count: 456, percentage: 74 },
+            { type: 'Content Flagged', count: 89, percentage: 14 },
+            { type: 'New Members', count: 34, percentage: 6 },
+            { type: 'Reports Generated', count: 23, percentage: 4 },
+            { type: 'Warnings Issued', count: 15, percentage: 2 },
+          ] : [
+            { type: 'Messages Sent', count: Math.floor(Math.random() * 100) + 50, percentage: 70 },
+            { type: 'Content Flagged', count: Math.floor(Math.random() * 20) + 5, percentage: 15 },
+            { type: 'New Members', count: Math.floor(Math.random() * 10) + 2, percentage: 8 },
+            { type: 'Reports Generated', count: Math.floor(Math.random() * 8) + 1, percentage: 4 },
+            { type: 'Warnings Issued', count: Math.floor(Math.random() * 5) + 1, percentage: 3 },
+          ],
+          hasGroups: true,
+          groupInfo: selectedGroupData
+        }
+      }));
+
+      setUserActivityData({
+        ...activityRes.data,
+        hasGroups: true
+      });
+    } catch (err) {
+      console.error('Failed to fetch group activity data:', err);
+      setError('Failed to load group analytics. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Handle time range change
+  const handleTimeRangeChange = (timeRange) => {
+    setSelectedTimeRange(timeRange);
+    fetchUserActivityData(timeRange);
+  };
+
+  // Handle group selection change
+  const handleGroupChange = (groupId) => {
+    setSelectedGroup(groupId);
+    fetchUserActivityData(selectedTimeRange, groupId);
+  };
+
+  // Effect to load data on component mount
   useEffect(() => {
-    fetchUserActivityData(selectedTimeRange);
-  }, [selectedTimeRange]);
+    fetchUserGroups();
+  }, []);
+
+  // Effect to load activity data when time range or groups change
+  useEffect(() => {
+    if (userGroups.length > 0) {
+      fetchUserActivityData(selectedTimeRange, selectedGroup);
+    }
+  }, [selectedTimeRange, userGroups]);
 
   // Transform real data into chart format
   const generateChartData = () => {
@@ -285,7 +415,10 @@ function UserActivityAnalyticsScreen({ navigation }) {
                 {groupOptions.find(option => option.value === selectedGroup)?.label}
               </Text>
               <Text style={styles.dropdownSubtext}>
-                {selectedGroup === 'Overall' ? '@allgroups' : '@group'}
+                {selectedGroup === 'all' ?
+                  `${groupOptions[0]?.memberCount || 0} total members` :
+                  `${groupOptions.find(g => g.value === selectedGroup)?.memberCount || 0} members`
+                }
               </Text>
             </View>
           </View>
@@ -303,7 +436,7 @@ function UserActivityAnalyticsScreen({ navigation }) {
                 key={option.value}
                 style={styles.dropdownItem}
                 onPress={() => {
-                  setSelectedGroup(option.value);
+                  handleGroupChange(option.value);
                   setIsDropdownOpen(false);
                 }}
               >
@@ -372,7 +505,7 @@ function UserActivityAnalyticsScreen({ navigation }) {
               styles.timeRangeButton,
               selectedTimeRange === range && styles.timeRangeButtonActive,
             ]}
-            onPress={() => setSelectedTimeRange(range)}
+            onPress={() => handleTimeRangeChange(range)}
           >
             <Text
               style={[

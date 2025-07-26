@@ -1,11 +1,11 @@
 import bcrypt from 'bcryptjs';
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import GroupCode from '../models/groupCode.js';
-import Group from '../models/groupModel.js';
-import GroupMember from '../models/groupUserModel.js';
-import Preference from '../models/preferenceModel.js';
-import User from '../models/userModel.js';
+import GroupCode from '../../models/groupCode.js';
+import Group from '../../models/groupModel.js';
+import GroupMember from '../../models/groupUserModel.js';
+import Preference from '../../models/preferenceModel.js';
+import User from '../../models/userModel.js';
 
 const router = express.Router();
 

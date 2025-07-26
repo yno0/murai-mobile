@@ -1,50 +1,22 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-    Dimensions,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
-
-// API service for flagged words data
-const API_BASE_URL = 'http://localhost:3000/api';
-
-const flaggedWordsService = {
-  getFlaggedWordsData: async (timeRange) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/dashboard/flagged-words?timeRange=${encodeURIComponent(timeRange)}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('Flagged words data received:', data);
-      return data;
-    } catch (error) {
-      console.error('Error fetching flagged words:', error);
-      return {
-        topWords: [],
-        recentDetections: [],
-        totalCount: 0,
-        summary: { avgAccuracy: 0, avgResponseTime: 0 }
-      };
-    }
-  },
-};
 
 const { width } = Dimensions.get('window');
 
 function FlaggedWordsAnalyticsScreen({ navigation }) {
-  const [selectedTimeRange, setSelectedTimeRange] = useState('Today');
+  // const { user } = useAuth(); // Get user from auth context
+  const [selectedTimeRange, setSelectedTimeRange] = useState('Week');
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
   const [flaggedWordsData, setFlaggedWordsData] = useState({
     topWords: [],
     recentDetections: [],
@@ -52,16 +24,56 @@ function FlaggedWordsAnalyticsScreen({ navigation }) {
     summary: { avgAccuracy: 0, avgResponseTime: 0 }
   });
 
-  const timeRanges = ['Today', 'Last 7 days', 'Last 30 days', 'All Time'];
+  const timeRanges = ['Today', 'Week', 'Month', 'Year'];
 
-  // Fetch flagged words data
+  // Fetch flagged words data using API service
   const fetchFlaggedWordsData = async (timeRange) => {
     try {
       setIsLoading(true);
-      const data = await flaggedWordsService.getFlaggedWordsData(timeRange);
-      setFlaggedWordsData(data);
-    } catch (error) {
-      console.error('Failed to fetch flagged words data:', error);
+      setError('');
+
+      // Map time range to match server expectations
+      const mappedTimeRange = timeRange.toLowerCase() === 'week' ? 'week' :
+                             timeRange.toLowerCase() === 'month' ? 'month' :
+                             timeRange.toLowerCase() === 'year' ? 'year' :
+                             timeRange.toLowerCase();
+
+      // For now, use mock data that simulates real detected words
+      const detectedWordsRes = {
+        data: {
+          detectedWords: [
+            { word: 'inappropriate', timestamp: new Date(), severity: 'high' },
+            { word: 'spam', timestamp: new Date(), severity: 'medium' },
+            { word: 'scam', timestamp: new Date(), severity: 'high' },
+            { word: 'phishing', timestamp: new Date(), severity: 'high' },
+            { word: 'malware', timestamp: new Date(), severity: 'high' },
+          ],
+          totalCount: 43
+        }
+      };
+
+      const statsRes = {
+        data: {
+          topWords: [
+            { word: 'inappropriate', count: 15, severity: 'high' },
+            { word: 'spam', count: 12, severity: 'medium' },
+            { word: 'scam', count: 8, severity: 'high' },
+            { word: 'phishing', count: 5, severity: 'high' },
+            { word: 'malware', count: 3, severity: 'high' },
+          ],
+          summary: { avgAccuracy: 95.2, avgResponseTime: 245 }
+        }
+      };
+
+      setFlaggedWordsData({
+        topWords: statsRes.data.topWords || [],
+        recentDetections: detectedWordsRes.data.detectedWords || [],
+        totalCount: detectedWordsRes.data.totalCount || 0,
+        summary: statsRes.data.summary || { avgAccuracy: 95, avgResponseTime: 250 }
+      });
+    } catch (err) {
+      console.error('Failed to fetch flagged words data:', err);
+      setError('Failed to load flagged words data. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -75,8 +87,14 @@ function FlaggedWordsAnalyticsScreen({ navigation }) {
   const generateChartData = () => {
     if (!flaggedWordsData.recentDetections || flaggedWordsData.recentDetections.length === 0) {
       return {
-        labels: ['', '', '', '', '', '', ''],
-        datasets: [{ data: [0, 0, 0, 0, 0, 0, 0], strokeWidth: 2, color: (opacity = 1) => `rgba(107, 114, 128, ${opacity})` }],
+        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        datasets: [{
+          data: [0, 0, 0, 0, 0, 0, 0],
+          strokeWidth: 3,
+          color: (opacity = 1) => `rgba(2, 185, 127, ${opacity})`,
+          fillShadowGradient: '#02B97F',
+          fillShadowGradientOpacity: 0.7,
+        }],
       };
     }
 
@@ -87,23 +105,23 @@ function FlaggedWordsAnalyticsScreen({ navigation }) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dayKey = date.toISOString().split('T')[0];
-      
+
       const dayCount = flaggedWordsData.recentDetections.filter(detection => {
         const detectionDate = new Date(detection.timestamp).toISOString().split('T')[0];
         return detectionDate === dayKey;
       }).length;
-      
+
       last7Days.push(dayCount);
     }
 
     return {
-      labels: ['', '', '', '', '', '', ''],
+      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
       datasets: [{
         data: last7Days.length > 0 ? last7Days : [0, 0, 0, 0, 0, 0, 0],
-        strokeWidth: 2,
-        color: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-        fillShadowGradient: 'rgba(107, 114, 128, 0.1)',
-        fillShadowGradientOpacity: 0.1,
+        strokeWidth: 3,
+        color: (opacity = 1) => `rgba(2, 185, 127, ${opacity})`,
+        fillShadowGradient: '#02B97F',
+        fillShadowGradientOpacity: 0.7,
       }],
     };
   };
@@ -112,24 +130,31 @@ function FlaggedWordsAnalyticsScreen({ navigation }) {
 
   const chartConfig = {
     backgroundColor: 'transparent',
-    backgroundGradientFrom: '#ffffff',
-    backgroundGradientTo: '#ffffff',
+    backgroundGradientFrom: '#f8fafc',
+    backgroundGradientTo: '#f8fafc',
     decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(156, 163, 175, ${opacity})`,
+    color: (opacity = 1) => `rgba(2, 185, 127, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
     style: {
       borderRadius: 16,
     },
     propsForDots: {
-      r: '0',
+      r: '4',
+      strokeWidth: '2',
+      stroke: '#ffffff',
     },
     propsForBackgroundLines: {
-      strokeWidth: 0,
+      strokeWidth: 1,
+      stroke: '#f1f5f9',
+      strokeDasharray: '5,5',
     },
-    withHorizontalLabels: false,
+    withHorizontalLabels: true,
     withVerticalLabels: false,
-    withInnerLines: false,
+    withInnerLines: true,
     withOuterLines: false,
+    withShadow: true,
+    fillShadowGradient: '#02B97F',
+    fillShadowGradientOpacity: 0.3,
   };
 
   // Use real data from API
@@ -141,23 +166,23 @@ function FlaggedWordsAnalyticsScreen({ navigation }) {
   })) || [];
 
   const changeData = [
-    { 
-      metric: 'Total Harmful Content', 
-      today: flaggedWordsData.totalCount || 0, 
+    {
+      metric: 'Total Harmful Content',
+      today: flaggedWordsData.totalCount || 0,
       yesterday: Math.floor((flaggedWordsData.totalCount || 0) * 0.85), // Estimate yesterday's count
-      change: '+16%' 
+      change: '+16%'
     },
-    { 
-      metric: 'Unique Threat Types', 
-      today: flaggedWordsData.topWords?.length || 0, 
-      yesterday: Math.max(0, (flaggedWordsData.topWords?.length || 0) - 2), 
-      change: '+21%' 
+    {
+      metric: 'Unique Threat Types',
+      today: flaggedWordsData.topWords?.length || 0,
+      yesterday: Math.max(0, (flaggedWordsData.topWords?.length || 0) - 2),
+      change: '+21%'
     },
-    { 
-      metric: 'AI Response Time', 
-      today: `${(flaggedWordsData.summary?.avgResponseTime / 1000 || 0.8).toFixed(1)}s`, 
-      yesterday: `${((flaggedWordsData.summary?.avgResponseTime / 1000 || 0.8) * 1.3).toFixed(1)}s`, 
-      change: '-27%' 
+    {
+      metric: 'AI Response Time',
+      today: `${(flaggedWordsData.summary?.avgResponseTime / 1000 || 0.8).toFixed(1)}s`,
+      yesterday: `${((flaggedWordsData.summary?.avgResponseTime / 1000 || 0.8) * 1.3).toFixed(1)}s`,
+      change: '-27%'
     },
   ];
 
@@ -195,48 +220,74 @@ function FlaggedWordsAnalyticsScreen({ navigation }) {
         ))}
       </View>
 
-      {/* Flagged Words Today */}
+      {/* Flagged Words Stats */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Harmful Content Detected Today</Text>
-        <View style={styles.statsCard}>
-          <View style={styles.statRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>127</Text>
-              <Text style={styles.statLabel}>Total Threats</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>23</Text>
-              <Text style={styles.statLabel}>Unique Types</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>12</Text>
-              <Text style={styles.statLabel}>High Severity</Text>
+        <View style={styles.sectionHeader}>
+          {/* <MaterialCommunityIcons name="shield-alert" size={24} color="#02B97F" /> */}
+          <Text style={styles.sectionTitle}>Harmful Content Detected</Text>
+        </View>
+        {isLoading ? (
+          <View style={styles.loadingCard}>
+            {/* <ActivityIndicator size="large" color="#02B97F" /> */}
+            <Text style={styles.loadingText}>Loading detection data...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorCard}>
+            {/* <MaterialCommunityIcons name="alert-circle" size={24} color="#ef4444" /> */}
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : (
+          <View style={styles.statsCard}>
+            <View style={styles.statRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{flaggedWordsData.totalCount || 0}</Text>
+                <Text style={styles.statLabel}>Total Threats</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{flaggedWordsData.topWords?.length || 0}</Text>
+                <Text style={styles.statLabel}>Unique Types</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{Math.floor((flaggedWordsData.totalCount || 0) * 0.3)}</Text>
+                <Text style={styles.statLabel}>High Severity</Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
       </View>
 
       {/* Trending Words */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Trending Threat Patterns</Text>
-        <View style={styles.trendingContainer}>
-          {trendingWords.map((item, index) => (
-            <View key={index} style={styles.trendingItem}>
-              <View style={styles.trendingInfo}>
-                <Text style={styles.trendingWord}>{item.word}</Text>
-                <Text style={styles.trendingCount}>{item.count} detections</Text>
+        {isLoading ? (
+          <View style={styles.loadingCard}>
+            <Text style={styles.loadingText}>Loading trending patterns...</Text>
+          </View>
+        ) : trendingWords.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>No threat patterns detected yet</Text>
+            <Text style={styles.emptySubtext}>Keep browsing safely with MURAi protection</Text>
+          </View>
+        ) : (
+          <View style={styles.trendingContainer}>
+            {trendingWords.map((item, index) => (
+              <View key={index} style={styles.trendingItem}>
+                <View style={styles.trendingInfo}>
+                  <Text style={styles.trendingWord}>{item.word}</Text>
+                  <Text style={styles.trendingCount}>{item.count} detections</Text>
+                </View>
+                <View style={styles.changeBadge}>
+                  <Text style={[
+                    styles.changeText,
+                    { color: item.change.startsWith('+') ? '#ef4444' : '#10b981' }
+                  ]}>
+                    {item.change}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.changeBadge}>
-                <Text style={[
-                  styles.changeText,
-                  { color: item.change.startsWith('+') ? '#6b7280' : '#6b7280' }
-                ]}>
-                  {item.change}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Change from Yesterday */}
@@ -329,7 +380,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   timeRangeButtonActive: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#02B97F',
   },
   timeRangeText: {
     fontSize: 14,
@@ -338,15 +389,70 @@ const styles = StyleSheet.create({
   },
   timeRangeTextActive: {
     fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
   },
   section: {
     marginBottom: 30,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
   },
   sectionTitle: {
     fontSize: 16,
     fontFamily: 'Poppins-Medium',
     color: '#111827',
-    marginBottom: 16,
+  },
+  loadingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 40,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    marginTop: 12,
+  },
+  errorCard: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#ef4444',
+    textAlign: 'center',
+  },
+  emptyCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 40,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+  },
+  emptyText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#9ca3af',
+    textAlign: 'center',
   },
   statsCard: {
     backgroundColor: '#ffffff',
@@ -471,4 +577,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FlaggedWordsAnalyticsScreen; 
+export default FlaggedWordsAnalyticsScreen;

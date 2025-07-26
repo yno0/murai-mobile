@@ -1,10 +1,10 @@
 import bcrypt from 'bcryptjs';
 import express from 'express';
-import { adminAuth } from '../middleware/authMiddleware.js';
-import AdminLogs from '../models/adminLogsMode.js';
-import Report from '../models/reportModel.js';
-import UserInfo from '../models/userInfoModel.js';
-import User from '../models/userModel.js';
+import { adminAuth } from '../../middleware/authMiddleware.js';
+import AdminLogs from '../../models/adminLogsMode.js';
+import Report from '../../models/reportModel.js';
+import UserInfo from '../../models/userInfoModel.js';
+import User from '../../models/userModel.js';
 
 const router = express.Router();
 

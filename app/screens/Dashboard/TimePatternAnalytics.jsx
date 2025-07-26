@@ -1,12 +1,12 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
     Dimensions,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -14,56 +14,149 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 const { width } = Dimensions.get('window');
 
 function TimePatternAnalyticsScreen({ navigation }) {
-  const [selectedTimeRange, setSelectedTimeRange] = useState('Today');
+  // const { user } = useAuth(); // Get user from auth context
+  const [selectedTimeRange, setSelectedTimeRange] = useState('Week');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [timePatternData, setTimePatternData] = useState({
+    hourlyPatterns: [],
+    dailyPatterns: [],
+    peakHours: [],
+    activitySummary: {},
+    totalActivities: 0
+  });
 
-  const timeRanges = ['Today', 'Last 7 days', 'Last 30 days', 'All Time'];
+  const timeRanges = ['Today', 'Week', 'Month', 'Year'];
 
+  // Fetch user-specific time pattern analytics data
+  const fetchTimePatternData = async (timeRange) => {
+    try {
+      setIsLoading(true);
+      setError('');
+
+      // Map time range to match server expectations
+      const mappedTimeRange = timeRange.toLowerCase() === 'week' ? 'week' :
+                             timeRange.toLowerCase() === 'month' ? 'month' :
+                             timeRange.toLowerCase() === 'year' ? 'year' :
+                             timeRange.toLowerCase();
+
+      // For now, use mock data that represents user's time-based activity patterns
+      const mockTimePatternData = {
+        hourlyPatterns: [
+          { hour: '6AM', detections: 2, activities: 5 },
+          { hour: '9AM', detections: 8, activities: 15 },
+          { hour: '12PM', detections: 12, activities: 25 },
+          { hour: '3PM', detections: 18, activities: 35 },
+          { hour: '6PM', detections: 15, activities: 28 },
+          { hour: '9PM', detections: 10, activities: 20 },
+          { hour: '12AM', detections: 3, activities: 8 },
+        ],
+        dailyPatterns: [
+          { day: 'Mon', detections: 45 },
+          { day: 'Tue', detections: 52 },
+          { day: 'Wed', detections: 38 },
+          { day: 'Thu', detections: 67 },
+          { day: 'Fri', detections: 89 },
+          { day: 'Sat', detections: 74 },
+          { day: 'Sun', detections: 92 },
+        ],
+        peakHours: [
+          { time: '3:00 PM', activity: 'High browsing activity', detections: 18 },
+          { time: '6:00 PM', activity: 'Social media usage', detections: 15 },
+          { time: '9:00 PM', activity: 'Entertainment content', detections: 10 },
+        ],
+        activitySummary: {
+          mostActiveDay: 'Sunday',
+          mostActiveHour: '3:00 PM',
+          averageDaily: 65,
+          weekendVsWeekday: '+23%'
+        },
+        totalActivities: 457
+      };
+
+      setTimePatternData(mockTimePatternData);
+    } catch (err) {
+      console.error('Failed to fetch time pattern data:', err);
+      setError('Failed to load time pattern analytics. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle time range change
+  const handleTimeRangeChange = (timeRange) => {
+    setSelectedTimeRange(timeRange);
+    fetchTimePatternData(timeRange);
+  };
+
+  // Effect to load data on component mount and time range change
+  useEffect(() => {
+    fetchTimePatternData(selectedTimeRange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTimeRange]);
+
+  // Generate dynamic chart data from user's time patterns
   const flagHistoryData = {
-    labels: ['', '', '', '', '', '', ''],
+    labels: timePatternData.dailyPatterns.length > 0 ?
+            timePatternData.dailyPatterns.map(d => d.day) :
+            ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     datasets: [
       {
-        data: [45, 52, 38, 67, 89, 74, 92],
-        strokeWidth: 2,
-        color: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-        fillShadowGradient: 'rgba(107, 114, 128, 0.1)',
-        fillShadowGradientOpacity: 0.1,
+        data: timePatternData.dailyPatterns.length > 0 ?
+              timePatternData.dailyPatterns.map(d => d.detections) :
+              [45, 52, 38, 67, 89, 74, 92],
+        strokeWidth: 3,
+        color: (opacity = 1) => `rgba(2, 185, 127, ${opacity})`,
+        fillShadowGradient: '#02B97F',
+        fillShadowGradientOpacity: 0.7,
       },
     ],
   };
 
   const timeOfDayData = {
-    labels: ['6AM', '9AM', '12PM', '3PM', '6PM', '9PM', '12AM'],
+    labels: timePatternData.hourlyPatterns.length > 0 ?
+            timePatternData.hourlyPatterns.map(h => h.hour) :
+            ['6AM', '9AM', '12PM', '3PM', '6PM', '9PM', '12AM'],
     datasets: [
       {
-        data: [5, 12, 18, 25, 20, 15, 8],
-        strokeWidth: 2,
-        color: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-        fillShadowGradient: 'rgba(107, 114, 128, 0.1)',
-        fillShadowGradientOpacity: 0.1,
+        data: timePatternData.hourlyPatterns.length > 0 ?
+              timePatternData.hourlyPatterns.map(h => h.detections) :
+              [5, 12, 18, 25, 20, 15, 8],
+        strokeWidth: 3,
+        color: (opacity = 1) => `rgba(2, 185, 127, ${opacity})`,
+        fillShadowGradient: '#02B97F',
+        fillShadowGradientOpacity: 0.7,
       },
     ],
   };
 
   const chartConfig = {
     backgroundColor: 'transparent',
-    backgroundGradientFrom: '#ffffff',
-    backgroundGradientTo: '#ffffff',
+    backgroundGradientFrom: '#f8fafc',
+    backgroundGradientTo: '#f8fafc',
     decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(156, 163, 175, ${opacity})`,
+    color: (opacity = 1) => `rgba(2, 185, 127, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
     style: {
       borderRadius: 16,
     },
     propsForDots: {
-      r: '0',
+      r: '4',
+      strokeWidth: '2',
+      stroke: '#ffffff',
     },
     propsForBackgroundLines: {
-      strokeWidth: 0,
+      strokeWidth: 1,
+      stroke: '#f1f5f9',
+      strokeDasharray: '5,5',
     },
-    withHorizontalLabels: false,
+    withHorizontalLabels: true,
     withVerticalLabels: false,
-    withInnerLines: false,
+    withInnerLines: true,
     withOuterLines: false,
+    withShadow: true,
+    fillShadowGradient: '#02B97F',
+    fillShadowGradientOpacity: 0.3,
   };
 
   const timeOfDayConfig = {
@@ -112,7 +205,7 @@ function TimePatternAnalyticsScreen({ navigation }) {
               styles.timeRangeButton,
               selectedTimeRange === range && styles.timeRangeButtonActive,
             ]}
-            onPress={() => setSelectedTimeRange(range)}
+            onPress={() => handleTimeRangeChange(range)}
           >
             <Text
               style={[
@@ -126,44 +219,64 @@ function TimePatternAnalyticsScreen({ navigation }) {
         ))}
       </View>
 
-      {/* Flag History */}
+      {/* Daily Detection Patterns */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Flag History</Text>
-        <View style={styles.chartContainer}>
-          <LineChart
-            data={flagHistoryData}
-            width={width - 40}
-            height={200}
-            chartConfig={chartConfig}
-            bezier
-            style={styles.chart}
-            withDots={true}
-            withShadow={false}
-            withFill={true}
-          />
-        </View>
+        <Text style={styles.sectionTitle}>Daily Detection Patterns</Text>
+        {isLoading ? (
+          <View style={styles.loadingCard}>
+            <Text style={styles.loadingText}>Loading daily patterns...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : (
+          <View style={styles.chartContainer}>
+            <LineChart
+              data={flagHistoryData}
+              width={width - 40}
+              height={200}
+              chartConfig={chartConfig}
+              bezier
+              style={styles.chart}
+              withDots={true}
+              withShadow={false}
+              withFill={true}
+            />
+          </View>
+        )}
       </View>
 
-      {/* Most Active Time of Day */}
+      {/* Hourly Detection Patterns */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Most Active Time of Day</Text>
-        <View style={styles.chartContainer}>
-          <LineChart
-            data={timeOfDayData}
-            width={width - 40}
-            height={200}
-            chartConfig={timeOfDayConfig}
-            bezier
-            style={styles.chart}
-            withDots={true}
-            withShadow={false}
-            withFill={true}
-          />
-        </View>
-        <View style={styles.timeInsight}>
-          <MaterialCommunityIcons name="clock" size={20} color="#3b82f6" />
-          <Text style={styles.insightText}>Peak activity: 3 PM (25 flags)</Text>
-        </View>
+        <Text style={styles.sectionTitle}>Hourly Detection Patterns</Text>
+        {isLoading ? (
+          <View style={styles.loadingCard}>
+            <Text style={styles.loadingText}>Loading hourly patterns...</Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.chartContainer}>
+              <LineChart
+                data={timeOfDayData}
+                width={width - 40}
+                height={200}
+                chartConfig={chartConfig}
+                bezier
+                style={styles.chart}
+                withDots={true}
+                withShadow={false}
+                withFill={true}
+              />
+            </View>
+            <View style={styles.timeInsight}>
+              <Text style={styles.insightText}>
+                Peak activity: {timePatternData.activitySummary?.mostActiveHour || '3:00 PM'}
+                ({timePatternData.hourlyPatterns.find(h => h.hour === '3PM')?.detections || 25} detections)
+              </Text>
+            </View>
+          </>
+        )}
       </View>
 
       {/* Weekly Patterns */}
@@ -205,24 +318,38 @@ function TimePatternAnalyticsScreen({ navigation }) {
       {/* Pattern Summary */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Pattern Summary</Text>
-        <View style={styles.summaryContainer}>
-          <View style={styles.summaryItem}>
-            <MaterialCommunityIcons name="trending-up" size={20} color="#8b5cf6" />
-            <Text style={styles.summaryText}>Flags increased by 15% this week</Text>
+        {isLoading ? (
+          <View style={styles.loadingCard}>
+            <Text style={styles.loadingText}>Loading pattern summary...</Text>
           </View>
-          <View style={styles.summaryItem}>
-            <MaterialCommunityIcons name="clock-outline" size={20} color="#3b82f6" />
-            <Text style={styles.summaryText}>Peak activity between 2-4 PM daily</Text>
+        ) : (
+          <View style={styles.summaryContainer}>
+            <View style={styles.summaryItem}>
+              <MaterialCommunityIcons name="trending-up" size={20} color="#02B97F" />
+              <Text style={styles.summaryText}>
+                Average daily: {timePatternData.activitySummary?.averageDaily || 65} detections
+              </Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <MaterialCommunityIcons name="clock-outline" size={20} color="#3b82f6" />
+              <Text style={styles.summaryText}>
+                Peak time: {timePatternData.activitySummary?.mostActiveHour || '3:00 PM'}
+              </Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <MaterialCommunityIcons name="calendar-week" size={20} color="#f59e0b" />
+              <Text style={styles.summaryText}>
+                Most active: {timePatternData.activitySummary?.mostActiveDay || 'Sunday'}
+              </Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <MaterialCommunityIcons name="chart-line" size={20} color="#8b5cf6" />
+              <Text style={styles.summaryText}>
+                Weekend activity: {timePatternData.activitySummary?.weekendVsWeekday || '+23%'} higher
+              </Text>
+            </View>
           </View>
-          <View style={styles.summaryItem}>
-            <MaterialCommunityIcons name="calendar-week" size={20} color="#f59e0b" />
-            <Text style={styles.summaryText}>Friday is the most active day</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <MaterialCommunityIcons name="alert-circle" size={20} color="#ef4444" />
-            <Text style={styles.summaryText}>5 new terms trending upward</Text>
-          </View>
-        </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -266,7 +393,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   timeRangeButtonActive: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#02B97F',
   },
   timeRangeText: {
     fontSize: 14,
@@ -275,6 +402,7 @@ const styles = StyleSheet.create({
   },
   timeRangeTextActive: {
     fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
   },
   section: {
     marginBottom: 30,
@@ -284,6 +412,34 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Medium',
     color: '#111827',
     marginBottom: 16,
+  },
+  loadingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 40,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    marginTop: 12,
+  },
+  errorCard: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#ef4444',
+    textAlign: 'center',
   },
   chartContainer: {
     backgroundColor: '#ffffff',

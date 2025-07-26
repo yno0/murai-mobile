@@ -11,11 +11,13 @@ import {
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
 function HomeScreen({ navigation }) {
+  const { user } = useAuth(); // Get user from auth context
   const [loading, setLoading] = React.useState(true);
   const [stats, setStats] = React.useState(null);
   const [chartData, setChartData] = React.useState(null);
@@ -28,12 +30,18 @@ function HomeScreen({ navigation }) {
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
+  // Get user's first name for greeting
+  const getUserFirstName = () => {
+    if (!user?.name) return 'User';
+    return user.name.split(' ')[0];
+  };
+
   const fetchNotifications = async () => {
     setNotifLoading(true);
     try {
       const res = await api.get('/notifications');
       setNotifications(res.data);
-    } catch (err) {
+    } catch (_err) {
       // Optionally handle error
     } finally {
       setNotifLoading(false);
@@ -49,23 +57,18 @@ function HomeScreen({ navigation }) {
     try {
       await api.put(`/notifications/${id}/read`);
       setNotifications((prev) => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
-    } catch (err) {}
+    } catch (_err) {}
   };
 
   const fetchData = React.useCallback(async (selectedTimeRange = timeRange) => {
     setLoading(true);
     setError('');
     try {
-      // Map time range to API format
-      const apiTimeRange = selectedTimeRange === 'week' ? 'last 7 days' :
-                          selectedTimeRange === 'month' ? 'last 30 days' :
-                          selectedTimeRange === 'year' ? 'all time' :
-                          'today';
-
+      // Use user-specific endpoints
       const [statsRes, chartRes, activityRes] = await Promise.all([
-        api.get(`/dashboard/overview?timeRange=${apiTimeRange}`),
-        api.get(`/dashboard/activity-chart?timeRange=${apiTimeRange}`),
-        api.get(`/dashboard/user-activity?timeRange=${apiTimeRange}`),
+        api.get(`/user-dashboard/overview?timeRange=${selectedTimeRange}`),
+        api.get(`/user-dashboard/activity-chart?timeRange=${selectedTimeRange}`),
+        api.get(`/user-dashboard/user-activity?timeRange=${selectedTimeRange}`),
       ]);
       setStats(statsRes.data);
       setChartData(chartRes.data);
@@ -134,11 +137,16 @@ function HomeScreen({ navigation }) {
       {/* Header with Notification */}
       <View style={styles.topHeader}>
         <View style={styles.header}>
-          <Text style={styles.greeting}>Hello Mhark,</Text>
-          <Text style={styles.subtitle}>Here&apos;s a quick look at your digital safety today.</Text>
+          <View style={styles.greetingContainer}>
+            <Text style={styles.greeting}>Hello {getUserFirstName()}</Text>
+            <View style={styles.waveContainer}>
+              <Text style={styles.waveEmoji}>👋</Text>
+            </View>
+          </View>
+          <Text style={styles.subtitle}>Here&apos;s your digital safety overview</Text>
         </View>
         <TouchableOpacity style={styles.notificationButton} onPress={openNotifModal}>
-          <MaterialCommunityIcons name="bell-outline" size={24} color="rgba(1, 82, 55, 1)" />
+          <MaterialCommunityIcons name="bell-outline" size={24} color="#02B97F" />
           {unreadCount > 0 && (
             <View style={styles.notifBadge}>
               <Text style={styles.notifBadgeText}>{unreadCount}</Text>
@@ -172,6 +180,37 @@ function HomeScreen({ navigation }) {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Hero Protection Status Card */}
+      {!loading && stats && (
+        <View style={styles.heroCard}>
+          <View style={styles.heroBackground}>
+            <View style={styles.heroContent}>
+              <View style={styles.heroIconContainer}>
+                <MaterialCommunityIcons name="shield-check" size={40} color="#ffffff" />
+              </View>
+              <View style={styles.heroTextContainer}>
+                <Text style={styles.heroTitle}>Protection Active</Text>
+                <Text style={styles.heroSubtitle}>Your digital safety is being monitored 24/7</Text>
+              </View>
+              <View style={styles.heroBadge}>
+                <Text style={styles.heroBadgeText}>{stats.protectionEffectiveness.value}</Text>
+              </View>
+            </View>
+            <View style={styles.heroStats}>
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatNumber}>{stats.harmfulContentDetected.value}</Text>
+                <Text style={styles.heroStatLabel}>Threats Blocked</Text>
+              </View>
+              <View style={styles.heroStatDivider} />
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatNumber}>{stats.websitesMonitored.value}</Text>
+                <Text style={styles.heroStatLabel}>Sites Monitored</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Notification Modal */}
       <Modal
@@ -264,28 +303,45 @@ function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Quick Actions */}
-      <View style={styles.quickActionsContainer}>
-        <TouchableOpacity style={styles.quickActionButton} onPress={() => navigation.navigate('Groups')}>
-          <View style={styles.quickActionIconBg}>
-            <MaterialCommunityIcons name="account-group-outline" size={20} color="#02B97F" />
-          </View>
-          <Text style={styles.quickActionText}>Create Group</Text>
-        </TouchableOpacity>
-        <View className="actionDivider" style={styles.actionDivider} />
-        <TouchableOpacity style={styles.quickActionButton} onPress={() => navigation.navigate('Analytics')}>
-          <View style={styles.quickActionIconBg}>
-            <MaterialCommunityIcons name="chart-box-outline" size={20} color="#02B97F" />
-          </View>
-          <Text style={styles.quickActionText}>View Analytics</Text>
-        </TouchableOpacity>
-        <View className="actionDivider" style={styles.actionDivider} />
-        <TouchableOpacity style={styles.quickActionButton} onPress={() => navigation.navigate('Settings')}>
-          <View style={styles.quickActionIconBg}>
-            <MaterialCommunityIcons name="cog-outline" size={20} color="#02B97F"  />
-          </View>
-          <Text style={styles.quickActionText}>Configure</Text>
-        </TouchableOpacity>
+      {/* Quick Actions Section */}
+      <View style={styles.quickActionsSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={styles.sectionSubtitle}>Manage your digital safety</Text>
+        </View>
+        <View style={styles.quickActionsGrid}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('Groups')}>
+            <View style={[styles.quickActionIconBg, { backgroundColor: '#e0f2fe' }]}>
+              <MaterialCommunityIcons name="account-group" size={28} color="#0277bd" />
+            </View>
+            <Text style={styles.quickActionTitle}>Groups</Text>
+            <Text style={styles.quickActionSubtitle}>Manage safety groups</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('Analytics')}>
+            <View style={[styles.quickActionIconBg, { backgroundColor: '#f3e5f5' }]}>
+              <MaterialCommunityIcons name="chart-line" size={28} color="#7b1fa2" />
+            </View>
+            <Text style={styles.quickActionTitle}>Analytics</Text>
+            <Text style={styles.quickActionSubtitle}>View detailed reports</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('Settings')}>
+            <View style={[styles.quickActionIconBg, { backgroundColor: '#fff3e0' }]}>
+              <MaterialCommunityIcons name="cog" size={28} color="#ef6c00" />
+            </View>
+            <Text style={styles.quickActionTitle}>Settings</Text>
+            <Text style={styles.quickActionSubtitle}>Configure preferences</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickActionCard}>
+            <View style={[styles.quickActionIconBg, { backgroundColor: '#e8f5e8' }]}>
+              <MaterialCommunityIcons name="help-circle" size={28} color="#2e7d32" />
+            </View>
+            <Text style={styles.quickActionTitle}>Help</Text>
+            <Text style={styles.quickActionSubtitle}>Get support</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Recent Activity */}
@@ -363,7 +419,7 @@ function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f1f5f9',
     paddingHorizontal: 20,
     paddingTop: 50,
   },
@@ -376,11 +432,24 @@ const styles = StyleSheet.create({
   header: {
     flex: 1,
   },
+  greetingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   greeting: {
-    fontSize: 28,
+    fontSize: 32,
     fontFamily: 'Poppins-Bold',
     color: '#1f2937',
-    marginBottom: 5,
+    marginRight: 8,
+  },
+  waveContainer: {
+    backgroundColor: '#fff7ed',
+    borderRadius: 20,
+    padding: 6,
+  },
+  waveEmoji: {
+    fontSize: 20,
   },
   subtitle: {
     fontSize: 16,
@@ -389,14 +458,22 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   notificationButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f8fafc',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 5,
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 6,
   },
   notifBadge: {
     position: 'absolute',
@@ -665,29 +742,36 @@ const styles = StyleSheet.create({
   },
   timeFilterContainer: {
     flexDirection: 'row',
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 30,
-    marginHorizontal: 5,
-  },
-  timeFilterButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  timeFilterButtonActive: {
     backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 6,
+    marginBottom: 25,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 4,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  timeFilterButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  timeFilterButtonActive: {
+    backgroundColor: '#02B97F',
+    shadowColor: '#02B97F',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   timeFilterText: {
     fontSize: 14,
@@ -695,8 +779,144 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   timeFilterTextActive: {
-    color: '#1f2937',
+    color: '#ffffff',
     fontFamily: 'Poppins-SemiBold',
+  },
+  // Hero Card Styles
+  heroCard: {
+    marginBottom: 25,
+  },
+  heroBackground: {
+    backgroundColor: '#02B97F',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#02B97F',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  heroContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  heroIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  heroTextContainer: {
+    flex: 1,
+  },
+  heroTitle: {
+    fontSize: 20,
+    fontFamily: 'Poppins-Bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  heroBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  heroBadgeText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    color: '#ffffff',
+  },
+  heroStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  heroStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  heroStatNumber: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  heroStatLabel: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+  },
+  heroStatDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    marginHorizontal: 20,
+  },
+  // Section Styles
+  sectionHeader: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontFamily: 'Poppins-Bold',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+  },
+  // Quick Actions Styles
+  quickActionsSection: {
+    marginBottom: 30,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  quickActionCard: {
+    width: '47%',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  quickActionTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1f2937',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  quickActionSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    textAlign: 'center',
   },
 });
 

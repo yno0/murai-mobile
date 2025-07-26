@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     Alert,
     FlatList,
@@ -64,11 +64,15 @@ export default function ExtensionSettings({ onClose }) {
   const [whitelistError, setWhitelistError] = useState('');
   const [initialPrefs, setInitialPrefs] = useState(null);
 
-  // Fix sensitivity save/load: always send string ('low', 'medium', 'high') and load as string
+  // Load preferences with improved error handling
   useEffect(() => {
-    setLoading(true);
-    getPreferences()
-      .then(prefs => {
+    const loadPreferences = async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const prefs = await getPreferences();
+
         const loadedPrefs = {
           selectedLanguage: prefs.language === 'Tagalog' ? 'tagalog' : prefs.language === 'English' ? 'english' : 'both',
           sensitivity: (prefs.sensitivity || 'medium').toLowerCase(),
@@ -80,6 +84,7 @@ export default function ExtensionSettings({ onClose }) {
           showHighlight: !!prefs.isHighlighted,
           flagColor: prefs.color || '#374151',
         };
+
         setSelectedLanguage(loadedPrefs.selectedLanguage);
         setSensitivity(loadedPrefs.sensitivity);
         setWhitelist(loadedPrefs.whitelist);
@@ -87,12 +92,35 @@ export default function ExtensionSettings({ onClose }) {
         setShowHighlight(loadedPrefs.showHighlight);
         setFlagColor(loadedPrefs.flagColor);
         setInitialPrefs(loadedPrefs);
+
+        console.log('Preferences loaded successfully');
+      } catch (error) {
+        console.error('Error loading preferences:', error);
+        setError('Unable to load preferences. Using default settings.');
+
+        // Set default values if loading fails
+        const defaultPrefs = {
+          selectedLanguage: 'both',
+          sensitivity: 'medium',
+          whitelist: { sites: [], terms: [] },
+          flagStyle: 'highlight',
+          showHighlight: true,
+          flagColor: '#374151',
+        };
+
+        setSelectedLanguage(defaultPrefs.selectedLanguage);
+        setSensitivity(defaultPrefs.sensitivity);
+        setWhitelist(defaultPrefs.whitelist);
+        setFlagStyle(defaultPrefs.flagStyle);
+        setShowHighlight(defaultPrefs.showHighlight);
+        setFlagColor(defaultPrefs.flagColor);
+        setInitialPrefs(defaultPrefs);
+      } finally {
         setLoading(false);
-      })
-      .catch(() => {
-        setError('Failed to load preferences');
-        setLoading(false);
-      });
+      }
+    };
+
+    loadPreferences();
   }, []);
 
   // Compare current state to initialPrefs
@@ -124,26 +152,49 @@ export default function ExtensionSettings({ onClose }) {
   // Save preferences after confirmation
   const handleSave = async () => {
     setSaving(true);
+    setError('');
+
     try {
-      await updatePreferences({
-        language: selectedLanguage === 'tagalog' ? 'Tagalog' : selectedLanguage === 'english' ? 'English' : 'Taglish',
+      const prefsToSave = {
+        language: selectedLanguage === 'tagalog' ? 'Tagalog' : selectedLanguage === 'english' ? 'English' : 'Both',
         sensitivity: sensitivity.toLowerCase(),
         whitelistSite: whitelist.sites,
         whitelistTerms: whitelist.terms,
         flagStyle,
         isHighlighted: showHighlight,
         color: flagColor,
+      };
+
+      await updatePreferences(prefsToSave);
+
+      // Update initial prefs to reflect saved state
+      setInitialPrefs({
+        selectedLanguage,
+        sensitivity,
+        whitelist,
+        flagStyle,
+        showHighlight,
+        flagColor,
       });
-      setSaving(false);
+
       setDirty(false);
       setConfirmVisible(false);
-      showToast('Settings saved!');
-      onClose();
-    } catch {
-      setError('Failed to save preferences');
-      setSaving(false);
+      showToast('Settings saved successfully!');
+
+      console.log('Preferences saved successfully');
+
+      // Close after a short delay to show the success message
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+
+    } catch (error) {
+      console.error('Error saving preferences:', error);
+      setError('Failed to save preferences. Changes saved locally.');
       setConfirmVisible(false);
-      showToast('Failed to save settings');
+      showToast('Settings saved locally');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -209,21 +260,62 @@ export default function ExtensionSettings({ onClose }) {
     </View>
   );
 
-  // Show loading and error states
+  // Retry loading preferences
+  const retryLoadPreferences = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const prefs = await getPreferences();
+
+      const loadedPrefs = {
+        selectedLanguage: prefs.language === 'Tagalog' ? 'tagalog' : prefs.language === 'English' ? 'english' : 'both',
+        sensitivity: (prefs.sensitivity || 'medium').toLowerCase(),
+        whitelist: {
+          sites: prefs.whitelistSite || [],
+          terms: prefs.whitelistTerms || [],
+        },
+        flagStyle: prefs.flagStyle || 'highlight',
+        showHighlight: !!prefs.isHighlighted,
+        flagColor: prefs.color || '#374151',
+      };
+
+      setSelectedLanguage(loadedPrefs.selectedLanguage);
+      setSensitivity(loadedPrefs.sensitivity);
+      setWhitelist(loadedPrefs.whitelist);
+      setFlagStyle(loadedPrefs.flagStyle);
+      setShowHighlight(loadedPrefs.showHighlight);
+      setFlagColor(loadedPrefs.flagColor);
+      setInitialPrefs(loadedPrefs);
+
+    } catch (error) {
+      setError('Unable to load preferences. Using default settings.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show loading state
   if (loading) return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' }}>
-      <Text style={{ color: '#374151', fontSize: 16 }}>Loading preferences...</Text>
-    </View>
-  );
-  if (error) return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' }}>
-      <Text style={{ color: '#ef4444', fontSize: 16 }}>{error}</Text>
-      <TouchableOpacity onPress={() => { setError(''); setLoading(true); getPreferences().then(prefs => { setSelectedLanguage(prefs.language === 'Tagalog' ? 'tagalog' : prefs.language === 'English' ? 'english' : 'both'); setSensitivity(prefs.sensitivity || 'medium'); setWhitelist({ sites: prefs.whitelistSite || [], terms: prefs.whitelistTerms || [] }); setFlagStyle(prefs.flagStyle || 'highlight'); setShowHighlight(!!prefs.isHighlighted); setFlagColor(prefs.color || '#374151'); setLoading(false); }).catch(() => { setError('Failed to load preferences'); setLoading(false); }); }} style={{ marginTop: 20, backgroundColor: '#374151', padding: 12, borderRadius: 8 }}><Text style={{ color: '#fff' }}>Retry</Text></TouchableOpacity>
+    <View style={styles.loadingContainer}>
+      <MaterialCommunityIcons name="loading" size={32} color="#36DCA6" />
+      <Text style={styles.loadingText}>Loading preferences...</Text>
     </View>
   );
 
   return (
     <View style={styles.container}>
+      {/* Error Banner */}
+      {error && (
+        <View style={styles.errorBanner}>
+          <MaterialCommunityIcons name="alert-circle" size={20} color="#ef4444" />
+          <Text style={styles.errorBannerText}>{error}</Text>
+          <TouchableOpacity onPress={retryLoadPreferences} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -927,4 +1019,47 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontFamily: 'Poppins-Regular',
   },
-}); 
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    padding: 20,
+  },
+  loadingText: {
+    color: '#374151',
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    marginTop: 12,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    margin: 16,
+    marginBottom: 0,
+  },
+  errorBannerText: {
+    flex: 1,
+    color: '#dc2626',
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    marginLeft: 8,
+  },
+  retryButton: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+  },
+});

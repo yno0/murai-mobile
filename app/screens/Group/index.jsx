@@ -99,14 +99,14 @@ function GroupsScreen({ navigation }) {
   };
 
   const renderGroupItem = ({ item }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.groupCard}
       onPress={() => handleGroupPress(item)}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
       <View style={styles.groupRow}>
         <View style={styles.groupIconContainer}>
-          <MaterialCommunityIcons name="account-group" size={36} color="#02B97F" />
+          <MaterialCommunityIcons name="account-group" size={28} color="#02B97F" />
         </View>
         <View style={styles.groupInfo}>
           <Text style={styles.groupName}>{item.name}</Text>
@@ -114,6 +114,7 @@ function GroupsScreen({ navigation }) {
             {(typeof item.memberCount === 'number' ? item.memberCount : (item.members ? item.members.length : 0))} members
           </Text>
         </View>
+        <MaterialCommunityIcons name="chevron-right" size={20} color="#9ca3af" />
       </View>
     </TouchableOpacity>
   );
@@ -142,7 +143,7 @@ function GroupsScreen({ navigation }) {
       />
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <MaterialCommunityIcons name="magnify" size={20} color="#9CA3AF" style={{ marginRight: 8 }} />
+        <MaterialCommunityIcons name="magnify" size={20} color="#6b7280" style={{ marginRight: 8 }} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search groups..."
@@ -154,19 +155,19 @@ function GroupsScreen({ navigation }) {
         />
         {search.length > 0 && (
           <TouchableOpacity onPress={() => setSearch('')} style={styles.clearBtn} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-            <MaterialCommunityIcons name="close-circle" size={20} color="#9CA3AF" />
+            <MaterialCommunityIcons name="close-circle" size={20} color="#6b7280" />
           </TouchableOpacity>
         )}
       </View>
       {/* Groups List */}
       {loading ? (
         <View style={styles.emptyState}>
-          <MaterialCommunityIcons name="account-group-outline" size={48} color="#D1D5DB" />
+          <MaterialCommunityIcons name="account-group-outline" size={64} color="#D1D5DB" />
           <Text style={styles.emptyText}>Loading...</Text>
         </View>
       ) : filteredGroups.length === 0 ? (
         <View style={styles.emptyState}>
-          <MaterialCommunityIcons name="account-group-outline" size={48} color="#D1D5DB" />
+          <MaterialCommunityIcons name="account-group-outline" size={64} color="#D1D5DB" />
           <Text style={styles.emptyText}>No groups found</Text>
           <Text style={styles.emptySubtext}>Create or join a group to get started</Text>
         </View>
@@ -295,7 +296,7 @@ function GroupsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f1f5f9',
   },
   header: {
     flexDirection: 'row',
@@ -310,22 +311,23 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   list: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingBottom: 20,
   },
   groupCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 0,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 3,
   },
   groupRow: {
     flexDirection: 'row',
@@ -333,9 +335,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   groupIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: '#E8F5F0',
     alignItems: 'center',
     justifyContent: 'center',
@@ -347,10 +349,10 @@ const styles = StyleSheet.create({
   },
   groupName: {
     fontSize: 18,
-    fontWeight: '500',
-    color: '#374151',
-    fontFamily: 'Poppins-Medium',
-    marginBottom: 2,
+    fontWeight: '600',
+    color: '#1f2937',
+    fontFamily: 'Poppins-SemiBold',
+    marginBottom: 4,
   },
   adminBadge: {
     fontSize: 12,
@@ -383,38 +385,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingVertical: 60,
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#374151',
-    fontFamily: 'Poppins-Medium',
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1f2937',
+    fontFamily: 'Poppins-SemiBold',
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#6b7280',
     fontFamily: 'Poppins-Regular',
     textAlign: 'center',
+    lineHeight: 22,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 24,
     paddingBottom: 40,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -424,29 +433,34 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '600',
-    color: '#374151',
+    color: '#1f2937',
     fontFamily: 'Poppins-SemiBold',
   },
   tabContainer: {
     flexDirection: 'row',
     marginHorizontal: 24,
     marginBottom: 24,
-    backgroundColor: '#f8fafc',
-    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
     padding: 4,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
   tab: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 12,
     alignItems: 'center',
-    borderRadius: 6,
+    borderRadius: 8,
   },
   activeTab: {
-    backgroundColor: '#E8F5F0',
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   tabText: {
     fontSize: 14,
@@ -456,117 +470,128 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: '#02B97F',
+    fontWeight: '600',
   },
   formContainer: {
     paddingHorizontal: 24,
   },
   input: {
     backgroundColor: '#f8fafc',
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     fontSize: 16,
-    color: '#374151',
+    color: '#1f2937',
     fontFamily: 'Poppins-Regular',
-    marginBottom: 16,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
   button: {
-    backgroundColor: '#E8F5F0',
-    paddingVertical: 14,
-    borderRadius: 8,
+    backgroundColor: '#02B97F',
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#36DCA6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
+    shadowColor: '#02B97F',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 4,
   },
   buttonText: {
-    color: '#02B97F',
+    color: '#ffffff',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     fontFamily: 'Poppins-SemiBold',
     letterSpacing: 0.5,
   },
   addBtn: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
+    padding: 10,
+    borderRadius: 24,
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   addBtnPressed: {
-    opacity: 0.5,
+    opacity: 0.7,
+    backgroundColor: '#e5e7eb',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginHorizontal: 24,
-    marginBottom: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#f3f4f6',
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#374151',
+    color: '#1f2937',
     fontFamily: 'Poppins-Regular',
     padding: 0,
   },
   clearBtn: {
-    marginLeft: 4,
+    marginLeft: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 4,
   },
   duplicateModalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 28,
-    marginHorizontal: 32,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 32,
+    marginHorizontal: 24,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   duplicateModalTitle: {
-    fontSize: 18,
-    fontFamily: 'Poppins-Medium',
-    color: '#374151',
-    marginBottom: 8,
+    fontSize: 20,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1f2937',
+    marginBottom: 12,
     textAlign: 'center',
   },
   duplicateModalText: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: 'Poppins-Regular',
     color: '#6b7280',
-    marginBottom: 20,
+    marginBottom: 24,
     textAlign: 'center',
+    lineHeight: 22,
   },
   duplicateModalButton: {
-    backgroundColor: '#36DCA6',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 32,
+    backgroundColor: '#02B97F',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
     alignItems: 'center',
+    shadowColor: '#02B97F',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   duplicateModalButtonText: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 16,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: 'Poppins-SemiBold',
   },
 });
 

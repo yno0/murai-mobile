@@ -10,11 +10,7 @@ import UserInfo from './models/userInfoModel.js';
 import User from './models/userModel.js';
 // Import routes
 import { findOrCreateGoogleUser } from './controller/authController.js';
-import adminRoutes from './routes/adminRoutes.js';
-import authRoutes from './routes/authRoutes.js';
-import dashboardRoutes from './routes/dashboardRoutes.js';
-import notificationRoutes from './routes/notificationRoutes.js';
-import userRoutes from './routes/userRoutes.js';
+import routes from './routes/index.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 // Load environment variables
@@ -25,11 +21,7 @@ const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
 
 app.use(cors());
 app.use(express.json());
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/notifications', notificationRoutes);
+app.use('/api', routes);
 
 app.use(session({ secret: 'your_secret', resave: false, saveUninitialized: true }));
 app.use(passport.initialize());
