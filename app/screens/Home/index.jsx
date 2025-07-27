@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Animated,
   Dimensions,
   FlatList,
   Modal,
@@ -16,6 +17,8 @@ import api from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+
 function HomeScreen({ navigation }) {
   const { user } = useAuth(); // Get user from auth context
   const [loading, setLoading] = React.useState(true);
@@ -26,9 +29,68 @@ function HomeScreen({ navigation }) {
   const [notifications, setNotifications] = React.useState([]);
   const [notifModalVisible, setNotifModalVisible] = React.useState(false);
   const [notifLoading, setNotifLoading] = React.useState(false);
-  const [timeRange, setTimeRange] = React.useState('today');
 
+  const timeRange = 'today';
   const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  // Animation values
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(50)).current;
+  const scaleAnim = React.useRef(new Animated.Value(0.8)).current;
+
+  // Quick action animations
+  const quickAction1Anim = React.useRef(new Animated.Value(0)).current;
+  const quickAction2Anim = React.useRef(new Animated.Value(0)).current;
+  const quickAction3Anim = React.useRef(new Animated.Value(0)).current;
+  const quickAction4Anim = React.useRef(new Animated.Value(0)).current;
+
+  // Initialize animations
+  const startAnimations = React.useCallback(() => {
+    // Main content animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 700,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Staggered quick action animations
+    setTimeout(() => {
+      Animated.stagger(150, [
+        Animated.timing(quickAction1Anim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(quickAction2Anim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(quickAction3Anim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(quickAction4Anim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 400);
+  }, [fadeAnim, slideAnim, scaleAnim, quickAction1Anim, quickAction2Anim, quickAction3Anim, quickAction4Anim]);
 
   // Get user's first name for greeting
   const getUserFirstName = () => {
@@ -83,7 +145,8 @@ function HomeScreen({ navigation }) {
 
   React.useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    startAnimations();
+  }, [fetchData, startAnimations]);
 
   // Prepare chart data for LineChart
   const preparedChartData = chartData ? {
@@ -135,7 +198,15 @@ function HomeScreen({ navigation }) {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header with Notification */}
-      <View style={styles.topHeader}>
+      <Animated.View
+        style={[
+          styles.topHeader,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         <View style={styles.header}>
           <View style={styles.greetingContainer}>
             <Text style={styles.greeting}>Hello {getUserFirstName()}</Text>
@@ -153,37 +224,21 @@ function HomeScreen({ navigation }) {
             </View>
           )}
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
-      {/* Time Filter Options */}
-      <View style={styles.timeFilterContainer}>
-        {['today', 'week', 'month', 'year'].map((filter) => (
-          <TouchableOpacity
-            key={filter}
-            style={[
-              styles.timeFilterButton,
-              timeRange === filter && styles.timeFilterButtonActive
-            ]}
-            onPress={() => {
-              setTimeRange(filter);
-              fetchData(filter);
-            }}
-          >
-            <Text style={[
-              styles.timeFilterText,
-              timeRange === filter && styles.timeFilterTextActive
-            ]}>
-              {filter === 'today' ? 'Today' :
-               filter === 'week' ? 'Week' :
-               filter === 'month' ? 'Month' : 'Year'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+
 
       {/* Hero Protection Status Card */}
       {!loading && stats && (
-        <View style={styles.heroCard}>
+        <Animated.View
+          style={[
+            styles.heroCard,
+            {
+              opacity: fadeAnim,
+              transform: [{ scale: scaleAnim }]
+            }
+          ]}
+        >
           <View style={styles.heroBackground}>
             <View style={styles.heroContent}>
               <View style={styles.heroIconContainer}>
@@ -209,7 +264,7 @@ function HomeScreen({ navigation }) {
               </View>
             </View>
           </View>
-        </View>
+        </Animated.View>
       )}
 
       {/* Notification Modal */}
@@ -272,7 +327,15 @@ function HomeScreen({ navigation }) {
       </Modal>
 
       {/* Stats Card */}
-      <View style={styles.statsCardContainer}>
+      <Animated.View
+        style={[
+          styles.statsCardContainer,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         <View style={styles.statsCard}>
           <View style={styles.statsHeader}>
             <View style={styles.statsLeft}>
@@ -298,54 +361,129 @@ function HomeScreen({ navigation }) {
             />
           </ScrollView>
         </View>
-        <TouchableOpacity style={styles.viewDetailedButton}>
+        <TouchableOpacity
+          style={styles.viewDetailedButton}
+          onPress={() => navigation.navigate('Dashboard')}
+        >
           <Text style={styles.viewDetailedText}>View Detailed →</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Quick Actions Section */}
-      <View style={styles.quickActionsSection}>
+      <Animated.View
+        style={[
+          styles.quickActionsSection,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <Text style={styles.sectionSubtitle}>Manage your digital safety</Text>
         </View>
         <View style={styles.quickActionsGrid}>
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('Groups')}>
-            <View style={[styles.quickActionIconBg, { backgroundColor: '#e0f2fe' }]}>
-              <MaterialCommunityIcons name="account-group" size={28} color="#0277bd" />
+          <AnimatedTouchableOpacity
+            style={[
+              styles.quickActionCard,
+              {
+                opacity: quickAction1Anim,
+                transform: [{
+                  translateY: quickAction1Anim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [30, 0]
+                  })
+                }]
+              }
+            ]}
+            onPress={() => navigation.navigate('Group')}
+          >
+            <View style={[styles.quickActionIconBg, { backgroundColor: '#e8f5f0' }]}>
+              <MaterialCommunityIcons name="account-group" size={28} color="#02B97F" />
             </View>
             <Text style={styles.quickActionTitle}>Groups</Text>
             <Text style={styles.quickActionSubtitle}>Manage safety groups</Text>
-          </TouchableOpacity>
+          </AnimatedTouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('Analytics')}>
-            <View style={[styles.quickActionIconBg, { backgroundColor: '#f3e5f5' }]}>
-              <MaterialCommunityIcons name="chart-line" size={28} color="#7b1fa2" />
+          <AnimatedTouchableOpacity
+            style={[
+              styles.quickActionCard,
+              {
+                opacity: quickAction2Anim,
+                transform: [{
+                  translateY: quickAction2Anim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [30, 0]
+                  })
+                }]
+              }
+            ]}
+            onPress={() => navigation.navigate('Dashboard')}
+          >
+            <View style={[styles.quickActionIconBg, { backgroundColor: '#e8f5f0' }]}>
+              <MaterialCommunityIcons name="chart-line" size={28} color="#02B97F" />
             </View>
             <Text style={styles.quickActionTitle}>Analytics</Text>
             <Text style={styles.quickActionSubtitle}>View detailed reports</Text>
-          </TouchableOpacity>
+          </AnimatedTouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('Settings')}>
-            <View style={[styles.quickActionIconBg, { backgroundColor: '#fff3e0' }]}>
-              <MaterialCommunityIcons name="cog" size={28} color="#ef6c00" />
+          <AnimatedTouchableOpacity
+            style={[
+              styles.quickActionCard,
+              {
+                opacity: quickAction3Anim,
+                transform: [{
+                  translateY: quickAction3Anim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [30, 0]
+                  })
+                }]
+              }
+            ]}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <View style={[styles.quickActionIconBg, { backgroundColor: '#e8f5f0' }]}>
+              <MaterialCommunityIcons name="cog" size={28} color="#02B97F" />
             </View>
             <Text style={styles.quickActionTitle}>Settings</Text>
             <Text style={styles.quickActionSubtitle}>Configure preferences</Text>
-          </TouchableOpacity>
+          </AnimatedTouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard}>
-            <View style={[styles.quickActionIconBg, { backgroundColor: '#e8f5e8' }]}>
-              <MaterialCommunityIcons name="help-circle" size={28} color="#2e7d32" />
+          <AnimatedTouchableOpacity
+            style={[
+              styles.quickActionCard,
+              {
+                opacity: quickAction4Anim,
+                transform: [{
+                  translateY: quickAction4Anim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [30, 0]
+                  })
+                }]
+              }
+            ]}
+            onPress={() => navigation.navigate('Extension')}
+          >
+            <View style={[styles.quickActionIconBg, { backgroundColor: '#e8f5f0' }]}>
+              <MaterialCommunityIcons name="puzzle" size={28} color="#02B97F" />
             </View>
-            <Text style={styles.quickActionTitle}>Help</Text>
-            <Text style={styles.quickActionSubtitle}>Get support</Text>
-          </TouchableOpacity>
+            <Text style={styles.quickActionTitle}>Extension</Text>
+            <Text style={styles.quickActionSubtitle}>Configure extension</Text>
+          </AnimatedTouchableOpacity>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Recent Activity */}
-      <View style={styles.recentActivity}>
+      <Animated.View
+        style={[
+          styles.recentActivity,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         <View style={styles.recentActivityHeader}>
           <View>
             <Text style={styles.recentActivityTitle}>Recent Activity</Text>
@@ -411,7 +549,7 @@ function HomeScreen({ navigation }) {
             />
           )}
         </View>
-      </View>
+      </Animated.View>
     </ScrollView>
   );
 }

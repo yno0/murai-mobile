@@ -41,11 +41,30 @@ function getRandomDate(daysAgo) {
 
 // Sample data arrays
 const harmfulWords = [
+  // English harmful words
   'hate', 'stupid', 'idiot', 'kill', 'die', 'loser', 'ugly', 'worthless',
-  'trash', 'garbage', 'pathetic', 'disgusting', 'annoying', 'terrible'
+  'trash', 'garbage', 'pathetic', 'disgusting', 'annoying', 'terrible',
+  'violence', 'threat', 'bullying', 'harassment', 'abuse', 'insult',
+
+  // Tagalog profanity and harmful words
+  'putangina', 'gago', 'tanga', 'bobo', 'ulol', 'tarantado', 'buwisit',
+  'pakyu', 'tangina', 'leche', 'peste', 'hudas', 'kingina', 'punyeta',
+  'hayop', 'walang hiya', 'bastos', 'sira ulo', 'lintik', 'pucha',
+  'bwisit', 'hinayupak', 'walang kwenta', 'pangit', 'kadiri', 'yawa',
+  'puta', 'puke', 'tae', 'demonyo', 'bruha', 'salot', 'peste ka',
+  'walang utak', 'sira', 'baliw', 'abnoy', 'gunggong', 'hangal',
+  'walang modo', 'basura', 'dumi', 'amoy', 'mabaho', 'panget',
+
+  // Taglish combinations
+  'gago ka', 'tanga mo', 'bobo naman', 'what the putangina', 'tangina naman',
+  'pakyu ka', 'gago this', 'tanga yan', 'bobo talaga', 'ulol ka ba',
+  'stupid ka', 'ang tanga mo', 'gago ka talaga', 'bobo mo naman',
+  'what the gago', 'tangina mo', 'putangina naman', 'ulol mo',
+  'bwisit ka', 'peste ka naman', 'kadiri mo', 'panget mo'
 ];
 
 const contexts = [
+  // English contexts
   'Social media comment',
   'Chat message',
   'Forum post',
@@ -53,7 +72,53 @@ const contexts = [
   'Website review',
   'Video comment',
   'Blog comment',
-  'Direct message'
+  'Direct message',
+  'Threatening message in comment section',
+  'Inappropriate language in chat',
+  'Bullying behavior detected',
+  'Hate speech in post content',
+
+  // Tagalog contexts
+  'Nagsabi ng masasamang salita sa comment',
+  'Nang-aaway sa group chat',
+  'Nambubully sa mga kaklase',
+  'Nagsabi ng putangina sa post',
+  'Nag-trash talk sa laro',
+  'Nanlalait sa itsura ng iba',
+  'Nag-curse sa live stream',
+  'Nambabash sa social media',
+  'Nag-threat sa DM',
+  'Nanlalait ng kapamilya',
+  'Nagsabi ng gago sa comment',
+  'Nang-aaway dahil sa politics',
+  'Nag-mura sa Facebook post',
+  'Nanlalait sa TikTok video',
+  'Nag-bash sa Instagram story',
+  'Nag-away sa Twitter thread',
+  'Nambubully sa Discord server',
+  'Nag-toxic sa online game',
+  'Nanlalait sa YouTube comment',
+  'Nag-harass sa Messenger',
+  'Nag-cyberbully sa classmate',
+  'Nag-body shame sa photo',
+
+  // Taglish contexts
+  'Nagsabi ng what the putangina sa chat',
+  'Nag-comment ng gago ka naman',
+  'Said tanga mo sa group',
+  'Posted bobo naman yan sa wall',
+  'Nag-reply ng pakyu ka sa thread',
+  'Commented tangina naman sa photo',
+  'Said ulol ka ba sa livestream',
+  'Nag-post ng bwisit na yan',
+  'Nag-chat ng stupid ka naman',
+  'Posted ang tanga mo sa timeline',
+  'Commented gago ka talaga sa video',
+  'Said bobo mo naman sa stream',
+  'Nag-reply ng what the gago sa post',
+  'Commented kadiri mo naman sa pic',
+  'Said panget mo sa live',
+  'Posted peste ka naman sa group'
 ];
 
 const websites = [
@@ -69,6 +134,40 @@ const websites = [
 
 const activityTypes = ['login', 'logout', 'update', 'visit', 'report', 'group_join', 'group_leave', 'flagged'];
 
+// Helper function to detect language from word and context
+function detectLanguageFromContent(word, context) {
+  const text = `${word} ${context}`.toLowerCase();
+
+  // Check for Tagalog words
+  const tagalogWords = ['putangina', 'gago', 'tanga', 'bobo', 'ulol', 'tarantado', 'buwisit',
+                       'pakyu', 'tangina', 'leche', 'peste', 'hudas', 'kingina', 'punyeta',
+                       'hayop', 'bastos', 'lintik', 'pucha', 'hinayupak', 'pangit', 'kadiri', 'yawa',
+                       'puta', 'puke', 'tae', 'demonyo', 'bruha', 'salot', 'walang', 'sira', 'baliw',
+                       'abnoy', 'gunggong', 'hangal', 'modo', 'basura', 'dumi', 'amoy', 'mabaho',
+                       'nagsabi', 'nang-aaway', 'nambubully', 'nanlalait', 'nag-curse', 'nambabash',
+                       'nag-threat', 'nag-harass', 'nag-mura', 'nag-bash', 'nag-away', 'nag-toxic',
+                       'nag-cyberbully', 'nag-body', 'sa', 'ng', 'mga', 'ang', 'naman', 'talaga',
+                       'mo', 'ka', 'yan', 'ba', 'dahil', 'classmate', 'kaklase'];
+
+  // Check for English words
+  const englishWords = ['hate', 'stupid', 'idiot', 'kill', 'die', 'loser', 'ugly', 'worthless',
+                       'social', 'media', 'comment', 'chat', 'message', 'forum', 'post', 'threatening',
+                       'what', 'the', 'said', 'posted', 'commented', 'replied'];
+
+  const hasTagalog = tagalogWords.some(word => text.includes(word));
+  const hasEnglish = englishWords.some(word => text.includes(word));
+
+  if (hasTagalog && hasEnglish) {
+    return 'Taglish';
+  } else if (hasTagalog) {
+    return 'Tagalog';
+  } else if (hasEnglish) {
+    return 'English';
+  } else {
+    return 'Other';
+  }
+}
+
 async function generateDataForUser(user) {
   console.log(`Generating data for user: ${user.name} (${user.email})`);
 
@@ -78,24 +177,28 @@ async function generateDataForUser(user) {
   await Notification.deleteMany({ userId: user._id });
 
   console.log('Cleared existing user data');
-    
+
     // Generate detected words for the last 30 days
     const detectedWords = [];
     for (let day = 0; day < 30; day++) {
       const date = getRandomDate(day);
       const dailyCount = getRandomNumber(2, 8); // 2-8 detections per day
-      
+
       for (let i = 0; i < dailyCount; i++) {
+        const selectedWord = getRandomElement(harmfulWords);
+        const selectedContext = getRandomElement(contexts);
+        const detectedLanguage = detectLanguageFromContent(selectedWord, selectedContext);
+
         const detectedWord = new DetectedWord({
-          word: getRandomElement(harmfulWords),
+          word: selectedWord,
           userId: user._id,
-          context: getRandomElement(contexts),
+          context: selectedContext,
           sentimentScore: getRandomFloat(-1, 0.2),
           url: getRandomElement(websites),
           accuracy: getRandomFloat(0.75, 0.98),
           responseTime: getRandomFloat(50, 300),
           patternType: getRandomElement(['profanity', 'harassment', 'toxicity', 'hate_speech']),
-          language: 'en',
+          language: detectedLanguage,
           severity: getRandomElement(['low', 'medium', 'high']),
           siteType: getRandomElement(['social', 'forum', 'chat', 'email']),
           createdAt: date

@@ -1,12 +1,11 @@
+import { Feather } from '@expo/vector-icons';
 import { useNavigation } from "@react-navigation/native";
-import React, { useState } from "react";
+import { useState } from "react";
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import Header from '../../components/common/Header';
 
 export default function PrivacyControls() {
   const navigation = useNavigation();
-  
+
   const [privacySettings, setPrivacySettings] = useState({
     dataSharing: false,
     analyticsTracking: true,
@@ -25,7 +24,7 @@ export default function PrivacyControls() {
 
   const handleDeleteData = () => {
     Alert.alert(
-      "Delete Data", 
+      "Delete Data",
       "Are you sure you want to delete all your data? This action cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
@@ -43,13 +42,13 @@ export default function PrivacyControls() {
       key: 'dataSharing',
       title: 'Data Sharing',
       description: 'Share anonymized data for improvements',
-      icon: 'share-variant-outline',
+      icon: 'share-2',
     },
     {
       key: 'analyticsTracking',
       title: 'Analytics Tracking',
       description: 'Help us improve the app with usage data',
-      icon: 'chart-line',
+      icon: 'trending-up',
     },
   ];
 
@@ -57,196 +56,276 @@ export default function PrivacyControls() {
     {
       title: 'Export My Data',
       description: 'Download a copy of your data',
-      icon: 'download-outline',
+      icon: 'download',
       onPress: handleExportData,
     },
     {
       title: 'Delete All Data',
       description: 'Permanently remove all your data',
-      icon: 'delete-outline',
+      icon: 'trash-2',
       onPress: handleDeleteData,
       isDanger: true,
     },
     {
       title: 'Privacy Policy',
       description: 'Read our privacy policy',
-      icon: 'file-document-outline',
+      icon: 'file-text',
       onPress: handlePrivacyPolicy,
     },
   ];
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <Header 
-        title="Privacy Controls"
-        showBackButton={true}
-        onBackPress={() => navigation.goBack()}
-        style={{ paddingHorizontal: 0 }}
-      />
-
-      {/* Privacy Settings */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Privacy Settings</Text>
-        
-        {privacyOptions.map((option) => (
-          <View key={option.key} style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <MaterialCommunityIcons 
-                name={option.icon} 
-                size={20} 
-                color="#6B7280" 
-              />
-              <View style={styles.settingContent}>
-                <Text style={styles.settingTitle}>{option.title}</Text>
-                <Text style={styles.settingDescription}>{option.description}</Text>
-              </View>
-            </View>
-            <Switch
-              value={privacySettings[option.key]}
-              onValueChange={() => toggleSetting(option.key)}
-              trackColor={{ false: '#E5E7EB', true: '#374151' }}
-              thumbColor={privacySettings[option.key] ? '#FFFFFF' : '#FFFFFF'}
-            />
-          </View>
-        ))}
-      </View>
-
-      {/* Data Management */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Data Management</Text>
-        
-        {privacyActions.map((action, index) => (
-          <TouchableOpacity 
-            key={index}
-            style={[
-              styles.actionItem,
-              action.isDanger && styles.dangerActionItem
-            ]}
-            onPress={action.onPress}
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
           >
-            <View style={styles.actionLeft}>
-              <MaterialCommunityIcons 
-                name={action.icon} 
-                size={20} 
-                color={action.isDanger ? "#EF4444" : "#6B7280"} 
-              />
-              <View style={styles.actionContent}>
-                <Text style={[
-                  styles.actionTitle,
-                  action.isDanger && styles.dangerActionTitle
-                ]}>
-                  {action.title}
-                </Text>
-                <Text style={[
-                  styles.actionDescription,
-                  action.isDanger && styles.dangerActionDescription
-                ]}>
-                  {action.description}
-                </Text>
-              </View>
-            </View>
-            <MaterialCommunityIcons 
-              name="chevron-right" 
-              size={20} 
-              color={action.isDanger ? "#EF4444" : "#9CA3AF"} 
-            />
+            <Feather name="arrow-left" size={24} color="#1D1D1F" />
           </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Privacy Summary */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Privacy Summary</Text>
-        
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryHeader}>
-            <MaterialCommunityIcons name="shield-account" size={24} color="#374151" />
-            <Text style={styles.summaryTitle}>Your Privacy Matters</Text>
-          </View>
-          <Text style={styles.summaryDescription}>
-            We respect your privacy and give you control over your data. Review and adjust your settings above to customize your privacy preferences.
-          </Text>
+          <Text style={styles.headerTitle}>Privacy Controls</Text>
+          <View style={styles.placeholderButton} />
         </View>
-      </View>
-    </ScrollView>
+
+        {/* Privacy Settings Card */}
+        <View style={styles.settingsCard}>
+          <View style={styles.cardHeader}>
+            <Feather name="shield" size={20} color="#01B97F" />
+            <Text style={styles.cardTitle}>Privacy Settings</Text>
+          </View>
+
+          {privacyOptions.map((option) => (
+            <View key={option.key} style={styles.settingItem}>
+              <View style={styles.settingLeft}>
+                <Feather
+                  name={option.icon}
+                  size={20}
+                  color="#01B97F"
+                />
+                <View style={styles.settingContent}>
+                  <Text style={styles.settingTitle}>{option.title}</Text>
+                  <Text style={styles.settingDescription}>{option.description}</Text>
+                </View>
+              </View>
+              <Switch
+                value={privacySettings[option.key]}
+                onValueChange={() => toggleSetting(option.key)}
+                trackColor={{ false: '#E5E7EB', true: '#01B97F' }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor="#E5E7EB"
+              />
+            </View>
+          ))}
+        </View>
+
+        {/* Data Management Card */}
+        <View style={styles.actionsCard}>
+          <View style={styles.cardHeader}>
+            <Feather name="database" size={20} color="#01B97F" />
+            <Text style={styles.cardTitle}>Data Management</Text>
+          </View>
+
+          {privacyActions.map((action, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.actionItem,
+                action.isDanger && styles.dangerActionItem
+              ]}
+              onPress={action.onPress}
+            >
+              <View style={styles.actionLeft}>
+                <Feather
+                  name={action.icon}
+                  size={20}
+                  color={action.isDanger ? "#EF4444" : "#01B97F"}
+                />
+                <View style={styles.actionContent}>
+                  <Text style={[
+                    styles.actionTitle,
+                    action.isDanger && styles.dangerActionTitle
+                  ]}>
+                    {action.title}
+                  </Text>
+                  <Text style={[
+                    styles.actionDescription,
+                    action.isDanger && styles.dangerActionDescription
+                  ]}>
+                    {action.description}
+                  </Text>
+                </View>
+              </View>
+              <Feather
+                name="chevron-right"
+                size={20}
+                color={action.isDanger ? "#EF4444" : "#A8AAB0"}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Privacy Summary Card */}
+        <View style={styles.summaryCard}>
+          <View style={styles.cardHeader}>
+            <Feather name="info" size={20} color="#01B97F" />
+            <Text style={styles.cardTitle}>Privacy Summary</Text>
+          </View>
+
+          <View style={styles.summaryContent}>
+            <View style={styles.summaryIcon}>
+              <Feather name="shield" size={32} color="#01B97F" />
+            </View>
+            <Text style={styles.summaryTitle}>Your Privacy Matters</Text>
+            <Text style={styles.summaryDescription}>
+              We respect your privacy and give you control over your data. Review and adjust your settings above to customize your privacy preferences.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.bottomSpacing} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7F7F7',
   },
-  section: {
-    marginHorizontal: 24,
-    marginBottom: 32,
+  scrollContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 60,
   },
-  sectionTitle: {
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: '#1D1D1F',
+    flex: 1,
+    textAlign: 'center',
+  },
+  placeholderButton: {
+    width: 40,
+    height: 40,
+  },
+  settingsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  actionsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  summaryCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
+  },
+  cardTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1D1D1F',
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    paddingHorizontal: 0,
+    marginBottom: 16,
   },
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 16,
   },
   settingContent: {
-    marginLeft: 12,
     flex: 1,
   },
   settingTitle: {
     fontSize: 16,
-    color: '#111827',
-    fontWeight: '500',
+    fontFamily: 'Poppins-Medium',
+    color: '#1D1D1F',
     marginBottom: 2,
   },
   settingDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
+    color: '#A8AAB0',
   },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    paddingHorizontal: 0,
+    marginBottom: 16,
   },
   dangerActionItem: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
+    backgroundColor: 'transparent',
   },
   actionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 16,
   },
   actionContent: {
-    marginLeft: 12,
     flex: 1,
   },
   actionTitle: {
     fontSize: 16,
-    color: '#111827',
-    fontWeight: '500',
+    fontFamily: 'Poppins-Medium',
+    color: '#1D1D1F',
     marginBottom: 2,
   },
   dangerActionTitle: {
@@ -254,32 +333,40 @@ const styles = StyleSheet.create({
   },
   actionDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
+    color: '#A8AAB0',
   },
   dangerActionDescription: {
-    color: '#B91C1C',
+    color: '#EF4444',
   },
-  summaryCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  summaryHeader: {
-    flexDirection: 'row',
+  summaryContent: {
     alignItems: 'center',
-    marginBottom: 12,
+    textAlign: 'center',
+  },
+  summaryIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F0FDF4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   summaryTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginLeft: 12,
+    fontSize: 20,
+    fontFamily: 'Poppins-Bold',
+    color: '#1D1D1F',
+    marginBottom: 12,
+    textAlign: 'center',
   },
   summaryDescription: {
-    fontSize: 14,
-    color: '#64748B',
-    lineHeight: 20,
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#A8AAB0',
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  bottomSpacing: {
+    height: 40,
   },
 });

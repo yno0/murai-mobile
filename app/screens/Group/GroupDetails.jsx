@@ -63,6 +63,8 @@ export default function GroupDetailsScreen() {
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [copied, setCopied] = useState(false);
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
+  const [activities, setActivities] = useState([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
 
   // Helper to check if current user is admin
   const isAdmin = groupData && user && (
@@ -76,6 +78,7 @@ export default function GroupDetailsScreen() {
   useEffect(() => {
     if (groupId) {
       fetchGroupDetails(groupId);
+      fetchGroupActivities(groupId);
     }
   }, [groupId]);
 
@@ -91,6 +94,38 @@ export default function GroupDetailsScreen() {
       setLoading(false);
     }
   };
+
+  const fetchGroupActivities = async (id) => {
+    setActivitiesLoading(true);
+    try {
+      const res = await api.get(`/users/groups/${id}/activities`);
+      setActivities(res.data.activities || []);
+    } catch (err) {
+      console.error('Failed to fetch group activities:', err);
+      // Fallback to empty array if API fails
+      setActivities([]);
+    } finally {
+      setActivitiesLoading(false);
+    }
+  };
+
+  const recordActivity = async (type, message, metadata = {}) => {
+    try {
+      await api.post(`/users/groups/${groupId}/activities`, {
+        type,
+        message,
+        metadata,
+        userId: user?.id || user?._id,
+        userName: user?.name || user?.username || 'Unknown User'
+      });
+      // Refresh activities after recording
+      fetchGroupActivities(groupId);
+    } catch (err) {
+      console.error('Failed to record activity:', err);
+    }
+  };
+
+
 
   const handleInviteMember = () => {
     if (!groupData) return;
@@ -116,7 +151,15 @@ export default function GroupDetailsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await api.delete(`/users/groups/${groupData.id}/members/${user.id}`);
+              // Record activity before leaving
+              await recordActivity(
+                'member_left',
+                `${user?.name || user?.username || 'Unknown User'} left the group`,
+                { reason: 'left' }
+              );
+
+              await api.post(`/users/groups/${groupData.id}/leave`);
+              setInfoModalVisible(false);
               navigation.goBack();
             } catch (err) {
               Alert.alert('Error', 'Failed to leave group');
@@ -139,6 +182,13 @@ export default function GroupDetailsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Record activity before deletion
+              await recordActivity(
+                'group_deleted',
+                `Group "${groupData.name}" was deleted`,
+                { groupName: groupData.name }
+              );
+
               await api.delete(`/users/groups/${groupData.id}`);
               navigation.goBack();
             } catch (err) {
@@ -164,7 +214,16 @@ export default function GroupDetailsScreen() {
     setEditLoading(true);
     setEditError('');
     try {
+      const oldName = groupData.name;
       await api.put(`/users/groups/${groupData.id}`, { name: editGroupName.trim() });
+
+      // Record activity
+      await recordActivity(
+        'group_updated',
+        `Group name changed from "${oldName}" to "${editGroupName.trim()}"`,
+        { oldName, newName: editGroupName.trim() }
+      );
+
       setEditModalVisible(false);
       fetchGroupDetails(groupData.id);
     } catch (err) {
@@ -212,22 +271,62 @@ export default function GroupDetailsScreen() {
     </View>
   );
 
+  const getActivityIcon = (type) => {
+    switch (type) {
+      case 'member_joined':
+        return 'account-plus';
+      case 'member_left':
+        return 'account-minus';
+      case 'member_removed':
+        return 'account-remove';
+      case 'group_created':
+        return 'account-group';
+      case 'group_updated':
+        return 'pencil';
+      case 'group_deleted':
+        return 'delete';
+      case 'detection':
+        return 'alert-circle';
+      case 'settings':
+        return 'cog';
+      default:
+        return 'information';
+    }
+  };
+
+  const formatActivityTime = (timestamp) => {
+    if (!timestamp) return 'Unknown time';
+
+    const now = new Date();
+    const activityTime = new Date(timestamp);
+    const diffInMs = now - activityTime;
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+
+    return activityTime.toLocaleDateString();
+  };
+
   const renderActivityItem = ({ item }) => (
     <View style={styles.activityItem}>
       <View style={styles.activityIcon}>
         <MaterialCommunityIcons
-          name={
-            item.type === 'detection' ? 'alert-circle' :
-            item.type === 'member' ? 'account-plus' :
-            'settings'
-          }
+          name={getActivityIcon(item.type)}
           size={22}
-          color="#02B97F"
+          color="#6b7280"
         />
       </View>
       <View style={styles.activityContent}>
         <Text style={styles.activityMessage}>{item.message}</Text>
-        <Text style={styles.activityTime}>{item.time}</Text>
+        <Text style={styles.activityTime}>{formatActivityTime(item.createdAt || item.timestamp)}</Text>
+        {item.userName && (
+          <Text style={styles.activityUser}>by {item.userName}</Text>
+        )}
       </View>
     </View>
   );
@@ -256,30 +355,39 @@ export default function GroupDetailsScreen() {
     switch (activeTab) {
       case 'members':
         return (
-          <View style={styles.membersTabContainer}>
-            <View style={styles.memberCountHeader}>
-              <Text style={styles.memberCountText}>
-                {groupData?.memberCount || (groupData?.members?.length || 0)} members
-              </Text>
-            </View>
-            <FlatList
-              data={groupData.members}
-              renderItem={renderMemberItem}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.listContainer}
-            />
-          </View>
-        );
-      case 'activity':
-        return (
           <FlatList
-            data={groupData.recentActivity}
-            renderItem={renderActivityItem}
+            data={groupData.members}
+            renderItem={renderMemberItem}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContainer}
           />
+        );
+      case 'activity':
+        return (
+          <View style={styles.activityTabContainer}>
+            {activitiesLoading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Loading activities...</Text>
+              </View>
+            ) : activities.length === 0 ? (
+              <View style={styles.emptyActivityContainer}>
+                <MaterialCommunityIcons name="history" size={48} color="#9ca3af" />
+                <Text style={styles.emptyActivityText}>No recent activity</Text>
+                <Text style={styles.emptyActivitySubtext}>Group activities will appear here</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={activities}
+                renderItem={renderActivityItem}
+                keyExtractor={(item) => item._id || item.id}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.listContainer}
+                refreshing={activitiesLoading}
+                onRefresh={() => fetchGroupActivities(groupId)}
+              />
+            )}
+          </View>
         );
       default:
         return (
@@ -369,35 +477,89 @@ export default function GroupDetailsScreen() {
         animationType="slide"
         onRequestClose={() => setInfoModalVisible(false)}
       >
-        <View style={[styles.modalOverlay, { justifyContent: 'flex-end' }]}> 
-          <View style={styles.bottomSheetModalContent}> 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <Text style={[styles.infoTitle, { marginBottom: 0 }]}>Group Information</Text>
-              <TouchableOpacity onPress={() => setInfoModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#111827" />
+        <View style={styles.modalOverlay}>
+          <View style={styles.enhancedModalContent}>
+            {/* Modal Handle */}
+            <View style={styles.modalHandle} />
+
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleContainer}>
+                <MaterialCommunityIcons name="information" size={24} color="#02B97F" />
+                <Text style={styles.modalTitle}>Group Information</Text>
+              </View>
+              <TouchableOpacity style={styles.closeButton} onPress={() => setInfoModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={20} color="#6b7280" />
               </TouchableOpacity>
             </View>
-            <View style={{ height: 12 }} />
-            <View style={styles.infoCardBetter}>
-              <View style={styles.infoRowBetterClean}>
-                <Text style={styles.infoLabelBetter}>Name</Text>
-                <Text style={styles.infoValueBetter}>{groupData?.name}</Text>
-              </View>
-              <View style={[styles.infoRowBetterClean, { alignItems: 'center' }]}> 
-                <Text style={styles.infoLabelBetter}>Code</Text>
-                <View style={styles.codeCopyRow}>
-                  <Text style={styles.codeBox}>{groupData?.shortCode || '-'}</Text>
-                  {groupData?.shortCode && (
-                    <TouchableOpacity style={styles.copyBtn} onPress={() => handleCopyCode(groupData.shortCode)}>
-                      <MaterialCommunityIcons name="content-copy" size={20} color="#3B82F6" />
-                    </TouchableOpacity>
-                  )}
-                  {copied && <Text style={styles.copiedText}>Copied!</Text>}
+
+            {/* Content */}
+            <View style={styles.modalContentContainer}>
+              {/* Group Details Card */}
+              <View style={styles.groupDetailsCard}>
+                <View style={styles.groupIconHeader}>
+                  <View style={styles.groupIconLarge}>
+                    <MaterialCommunityIcons name="account-group" size={32} color="#02B97F" />
+                  </View>
+                  <Text style={styles.groupNameLarge}>{groupData?.name}</Text>
+                  <Text style={styles.groupMemberCount}>
+                    {groupData?.memberCount || (groupData?.members?.length || 0)} members
+                  </Text>
+                </View>
+
+                {/* Group Info Rows */}
+                <View style={styles.infoSection}>
+                  <View style={styles.infoRowEnhanced}>
+                    <View style={styles.infoIconContainer}>
+                      <MaterialCommunityIcons name="key-variant" size={18} color="#6b7280" />
+                    </View>
+                    <Text style={styles.infoLabelEnhanced}>Group Code</Text>
+                    <View style={styles.codeContainer}>
+                      <Text style={styles.codeBoxEnhanced}>{groupData?.shortCode || '-'}</Text>
+                      {groupData?.shortCode && (
+                        <TouchableOpacity style={styles.copyBtnEnhanced} onPress={() => handleCopyCode(groupData.shortCode)}>
+                          <MaterialCommunityIcons name="content-copy" size={16} color="#02B97F" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={styles.infoRowEnhanced}>
+                    <View style={styles.infoIconContainer}>
+                      <MaterialCommunityIcons name="calendar" size={18} color="#6b7280" />
+                    </View>
+                    <Text style={styles.infoLabelEnhanced}>Created</Text>
+                    <Text style={styles.infoValueEnhanced}>{formatDateTime(groupData?.createdAt)}</Text>
+                  </View>
+
+                  <View style={styles.infoRowEnhanced}>
+                    <View style={styles.infoIconContainer}>
+                      <MaterialCommunityIcons name="crown" size={18} color="#6b7280" />
+                    </View>
+                    <Text style={styles.infoLabelEnhanced}>Your Role</Text>
+                    <Text style={[styles.infoValueEnhanced, { color: isAdmin ? '#02B97F' : '#6b7280' }]}>
+                      {isAdmin ? 'Admin' : 'Member'}
+                    </Text>
+                  </View>
                 </View>
               </View>
-              <View style={styles.infoRowBetterClean}>
-                <Text style={styles.infoLabelBetter}>Created</Text>
-                <Text style={styles.infoValueBetter}>{formatDateTime(groupData?.createdAt)}</Text>
+
+              {/* Copy Success Message */}
+              {copied && (
+                <View style={styles.successMessage}>
+                  <MaterialCommunityIcons name="check-circle" size={16} color="#10b981" />
+                  <Text style={styles.successText}>Code copied to clipboard!</Text>
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              <View style={styles.modalActions}>
+                {!isAdmin && (
+                  <TouchableOpacity style={styles.leaveGroupButtonEnhanced} onPress={handleLeaveGroup}>
+                    <MaterialCommunityIcons name="exit-to-app" size={20} color="#dc2626" />
+                    <Text style={styles.leaveGroupButtonTextEnhanced}>Leave Group</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
@@ -410,38 +572,69 @@ export default function GroupDetailsScreen() {
         animationType="slide"
         onRequestClose={() => setInviteModalVisible(false)}
       >
-        <View style={[styles.modalOverlay, { justifyContent: 'flex-end' }]}> 
-          <View style={styles.bottomSheetModalContent}> 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <Text style={[styles.infoTitle, { marginBottom: 0 }]}>Invite to Group</Text>
-              <TouchableOpacity onPress={() => setInviteModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#111827" />
+        <View style={styles.modalOverlay}>
+          <View style={styles.enhancedModalContent}>
+            {/* Modal Handle */}
+            <View style={styles.modalHandle} />
+
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleContainer}>
+                <MaterialCommunityIcons name="account-plus" size={24} color="#02B97F" />
+                <Text style={styles.modalTitle}>Invite to Group</Text>
+              </View>
+              <TouchableOpacity style={styles.closeButton} onPress={() => setInviteModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={20} color="#6b7280" />
               </TouchableOpacity>
             </View>
-            <View style={{ height: 12 }} />
-            <View style={styles.infoCardBetter}>
-              <View style={[styles.infoRowBetterClean, { alignItems: 'center' }]}> 
-                <Text style={styles.infoLabelBetter}>Code</Text>
-                <View style={styles.codeCopyRow}>
-                  <Text style={styles.codeBox}>{groupData?.shortCode || '-'}</Text>
+
+            {/* Content */}
+            <View style={styles.modalContentContainer}>
+              {/* Invite Instructions */}
+              <View style={styles.inviteInstructions}>
+                <Text style={styles.instructionTitle}>Share this code with others</Text>
+                <Text style={styles.instructionText}>
+                  Anyone with this code can join "{groupData?.name}"
+                </Text>
+              </View>
+
+              {/* Code Display */}
+              <View style={styles.codeDisplayCard}>
+                <View style={styles.codeDisplayHeader}>
+                  <MaterialCommunityIcons name="key-variant" size={20} color="#6b7280" />
+                  <Text style={styles.codeDisplayLabel}>Group Code</Text>
+                </View>
+                <View style={styles.codeDisplayContainer}>
+                  <Text style={styles.codeDisplayText}>{groupData?.shortCode || '-'}</Text>
                   {groupData?.shortCode && (
-                    <TouchableOpacity style={styles.copyBtn} onPress={() => handleCopyCode(groupData.shortCode)}>
-                      <MaterialCommunityIcons name="content-copy" size={20} color="#3B82F6" />
+                    <TouchableOpacity style={styles.copyBtnLarge} onPress={() => handleCopyCode(groupData.shortCode)}>
+                      <MaterialCommunityIcons name="content-copy" size={20} color="#02B97F" />
                     </TouchableOpacity>
                   )}
-                  {copied && <Text style={styles.copiedText}>Copied!</Text>}
                 </View>
               </View>
+
+              {/* Copy Success Message */}
+              {copied && (
+                <View style={styles.successMessage}>
+                  <MaterialCommunityIcons name="check-circle" size={16} color="#10b981" />
+                  <Text style={styles.successText}>Code copied to clipboard!</Text>
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              <View style={styles.inviteActions}>
+                <TouchableOpacity style={styles.shareBtnEnhanced} onPress={() => handleShare(groupData?.shortCode)}>
+                  <MaterialCommunityIcons name="share-variant" size={20} color="#ffffff" />
+                  <Text style={styles.shareBtnTextEnhanced}>Share Invite</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <TouchableOpacity style={styles.shareBtn} onPress={() => handleShare(groupData?.shortCode)}>
-              <MaterialCommunityIcons name="share-variant" size={20} color="#fff" />
-              <Text style={styles.shareBtnText}>Share Link</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
       {/* Header */}
-      <Header 
+      <Header
         title={groupData?.name || 'Group Details'}
         showBackButton={true}
         onBackPress={() => navigation.goBack()}
@@ -464,6 +657,8 @@ export default function GroupDetailsScreen() {
       />
 
 
+
+
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
@@ -479,7 +674,7 @@ export default function GroupDetailsScreen() {
           onPress={() => setActiveTab('members')}
         >
           <Text style={[styles.tabText, activeTab === 'members' && styles.activeTabText]}>
-            Members
+            Members ({groupData?.memberCount || (groupData?.members?.length || 0)})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -511,14 +706,7 @@ export default function GroupDetailsScreen() {
         </View>
       )}
       
-      {!isAdmin && (
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveGroup}>
-            <MaterialCommunityIcons name="exit-to-app" size={20} color="#EF4444" />
-            <Text style={styles.leaveButtonText}>Leave Group</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+
     </View>
   );
 }
@@ -541,6 +729,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
+
 
   tabContainer: {
     flexDirection: 'row',
@@ -577,7 +766,7 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   activeTabText: {
-    color: '#02B97F',
+    color: '#1f2937',
     fontWeight: '600',
   },
   content: {
@@ -585,25 +774,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     backgroundColor: '#ffffff',
     paddingTop: 8,
-  },
-  membersTabContainer: {
-    flex: 1,
-  },
-  memberCountHeader: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    marginTop: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    alignItems: 'center',
-  },
-  memberCountText: {
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#02B97F',
   },
   overviewContainer: {
     paddingTop: 20,
@@ -705,7 +875,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#E8F5F0',
+    backgroundColor: '#f3f4f6',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -715,7 +885,7 @@ const styles = StyleSheet.create({
   memberInitial: {
     fontSize: 20,
     fontFamily: 'Poppins-Bold',
-    color: '#02B97F',
+    color: '#374151',
   },
   memberDetails: {
     flex: 1,
@@ -768,7 +938,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#E8F5F0',
+    backgroundColor: '#f3f4f6',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -790,6 +960,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'Poppins-Regular',
     color: '#9ca3af',
+  },
+  activityUser: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  activityTabContainer: {
+    flex: 1,
+  },
+  emptyActivityContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyActivityText: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyActivitySubtext: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#9ca3af',
+    textAlign: 'center',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -984,7 +1183,7 @@ const styles = StyleSheet.create({
   statNumberBetter: {
     fontSize: 32,
     fontFamily: 'Poppins-Bold',
-    color: '#02B97F',
+    color: '#1f2937',
     marginBottom: 4,
   },
   statLabelBetter: {
@@ -1039,8 +1238,8 @@ const styles = StyleSheet.create({
   },
   codeBox: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    backgroundColor: '#E8F5F0',
-    color: '#02B97F',
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
     fontSize: 18,
     fontWeight: '600',
     paddingHorizontal: 12,
@@ -1054,12 +1253,12 @@ const styles = StyleSheet.create({
   copyBtn: {
     padding: 8,
     borderRadius: 8,
-    backgroundColor: '#E8F5F0',
+    backgroundColor: '#f3f4f6',
     marginLeft: 4,
   },
   copiedText: {
     marginLeft: 12,
-    color: '#02B97F',
+    color: '#374151',
     fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
   },
@@ -1095,5 +1294,322 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Poppins-SemiBold',
     marginLeft: 8,
+  },
+  leaveGroupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fef2f2',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  leaveGroupButtonText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#dc2626',
+  },
+  // Enhanced Modal Styles
+  enhancedModalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingTop: 8,
+    paddingBottom: 32,
+    paddingHorizontal: 24,
+    width: '100%',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#d1d5db',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1f2937',
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalContentContainer: {
+    flex: 1,
+  },
+  groupDetailsCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  groupIconHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  groupIconLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#E8F5F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    shadowColor: '#02B97F',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  groupNameLarge: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  groupMemberCount: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  infoSection: {
+    gap: 16,
+  },
+  infoRowEnhanced: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+    gap: 12,
+  },
+  infoIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoLabelEnhanced: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#374151',
+    flex: 1,
+  },
+  infoValueEnhanced: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1f2937',
+  },
+  codeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  codeBoxEnhanced: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    backgroundColor: '#E8F5F0',
+    color: '#02B97F',
+    fontSize: 16,
+    fontWeight: '700',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    letterSpacing: 2,
+    minWidth: 80,
+    textAlign: 'center',
+  },
+  copyBtnEnhanced: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E8F5F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0fdf4',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  successText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#16a34a',
+  },
+  modalActions: {
+    gap: 12,
+  },
+  leaveGroupButtonEnhanced: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fef2f2',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  leaveGroupButtonTextEnhanced: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#dc2626',
+  },
+  // Invite Modal Styles
+  inviteInstructions: {
+    backgroundColor: '#f0f9ff',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#e0f2fe',
+  },
+  instructionTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  instructionText: {
+    fontSize: 15,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    lineHeight: 22,
+  },
+  codeDisplayCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  codeDisplayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  codeDisplayLabel: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#374151',
+  },
+  codeDisplayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+  },
+  codeDisplayText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#02B97F',
+    letterSpacing: 4,
+    backgroundColor: '#E8F5F0',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    textAlign: 'center',
+    minWidth: 120,
+  },
+  copyBtnLarge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E8F5F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#02B97F',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  inviteActions: {
+    gap: 12,
+  },
+  shareBtnEnhanced: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#02B97F',
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    gap: 8,
+    shadowColor: '#02B97F',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  shareBtnTextEnhanced: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
   },
 }); 

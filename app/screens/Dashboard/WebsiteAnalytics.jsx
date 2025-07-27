@@ -1,16 +1,19 @@
 import { Feather } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Animated,
     Dimensions,
+    Modal,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import MainHeader from '../../components/common/MainHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -19,6 +22,7 @@ function WebsiteAnalyticsScreen({ navigation }) {
   const [selectedTimeRange, setSelectedTimeRange] = useState('Week');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [websiteData, setWebsiteData] = useState({
     topWebsites: [],
     totalWebsites: 0,
@@ -26,7 +30,39 @@ function WebsiteAnalyticsScreen({ navigation }) {
     monitoringStats: {}
   });
 
+  // Animation refs
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+
   const timeRanges = ['Today', 'Week', 'Month', 'Year'];
+
+  // Animation functions
+  const startEntranceAnimation = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 700,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const resetAnimations = () => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(50);
+    scaleAnim.setValue(0.8);
+  };
 
   // Fetch user's flagged websites data
   const fetchWebsiteData = async (timeRange) => {
@@ -71,6 +107,19 @@ function WebsiteAnalyticsScreen({ navigation }) {
   useEffect(() => {
     fetchWebsiteData(selectedTimeRange);
   }, [selectedTimeRange]);
+
+  useEffect(() => {
+    if (!isLoading && !error) {
+      startEntranceAnimation();
+    }
+  }, [isLoading, error]);
+
+  const handleTimeRangeChange = (range) => {
+    if (range !== selectedTimeRange) {
+      resetAnimations();
+      setSelectedTimeRange(range);
+    }
+  };
 
   // Generate chart data from real website data
   const generateChartData = () => {
@@ -143,6 +192,23 @@ function WebsiteAnalyticsScreen({ navigation }) {
     return 'web';
   }
 
+  // Menu items
+  const sideMenuItems = [
+    { title: 'Dashboard Overview', icon: 'bar-chart-2', action: () => navigation.navigate('DashboardMain') },
+    { title: 'Detection Analytics', icon: 'shield-search', action: () => navigation.navigate('DetectionAnalytics') },
+    { title: 'Where It Happened', icon: 'web', action: () => setIsMenuOpen(false) },
+    { title: 'People & Activity', icon: 'account-group', action: () => navigation.navigate('UserActivityAnalytics') },
+  ];
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  const handleMenuAction = (action) => {
+    setIsMenuOpen(false);
+    action();
+  };
+
 
   // Use real data from API response
   const monitoringStats = [
@@ -154,40 +220,74 @@ function WebsiteAnalyticsScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color="#374151" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Where It Happened</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <MainHeader
+        title="Where It Happened"
+        subtitle="Website monitoring & detection insights"
+        rightActions={[
+          {
+            icon: 'menu',
+            iconType: 'feather',
+            onPress: toggleMenu
+          }
+        ]}
+        style={{ paddingHorizontal: 0 }}
+      />
 
-      {/* Time Range Selector */}
-      <View style={styles.timeRangeContainer}>
-        {timeRanges.map((range) => (
-          <TouchableOpacity
-            key={range}
-            style={[
-              styles.timeRangeButton,
-              selectedTimeRange === range && styles.timeRangeButtonActive,
-            ]}
-            onPress={() => setSelectedTimeRange(range)}
-          >
-            <Text
+      {/* Enhanced Time Range Selector */}
+      <Animated.View
+        style={[
+          styles.timeRangeContainer,
+          {
+            opacity: fadeAnim,
+          }
+        ]}
+      >
+        <View style={styles.timeRangeSelectorHeader}>
+          <MaterialCommunityIcons name="clock-outline" size={20} color="#6b7280" />
+          <Text style={styles.timeRangeSelectorTitle}>Time Period</Text>
+        </View>
+        <View style={styles.timeRangeButtonsContainer}>
+          {timeRanges.map((range) => (
+            <TouchableOpacity
+              key={range}
               style={[
-                styles.timeRangeText,
-                selectedTimeRange === range && styles.timeRangeTextActive,
+                styles.timeRangeButton,
+                selectedTimeRange === range && styles.timeRangeButtonActive,
               ]}
+              onPress={() => handleTimeRangeChange(range)}
             >
-              {range}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+              <MaterialCommunityIcons
+                name={
+                  range === 'Today' ? 'calendar-today' :
+                  range === 'Week' ? 'calendar-week' :
+                  range === 'Month' ? 'calendar-month' :
+                  'calendar-range'
+                }
+                size={16}
+                color={selectedTimeRange === range ? '#ffffff' : '#6b7280'}
+              />
+              <Text
+                style={[
+                  styles.timeRangeText,
+                  selectedTimeRange === range && styles.timeRangeTextActive,
+                ]}
+              >
+                {range}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </Animated.View>
 
       {/* Monitoring Stats */}
-      <View style={styles.section}>
+      <Animated.View
+        style={[
+          styles.section,
+          {
+            opacity: fadeAnim,
+          }
+        ]}
+      >
         <View style={styles.sectionHeader}>
           <MaterialCommunityIcons name="monitor-dashboard" size={24} color="#02B97F" />
           <Text style={styles.sectionTitle}>MURAi Monitoring Status</Text>
@@ -205,15 +305,26 @@ function WebsiteAnalyticsScreen({ navigation }) {
         ) : (
           <View style={styles.statsGrid}>
             {monitoringStats.map((stat, index) => (
-              <View key={index} style={styles.statCard}>
+              <Animated.View
+                key={index}
+                style={[
+                  styles.statCard,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{
+                      translateY: slideAnim
+                    }]
+                  }
+                ]}
+              >
                 <Text style={styles.statValue}>{stat.value}</Text>
                 <Text style={styles.statLabel}>{stat.metric}</Text>
                 <Text style={styles.statChange}>{stat.change}</Text>
-              </View>
+              </Animated.View>
             ))}
           </View>
         )}
-      </View>
+      </Animated.View>
 
       {/* Top Websites Chart */}
       <View style={styles.section}>
@@ -224,24 +335,55 @@ function WebsiteAnalyticsScreen({ navigation }) {
             <Text style={styles.loadingText}>Loading chart data...</Text>
           </View>
         ) : (
-          <View style={styles.chartContainer}>
-            <BarChart
-              data={chartData}
-              width={width - 40}
-              height={220}
-              chartConfig={chartConfig}
-              style={styles.chart}
-              fromZero
-              showBarTops
-              showValuesOnTopOfBars
-            />
-          </View>
+          <Animated.View
+            style={[
+              styles.chartContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ scale: scaleAnim }]
+              }
+            ]}
+          >
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.barChartScrollContent}
+              style={styles.barChartScroll}
+            >
+              <BarChart
+                data={chartData}
+                width={Math.max(width - 20, (websiteData.topWebsites?.length || 1) * 100)}
+                height={220}
+                chartConfig={chartConfig}
+                style={styles.chart}
+                fromZero
+                showBarTops
+                showValuesOnTopOfBars
+                verticalLabelRotation={0}
+              />
+            </ScrollView>
+          </Animated.View>
         )}
       </View>
 
       {/* Top Websites with Flags */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Platforms by Threat Level</Text>
+      <Animated.View
+        style={[
+          styles.section,
+          {
+            opacity: fadeAnim,
+          }
+        ]}
+      >
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleContainer}>
+            <MaterialCommunityIcons name="flag-variant" size={24} color="#ef4444" />
+            <Text style={styles.sectionTitle}>Platforms by Threat Level</Text>
+          </View>
+          <View style={styles.sectionBadge}>
+            <Text style={styles.sectionBadgeText}>Risk Analysis</Text>
+          </View>
+        </View>
         {isLoading ? (
           <View style={styles.loadingCard}>
             <ActivityIndicator size="large" color="#02B97F" />
@@ -256,77 +398,131 @@ function WebsiteAnalyticsScreen({ navigation }) {
         ) : (
           <View style={styles.websitesContainer}>
             {topWebsites.map((website, index) => (
-              <View key={index} style={styles.websiteItem}>
-                <View style={styles.websiteInfo}>
-                  <View style={styles.websiteIcon}>
-                    <MaterialCommunityIcons name={website.icon} size={20} color="#02B97F" />
-                  </View>
-                  <View style={styles.websiteDetails}>
-                    <View style={styles.websiteHeader}>
-                      <Text style={styles.websiteName}>{website.name}</Text>
-                      <View style={[
-                        styles.riskBadge,
-                        { backgroundColor: website.risk === 'high' ? '#fef2f2' :
-                                          website.risk === 'medium' ? '#fef3c7' : '#f0fdf4' }
-                      ]}>
-                        <Text style={[
-                          styles.riskText,
-                          { color: website.risk === 'high' ? '#dc2626' :
-                                   website.risk === 'medium' ? '#d97706' : '#059669' }
+              <Animated.View
+                key={index}
+                style={[
+                  styles.websiteItem,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{
+                      translateY: Animated.add(slideAnim, new Animated.Value(index * 5))
+                    }]
+                  }
+                ]}
+              >
+                <View style={styles.websiteCard}>
+                  <View style={styles.websiteMainInfo}>
+                    <View style={styles.websiteIconContainer}>
+                      <MaterialCommunityIcons name={website.icon} size={24} color="#02B97F" />
+                    </View>
+                    <View style={styles.websiteContent}>
+                      <View style={styles.websiteTopRow}>
+                        <Text style={styles.websiteName}>{website.name}</Text>
+                        <View style={[
+                          styles.riskBadge,
+                          { backgroundColor: website.risk === 'high' ? '#fef2f2' :
+                                            website.risk === 'medium' ? '#fef3c7' : '#f0fdf4' }
                         ]}>
-                          {website.risk.toUpperCase()}
-                        </Text>
+                          <View style={[
+                            styles.riskDot,
+                            { backgroundColor: website.risk === 'high' ? '#dc2626' :
+                                             website.risk === 'medium' ? '#d97706' : '#059669' }
+                          ]} />
+                          <Text style={[
+                            styles.riskText,
+                            { color: website.risk === 'high' ? '#dc2626' :
+                                     website.risk === 'medium' ? '#d97706' : '#059669' }
+                          ]}>
+                            {website.risk.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.websiteBottomRow}>
+                        <View style={styles.threatInfo}>
+                          <MaterialCommunityIcons name="shield-alert" size={16} color="#ef4444" />
+                          <Text style={styles.websiteFlags}>{website.threats} threats detected</Text>
+                        </View>
+                        <View style={[
+                          styles.changeBadge,
+                          { backgroundColor: website.change.startsWith('+') ? '#fef2f2' : '#f0fdf4' }
+                        ]}>
+                          <MaterialCommunityIcons
+                            name={website.change.startsWith('+') ? 'trending-up' : 'trending-down'}
+                            size={12}
+                            color={website.change.startsWith('+') ? '#ef4444' : '#10b981'}
+                          />
+                          <Text style={[
+                            styles.changeText,
+                            { color: website.change.startsWith('+') ? '#ef4444' : '#10b981' }
+                          ]}>
+                            {website.change}
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                    <Text style={styles.websiteFlags}>{website.threats} threats detected</Text>
                   </View>
                 </View>
-                <View style={[
-                  styles.changeBadge,
-                  { backgroundColor: website.change.startsWith('+') ? '#fef2f2' : '#f0fdf4' }
-                ]}>
-                  <Text style={[
-                    styles.changeText,
-                    { color: website.change.startsWith('+') ? '#ef4444' : '#10b981' }
-                  ]}>
-                    {website.change}
-                  </Text>
-                </View>
-              </View>
+              </Animated.View>
             ))}
           </View>
         )}
-      </View>
+      </Animated.View>
 
-      {/* Site Activity Summary */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Site Activity Summary</Text>
-        {isLoading ? (
-          <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color="#02B97F" />
-            <Text style={styles.loadingText}>Loading activity summary...</Text>
-          </View>
-        ) : (
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryItem}>
-              <MaterialCommunityIcons name="web" size={20} color="#02B97F" />
-              <Text style={styles.summaryText}>
-                Most active: {topWebsites[0]?.name || 'No data'} ({topWebsites[0]?.threats || 0} flags)
-              </Text>
+      {/* Side Menu Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isMenuOpen}
+        onRequestClose={() => setIsMenuOpen(false)}
+      >
+        <View style={styles.overlay}>
+          <TouchableOpacity
+            style={styles.bottomSheetContainer}
+            activeOpacity={1}
+            onPress={() => setIsMenuOpen(false)}
+          >
+            <View style={styles.bottomSheet}>
+              <View style={styles.handleBar} />
+              <View style={styles.menuHeader}>
+                <Text style={styles.sectionTitle}>Navigation</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setIsMenuOpen(false)}
+                >
+                  <Feather name="x" size={20} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
+                {/* Analytics Section */}
+                <View style={styles.menuSection}>
+                  <Text style={styles.menuSectionTitle}>Analytics</Text>
+                  {sideMenuItems.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.menuItem}
+                      onPress={() => handleMenuAction(item.action)}
+                    >
+                      <View style={styles.menuItemIcon}>
+                        <MaterialCommunityIcons name={item.icon} size={24} color="#374151" />
+                      </View>
+                      <View style={styles.menuItemContent}>
+                        <Text style={styles.menuItemText}>{item.title}</Text>
+                        <Text style={styles.menuItemSubtitle}>
+                          {index === 0 ? 'Main dashboard overview' :
+                           index === 1 ? 'Comprehensive detection insights' :
+                           index === 2 ? 'Website monitoring & stats' :
+                           'User activity & interactions'}
+                        </Text>
+                      </View>
+                      <MaterialCommunityIcons name="chevron-right" size={20} color="#9ca3af" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
             </View>
-            <View style={styles.summaryItem}>
-              <MaterialCommunityIcons name="trending-up" size={20} color="#10b981" />
-              <Text style={styles.summaryText}>
-                {topWebsites[2]?.name || 'TikTok'} showing +40% increase
-              </Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <MaterialCommunityIcons name="shield-check" size={20} color="#02B97F" />
-              <Text style={styles.summaryText}>All sites under 24/7 monitoring</Text>
-            </View>
-          </View>
-        )}
-      </View>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -336,7 +532,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
     paddingHorizontal: 20,
-    paddingTop: 50,
+  },
+  timeRangeSelectorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  timeRangeSelectorTitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#374151',
+  },
+  timeRangeButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   header: {
     flexDirection: 'row',
@@ -359,25 +570,34 @@ const styles = StyleSheet.create({
     width: 40,
   },
   timeRangeContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    gap: 8,
+    marginBottom: 24,
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 16,
   },
   timeRangeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    gap: 6,
   },
   timeRangeButtonActive: {
     backgroundColor: '#02B97F',
+    borderColor: '#02B97F',
   },
   timeRangeText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: '#374151',
+    fontSize: 12,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#6b7280',
   },
   timeRangeTextActive: {
-    fontFamily: 'Poppins-SemiBold',
     color: '#ffffff',
   },
   section: {
@@ -385,14 +605,31 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   sectionTitle: {
     fontSize: 16,
-    fontFamily: 'Poppins-Medium',
-    color: '#111827',
+    fontFamily: 'Poppins-SemiBold',
+    color: '#374151',
+  },
+  sectionBadge: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  sectionBadgeText: {
+    fontSize: 10,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#6b7280',
+    textTransform: 'uppercase',
   },
   loadingCard: {
     backgroundColor: '#ffffff',
@@ -493,72 +730,106 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     borderRadius: 16,
   },
+  barChartScroll: {
+    width: '100%',
+  },
+  barChartScrollContent: {
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
   websitesContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
+    gap: 12,
   },
   websiteItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  websiteCard: {
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f8f9fa',
   },
-  websiteInfo: {
+  websiteMainInfo: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    alignItems: 'flex-start',
+    gap: 12,
   },
-  websiteIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  websiteIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#E8F5F0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
-  websiteDetails: {
+  websiteContent: {
     flex: 1,
+    gap: 8,
   },
-  websiteHeader: {
+  websiteTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+  },
+  websiteBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  threatInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   websiteName: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
     color: '#111827',
-    marginRight: 8,
+    flex: 1,
   },
   riskBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  riskDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   riskText: {
     fontSize: 10,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: 'Poppins-Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   websiteFlags: {
     fontSize: 12,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: 'Poppins-Medium',
     color: '#6b7280',
   },
   changeBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 12,
+    gap: 4,
   },
   changeText: {
-    fontSize: 12,
-    fontFamily: 'Poppins-Medium',
+    fontSize: 11,
+    fontFamily: 'Poppins-SemiBold',
   },
   summaryContainer: {
     backgroundColor: '#f8fafc',
@@ -582,6 +853,100 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 4,
   },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheetContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'transparent',
+  },
+  bottomSheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 15,
+  },
+  menuHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  menuScroll: {
+    flex: 1,
+  },
+  menuSection: {
+    marginBottom: 20,
+  },
+  menuSectionTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  menuItemIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  menuItemContent: {
+    flex: 1,
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  menuItemSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#9ca3af',
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+  },
 });
 
-export default WebsiteAnalyticsScreen; 
+export default WebsiteAnalyticsScreen;

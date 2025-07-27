@@ -5,6 +5,7 @@ import GroupCode from '../../models/groupCode.js';
 import Group from '../../models/groupModel.js';
 import GroupMember from '../../models/groupUserModel.js';
 import Preference from '../../models/preferenceModel.js';
+import UserInfo from '../../models/userInfoModel.js';
 import User from '../../models/userModel.js';
 
 const router = express.Router();
@@ -27,9 +28,98 @@ router.get('/me', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('name email');
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json({ id: user._id, name: user.name, email: user.email });
+
+    // Get additional user info including phone
+    const userInfo = await UserInfo.findOne({ userId: req.user.id });
+    const phone = userInfo?.phone || '';
+
+    res.json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: phone
+    });
   } catch (err) {
+    console.error('Get user error:', err);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /api/users/me - Update user profile
+router.put('/me', authenticateToken, async (req, res) => {
+  try {
+    const { name, email, phone } = req.body;
+
+    // Validate required fields
+    if (!name || !email) {
+      return res.status(400).json({ message: 'Name and email are required' });
+    }
+
+    // Validate email format
+    const emailRegex = /\S+@\S+\.\S+/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Please enter a valid email address' });
+    }
+
+    // Check if email is already taken by another user
+    const existingUser = await User.findOne({
+      email: email.toLowerCase(),
+      _id: { $ne: req.user.id }
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email is already in use by another user' });
+    }
+
+    // Update user basic information
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        updatedAt: new Date()
+      },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Update or create UserInfo if phone is provided
+    if (phone !== undefined) {
+      await UserInfo.findOneAndUpdate(
+        { userId: req.user.id },
+        {
+          phone: phone.trim(),
+          updatedAt: new Date()
+        },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true
+        }
+      );
+    }
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: phone
+      }
+    });
+
+  } catch (err) {
+    console.error('Update profile error:', err);
+
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 

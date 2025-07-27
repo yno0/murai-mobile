@@ -28,6 +28,10 @@ function GroupsScreen({ navigation }) {
   const [search, setSearch] = useState('');
   const [addBtnPressed, setAddBtnPressed] = useState(false);
   const [duplicateModalVisible, setDuplicateModalVisible] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [failedModalVisible, setFailedModalVisible] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalTitle, setModalTitle] = useState('');
 
   // Fetch groups on mount
   React.useEffect(() => {
@@ -49,7 +53,9 @@ function GroupsScreen({ navigation }) {
 
   const handleCreateGroup = async () => {
     if (!groupName.trim()) {
-      alert('Please enter a group name');
+      setModalTitle('Invalid Input');
+      setModalMessage('Please enter a group name');
+      setFailedModalVisible(true);
       return;
     }
     // Prevent duplicate group name (case and diacritic insensitive)
@@ -66,8 +72,13 @@ function GroupsScreen({ navigation }) {
       setGroups(prev => [res.data, ...prev]);
       setGroupName('');
       setModalVisible(false);
+      setModalTitle('Success!');
+      setModalMessage(`Group "${res.data.name}" has been created successfully`);
+      setSuccessModalVisible(true);
     } catch (err) {
-      setError('Failed to create group');
+      setModalTitle('Creation Failed');
+      setModalMessage('Failed to create group. Please try again.');
+      setFailedModalVisible(true);
     } finally {
       setLoading(false);
     }
@@ -75,7 +86,9 @@ function GroupsScreen({ navigation }) {
 
   const handleJoinGroup = async () => {
     if (!groupCode.trim()) {
-      alert('Please enter a group code');
+      setModalTitle('Invalid Input');
+      setModalMessage('Please enter a group code');
+      setFailedModalVisible(true);
       return;
     }
     setLoading(true);
@@ -84,11 +97,15 @@ function GroupsScreen({ navigation }) {
       const res = await api.post('/users/groups/join', { code: groupCode.trim().toUpperCase() });
       // Optionally, refetch all groups or just add the joined group
       fetchGroups();
-      alert(`Successfully joined "${res.data.name}"`);
       setGroupCode('');
       setModalVisible(false);
+      setModalTitle('Welcome!');
+      setModalMessage(`Successfully joined "${res.data.name}"`);
+      setSuccessModalVisible(true);
     } catch (err) {
-      setError('Failed to join group');
+      setModalTitle('Join Failed');
+      setModalMessage('Failed to join group. Please check the code and try again.');
+      setFailedModalVisible(true);
     } finally {
       setLoading(false);
     }
@@ -289,6 +306,48 @@ function GroupsScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* Success Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={successModalVisible}
+        onRequestClose={() => setSuccessModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.statusModalContent}>
+            <View style={styles.successIconContainer}>
+              <MaterialCommunityIcons name="check-circle" size={48} color="#02B97F" />
+            </View>
+            <Text style={styles.statusModalTitle}>{modalTitle}</Text>
+            <Text style={styles.statusModalText}>{modalMessage}</Text>
+            <TouchableOpacity style={styles.successModalButton} onPress={() => setSuccessModalVisible(false)}>
+              <Text style={styles.statusModalButtonText}>Great!</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Failed Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={failedModalVisible}
+        onRequestClose={() => setFailedModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.statusModalContent}>
+            <View style={styles.failedIconContainer}>
+              <MaterialCommunityIcons name="close-circle" size={48} color="#EF4444" />
+            </View>
+            <Text style={styles.statusModalTitle}>{modalTitle}</Text>
+            <Text style={styles.statusModalText}>{modalMessage}</Text>
+            <TouchableOpacity style={styles.failedModalButton} onPress={() => setFailedModalVisible(false)}>
+              <Text style={styles.statusModalButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -296,7 +355,7 @@ function GroupsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#ffffff',
   },
   header: {
     flexDirection: 'row',
@@ -307,27 +366,23 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#111827',
   },
   list: {
     paddingHorizontal: 20,
     paddingBottom: 20,
+    paddingTop: 8,
   },
   groupCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: '#e5e7eb',
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
   },
   groupRow: {
     flexDirection: 'row',
@@ -335,28 +390,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   groupIconContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#E8F5F0',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f0fdf4',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   groupInfo: {
     flex: 1,
     justifyContent: 'center',
   },
   groupName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
-    fontFamily: 'Poppins-SemiBold',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+    marginBottom: 2,
   },
   adminBadge: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '400',
     color: '#3B82F6',
     backgroundColor: '#EBF4FF',
     paddingHorizontal: 8,
@@ -372,7 +426,7 @@ const styles = StyleSheet.create({
   memberCount: {
     fontSize: 14,
     color: '#6b7280',
-    fontFamily: 'Poppins-Regular',
+    fontWeight: '400',
   },
   chevron: {
     position: 'absolute',
@@ -389,41 +443,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     marginHorizontal: 20,
     marginTop: 20,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: '#e5e7eb',
   },
   emptyText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1f2937',
-    fontFamily: 'Poppins-SemiBold',
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#111827',
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 16,
     color: '#6b7280',
-    fontFamily: 'Poppins-Regular',
+    fontWeight: '400',
     textAlign: 'center',
     lineHeight: 22,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     paddingTop: 24,
     paddingBottom: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -433,82 +481,68 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   modalTitle: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: '#1f2937',
-    fontFamily: 'Poppins-SemiBold',
+    fontSize: 20,
+    fontWeight: '500',
+    color: '#111827',
   },
   tabContainer: {
     flexDirection: 'row',
     marginHorizontal: 24,
     marginBottom: 24,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
     padding: 4,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 6,
   },
   activeTab: {
     backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   tabText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '400',
     color: '#6b7280',
-    fontFamily: 'Poppins-Medium',
   },
   activeTabText: {
     color: '#02B97F',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   formContainer: {
     paddingHorizontal: 24,
   },
   input: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     fontSize: 16,
-    color: '#1f2937',
-    fontFamily: 'Poppins-Regular',
+    color: '#111827',
+    fontWeight: '400',
     marginBottom: 20,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
   button: {
     backgroundColor: '#02B97F',
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 8,
     alignItems: 'center',
-    shadowColor: '#02B97F',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
   },
   buttonText: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-    letterSpacing: 0.5,
+    fontWeight: '500',
   },
   addBtn: {
     padding: 10,
-    borderRadius: 24,
-    backgroundColor: '#f1f5f9',
+    borderRadius: 20,
+    backgroundColor: '#f9fafb',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
@@ -522,25 +556,21 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
     marginHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 16,
+    marginTop: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: '#e5e7eb',
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#1f2937',
-    fontFamily: 'Poppins-Regular',
+    color: '#111827',
+    fontWeight: '400',
     padding: 0,
   },
   clearBtn: {
@@ -551,26 +581,21 @@ const styles = StyleSheet.create({
   },
   duplicateModalContent: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 32,
     marginHorizontal: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
   },
   duplicateModalTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#1f2937',
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#111827',
     marginBottom: 12,
     textAlign: 'center',
   },
   duplicateModalText: {
     fontSize: 16,
-    fontFamily: 'Poppins-Regular',
+    fontWeight: '400',
     color: '#6b7280',
     marginBottom: 24,
     textAlign: 'center',
@@ -578,21 +603,77 @@ const styles = StyleSheet.create({
   },
   duplicateModalButton: {
     backgroundColor: '#02B97F',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 40,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
     alignItems: 'center',
-    shadowColor: '#02B97F',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
   },
   duplicateModalButtonText: {
     color: '#ffffff',
     fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
+    fontWeight: '500',
+  },
+  statusModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 32,
+    marginHorizontal: 24,
+    alignItems: 'center',
+  },
+  successIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#f0fdf4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  failedIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#fef2f2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  statusModalTitle: {
+    fontSize: 20,
+    fontWeight: '500',
+    color: '#111827',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  statusModalText: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#6b7280',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  successModalButton: {
+    backgroundColor: '#02B97F',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    minWidth: 120,
+  },
+  failedModalButton: {
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    minWidth: 120,
+  },
+  statusModalButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 
-export default GroupsScreen; 
+export default GroupsScreen;

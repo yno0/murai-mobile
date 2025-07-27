@@ -1,14 +1,14 @@
 import { Feather } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Dimensions,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -19,37 +19,19 @@ const { width } = Dimensions.get('window');
 
 function DashboardScreen({ navigation }) {
   // const { user } = useAuth(); // Get user from auth context
-  const [selectedTimeRange, setSelectedTimeRange] = useState('Week');
+  const [selectedTimeRange, setSelectedTimeRange] = useState('Today');
+
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [dashboardData, setDashboardData] = useState({
     overview: null,
     chartData: null,
-    insights: null,
     userActivity: null,
   });
 
-  // Default chart data structure
-  const defaultChartData = {
-    labels: ['', '', '', '', '', '', ''],
-    datasets: [
-      {
-        data: [0, 0, 0, 0, 0, 0, 0],
-        strokeWidth: 2,
-        color: (opacity = 1) => `rgba(34, 197, 94, ${opacity})`,
-        fillShadowGradient: 'rgba(34, 197, 94, 0.1)',
-        fillShadowGradientOpacity: 0.1,
-      },
-      {
-        data: [0, 0, 0, 0, 0, 0, 0],
-        strokeWidth: 2,
-        color: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-        fillShadowGradient: 'rgba(107, 114, 128, 0.1)',
-        fillShadowGradientOpacity: 0.1,
-      },
-    ],
-  };
+
 
   // Detection chart configuration matching home screen theme
   const detectionChartConfig = {
@@ -81,7 +63,7 @@ function DashboardScreen({ navigation }) {
     fillShadowGradientOpacity: 0.3,
   };
 
-  const timeRanges = ['Today', 'Week', 'Month', 'Year'];
+  const timeRanges = ['Today', 'Last 7 Days', 'Last Month', 'Last Year'];
 
   // Fetch dashboard data using the same pattern as home screen
   const fetchDashboardData = async (timeRangeParam = selectedTimeRange) => {
@@ -89,34 +71,32 @@ function DashboardScreen({ navigation }) {
     setError('');
     try {
       // Map time range to match server expectations
-      const mappedTimeRange = timeRangeParam.toLowerCase() === 'week' ? 'week' :
-                             timeRangeParam.toLowerCase() === 'month' ? 'month' :
-                             timeRangeParam.toLowerCase() === 'year' ? 'year' :
+      const mappedTimeRange = timeRangeParam === 'Today' ? 'today' :
+                             timeRangeParam === 'Last 7 Days' ? 'week' :
+                             timeRangeParam === 'Last Month' ? 'month' :
+                             timeRangeParam === 'Last Year' ? 'year' :
                              timeRangeParam.toLowerCase();
 
       // Use detection-focused endpoints
+      const yearParam = '';
+
       const [overviewRes, detectionChartRes, userActivityRes] = await Promise.all([
         // Get overview data with detection focus
-        api.get(`/user-dashboard/overview?timeRange=${mappedTimeRange}`).catch(() =>
-          api.get(`/dashboard/overview?timeRange=${mappedTimeRange}`)
+        api.get(`/user-dashboard/overview?timeRange=${mappedTimeRange}${yearParam}`).catch(() =>
+          api.get(`/dashboard/overview?timeRange=${mappedTimeRange}${yearParam}`)
         ),
-        // Get detection chart data (using detected words endpoint)
-        api.get(`/detected-words/chart?timeRange=${mappedTimeRange}`).catch(() =>
-          api.get(`/dashboard/activity-chart?timeRange=${mappedTimeRange}`)
+        // Get detection chart data (using user dashboard activity chart)
+        api.get(`/user-dashboard/activity-chart?timeRange=${mappedTimeRange}${yearParam}`).catch(() =>
+          api.get(`/dashboard/activity-chart?timeRange=${mappedTimeRange}${yearParam}`)
         ),
-        api.get(`/user-dashboard/user-activity?timeRange=${mappedTimeRange}`).catch(() =>
-          api.get(`/dashboard/insights`)
+        api.get(`/user-dashboard/user-activity?timeRange=${mappedTimeRange}${yearParam}`).catch(() =>
+          api.get(`/dashboard/user-activity?timeRange=${mappedTimeRange}${yearParam}`)
         ),
       ]);
 
       setDashboardData({
         overview: overviewRes.data,
         chartData: detectionChartRes.data,
-        insights: { insights: [
-          { icon: 'shield-check', text: 'Your protection is active and monitoring your browsing.', color: '#10b981' },
-          { icon: 'brain', text: 'AI is learning your patterns to provide better protection.', color: '#8b5cf6' },
-          { icon: 'shield-alert', text: 'All systems operational - you are protected.', color: '#10b981' }
-        ]},
         userActivity: userActivityRes.data,
       });
     } catch (err) {
@@ -136,11 +116,7 @@ function DashboardScreen({ navigation }) {
             { label: 'Monitored', data: [0, 0, 0, 0, 0, 0, 0] },
           ],
         },
-        insights: {
-          insights: [
-            { icon: 'shield-alert', text: 'Welcome to MURAi! Start browsing to see your protection data.', color: '#10b981' },
-          ],
-        },
+
         userActivity: {
           activityBreakdown: [],
           recentActivity: [],
@@ -151,6 +127,8 @@ function DashboardScreen({ navigation }) {
       setIsLoading(false);
     }
   };
+
+
 
   // Effect to load data on component mount and time range change
   useEffect(() => {
@@ -209,12 +187,17 @@ function DashboardScreen({ navigation }) {
     },
   ] : [];
 
-  // Prepare insights for display
-  const insightsData = dashboardData.insights?.insights || [
-    { icon: 'shield-alert', text: 'Loading insights...', color: 'rgba(81, 7, 192, 1)' },
-  ];
+
 
   const menuOptions = [
+    {
+      icon: '🔍',
+      title: 'Detection Analytics',
+      subtitle: 'Comprehensive detection insights & patterns',
+      color: '#f0fdf4',
+      iconColor: '#02B97F',
+      screen: 'DetectionAnalytics',
+    },
     {
       icon: '🧼',
       title: 'What MURAi Caught',
@@ -232,14 +215,6 @@ function DashboardScreen({ navigation }) {
       screen: 'WebsiteAnalytics',
     },
     {
-      icon: '💬',
-      title: 'Language & Tone',
-      subtitle: 'Mood analysis & safety scores',
-      color: '#f0fdf4',
-      iconColor: '#10b981',
-      screen: 'LanguageAnalytics',
-    },
-    {
       icon: '👨‍👩‍👧‍👦',
       title: 'People & Activity',
       subtitle: 'User activity & alert interactions',
@@ -247,23 +222,13 @@ function DashboardScreen({ navigation }) {
       iconColor: '#f59e0b',
       screen: 'UserActivityAnalytics',
     },
-    {
-      icon: '📆',
-      title: 'Patterns Over Time',
-      subtitle: 'Historical data & time patterns',
-      color: '#f3e8ff',
-      iconColor: '#8b5cf6',
-      screen: 'TimePatternAnalytics',
-    },
   ];
 
   const sideMenuItems = [
     { title: 'Dashboard Overview', icon: 'bar-chart-2', action: () => setIsMenuOpen(false) },
-    { title: 'What MURAi Caught', icon: 'alert-circle', action: () => navigation.navigate('FlaggedWordsAnalytics') },
+    { title: 'Detection Analytics', icon: 'shield-search', action: () => navigation.navigate('DetectionAnalytics') },
     { title: 'Where It Happened', icon: 'web', action: () => navigation.navigate('WebsiteAnalytics') },
-    { title: 'Language & Tone', icon: 'translate', action: () => navigation.navigate('LanguageAnalytics') },
     { title: 'People & Activity', icon: 'account-group', action: () => navigation.navigate('UserActivityAnalytics') },
-    { title: 'Patterns Over Time', icon: 'trending-up', action: () => navigation.navigate('TimePatternAnalytics') },
   ];
 
   const toggleMenu = () => {
@@ -276,8 +241,14 @@ function DashboardScreen({ navigation }) {
   };
 
   const handleTimeRangeChange = (range) => {
-    setSelectedTimeRange(range);
+    if (range !== selectedTimeRange) {
+      setSelectedTimeRange(range);
+      // Show loading state immediately for better UX
+      setIsLoading(true);
+    }
   };
+
+
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -293,7 +264,6 @@ function DashboardScreen({ navigation }) {
         ]}
         style={{ paddingHorizontal: 0 }}
       />
-
 
       {/* Enhanced Time Range Selector */}
       <View style={styles.timeRangeContainer}>
@@ -311,16 +281,20 @@ function DashboardScreen({ navigation }) {
               ]}
               onPress={() => handleTimeRangeChange(range)}
             >
-              <MaterialCommunityIcons
-                name={
-                  range === 'Today' ? 'calendar-today' :
-                  range === 'Week' ? 'calendar-week' :
-                  range === 'Month' ? 'calendar-month' :
-                  'calendar-range'
-                }
-                size={16}
-                color={selectedTimeRange === range ? '#ffffff' : '#6b7280'}
-              />
+              {isLoading && selectedTimeRange === range ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <MaterialCommunityIcons
+                  name={
+                    range === 'Today' ? 'calendar-today' :
+                    range === 'Last 7 Days' ? 'calendar-week' :
+                    range === 'Last Month' ? 'calendar-month' :
+                    'calendar-range'
+                  }
+                  size={16}
+                  color={selectedTimeRange === range ? '#ffffff' : '#6b7280'}
+                />
+              )}
               <Text
                 style={[
                   styles.timeRangeText,
@@ -333,6 +307,8 @@ function DashboardScreen({ navigation }) {
           ))}
         </View>
       </View>
+
+
 
       {/* Overall Stats */}
       {isLoading ? (
@@ -388,7 +364,12 @@ function DashboardScreen({ navigation }) {
         <View style={styles.chartHeader}>
           <View style={styles.chartTitleContainer}>
             <MaterialCommunityIcons name="shield-search" size={24} color="#02B97F" />
-            <Text style={styles.chartTitle}>Detection Trends</Text>
+            <Text style={styles.chartTitle}>
+              {selectedTimeRange === 'Today' ? 'Today\'s Activity' :
+               selectedTimeRange === 'Last 7 Days' ? 'Weekly Overview' :
+               selectedTimeRange === 'Last Month' ? 'Monthly Trends' :
+               'Yearly Overview'}
+            </Text>
           </View>
           <View style={styles.chartPeriodBadge}>
             <Text style={styles.chartPeriodText}>{selectedTimeRange}</Text>
@@ -400,52 +381,64 @@ function DashboardScreen({ navigation }) {
           <View style={styles.chartStatItem}>
             <MaterialCommunityIcons name="shield-alert" size={20} color="#ef4444" />
             <Text style={styles.chartStatValue}>
-              {detectionChartData.datasets[0].data.reduce((a, b) => a + b, 0)}
+              {isLoading ? '...' : detectionChartData.datasets[0].data.reduce((a, b) => a + b, 0)}
             </Text>
-            <Text style={styles.chartStatLabel}>Threats Detected</Text>
+            <Text style={styles.chartStatLabel}>Total Detections</Text>
           </View>
           <View style={styles.chartStatDivider} />
           <View style={styles.chartStatItem}>
-            <MaterialCommunityIcons name="shield-check" size={20} color="#02B97F" />
+            <MaterialCommunityIcons name="trending-up" size={20} color="#02B97F" />
             <Text style={styles.chartStatValue}>
-              {Math.round(detectionChartData.datasets[0].data.reduce((a, b) => a + b, 0) * 0.85)}
+              {isLoading ? '...' : Math.max(...detectionChartData.datasets[0].data)}
             </Text>
-            <Text style={styles.chartStatLabel}>Content Blocked</Text>
+            <Text style={styles.chartStatLabel}>
+              {selectedTimeRange === 'Today' ? 'Peak Hour' :
+               selectedTimeRange === 'Last 7 Days' ? 'Peak Day' :
+               selectedTimeRange === 'Last Month' ? 'Peak Month' :
+               'Peak Year'}
+            </Text>
           </View>
         </View>
 
         {/* Horizontally Scrollable Detection Chart */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.chartScrollContainer}
-          contentContainerStyle={styles.chartScrollContent}
-        >
-          <LineChart
-            data={detectionChartData}
-            width={Math.max(width - 40, detectionChartData.labels.length * 80)}
-            height={200}
-            chartConfig={detectionChartConfig}
-            bezier
-            style={styles.chart}
-            withDots={true}
-            withShadow={true}
-            withFill={true}
-            withInnerLines={false}
-            withOuterLines={false}
-            withVerticalLines={false}
-            withHorizontalLines={false}
-          />
-        </ScrollView>
+        {isLoading ? (
+          <View style={styles.chartLoadingContainer}>
+            <ActivityIndicator size="large" color="#02B97F" />
+            <Text style={styles.chartLoadingText}>Loading {selectedTimeRange.toLowerCase()} data...</Text>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.chartScrollContainer}
+            contentContainerStyle={styles.chartScrollContent}
+          >
+            <LineChart
+              data={detectionChartData}
+              width={Math.max(width - 40, detectionChartData.labels.length * 80)}
+              height={200}
+              chartConfig={detectionChartConfig}
+              bezier
+              style={styles.chart}
+              withDots={true}
+              withShadow={true}
+              withFill={true}
+              withInnerLines={false}
+              withOuterLines={false}
+              withVerticalLines={false}
+              withHorizontalLines={false}
+            />
+          </ScrollView>
+        )}
 
         {/* Detection Legend */}
         <View style={styles.chartLegend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#02B97F' }]} />
-            <Text style={styles.legendText}>Detections Over Time</Text>
+            <Text style={styles.legendText}>Harmful Content Detected</Text>
             <View style={styles.legendBadge}>
               <Text style={styles.legendBadgeText}>
-                {Math.max(...detectionChartData.datasets[0].data)}
+                {selectedTimeRange}
               </Text>
             </View>
           </View>
@@ -473,39 +466,7 @@ function DashboardScreen({ navigation }) {
         ))}
       </View>
 
-              {/* Enhanced MURAi Insights Summary */}
-        <View style={styles.summaryContainer}>
-          <View style={styles.summaryHeader}>
-            <View style={styles.summaryTitleContainer}>
-              <MaterialCommunityIcons name="brain" size={24} color="#8b5cf6" />
-              <Text style={styles.summaryTitle}>MURAi AI Insights</Text>
-            </View>
-            <View style={styles.aiStatusBadge}>
-              <View style={styles.aiStatusDot} />
-              <Text style={styles.aiStatusText}>Active</Text>
-            </View>
-          </View>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#3b82f6" />
-              <Text style={styles.loadingText}>Loading insights...</Text>
-            </View>
-          ) : (
-            <View style={styles.summaryItems}>
-              {insightsData.map((insight, index) => (
-                <View key={index} style={styles.summaryItem}>
-                  <View style={styles.insightIconContainer}>
-                    <MaterialCommunityIcons name={insight.icon} size={18} color={insight.color} />
-                  </View>
-                  <Text style={styles.summaryText}>{insight.text}</Text>
-                  <View style={styles.insightArrow}>
-                    <MaterialCommunityIcons name="chevron-right" size={16} color="#9ca3af" />
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
+
 
       {/* Bottom Sheet Menu */}
       <Modal
@@ -547,9 +508,7 @@ function DashboardScreen({ navigation }) {
                           {index === 0 ? 'Main dashboard overview' :
                            index === 1 ? 'Flagged words & trending terms' :
                            index === 2 ? 'Website monitoring & stats' :
-                           index === 3 ? 'Language analysis & safety scores' :
-                           index === 4 ? 'User activity & interactions' :
-                           'Time patterns & historical data'}
+                           'User activity & interactions'}
                         </Text>
                       </View>
                       <MaterialCommunityIcons name="chevron-right" size={20} color="#9ca3af" />
@@ -570,6 +529,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
     paddingHorizontal: 16,
+    paddingBottom: 20,
   },
   topBar: {
     flexDirection: 'row',
@@ -652,17 +612,64 @@ const styles = StyleSheet.create({
   timeRangeTextActive: {
     color: '#ffffff',
   },
+  yearSelectorContainer: {
+    marginBottom: 24,
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 16,
+  },
+  yearSelectorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  yearSelectorTitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#374151',
+  },
+  yearScrollContainer: {
+    marginHorizontal: -4,
+  },
+  yearButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  yearButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  yearButtonActive: {
+    backgroundColor: '#02B97F',
+    borderColor: '#02B97F',
+  },
+  yearText: {
+    fontSize: 12,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#6b7280',
+  },
+  yearTextActive: {
+    color: '#ffffff',
+  },
   overallStatsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 30,
+    marginBottom: 24,
+    gap: 8,
   },
   statCard: {
     flex: 1,
     backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 16,
-    marginHorizontal: 4,
     borderWidth: 1,
     borderColor: '#f3f4f6',
     shadowColor: '#000',
@@ -673,6 +680,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 3,
+    minHeight: 120,
   },
   statIconContainer: {
     width: 40,
@@ -712,11 +720,19 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
-    marginBottom: 30,
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: '#f3f4f6',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
   chartHeader: {
     flexDirection: 'row',
@@ -786,13 +802,27 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     borderRadius: 16,
   },
+  chartLoadingContainer: {
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  chartLoadingText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    marginTop: 12,
+  },
   viewAllText: {
     fontSize: 14,
     color: '#3b82f6',
     fontFamily: 'Poppins-SemiBold',
   },
   menuContainer: {
-    marginBottom: 30,
+    marginBottom: 24,
   },
   menuTitle: {
     fontSize: 16,
@@ -804,22 +834,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 8,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#f3f4f6',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 2,
   },
   menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   menuEmoji: {
-    fontSize: 20,
+    fontSize: 24,
   },
   menuContent: {
     flex: 1,
@@ -830,89 +868,7 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 2,
   },
-  summaryContainer: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 40,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  summaryTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  summaryTitle: {
-    fontSize: 18,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#111827',
-  },
-  aiStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 6,
-  },
-  aiStatusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10b981',
-  },
-  aiStatusText: {
-    fontSize: 11,
-    fontFamily: 'Poppins-Medium',
-    color: '#059669',
-  },
-  summaryItems: {
-    gap: 16,
-  },
-  summaryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  insightIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  summaryText: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-    color: '#475569',
-    flex: 1,
-    lineHeight: 18,
-  },
-  insightArrow: {
-    marginLeft: 8,
-  },
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

@@ -1,44 +1,105 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Link } from "expo-router";
-import React, { useState } from "react";
-import { Image, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import { useState } from "react";
+import { ScrollView, StatusBar, StyleSheet, Text, View } from "react-native";
 import AppButton from "../components/common/AppButton";
 import AppInput from "../components/common/AppInput";
 import { COLORS } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
-
-const BG = COLORS.BG;
-const CARD_BG = COLORS.CARD_BG;
-const ACCENT = COLORS.ACCENT;
-const TEXT = COLORS.TEXT_MAIN;
-const SUBTLE = COLORS.SUBTLE;
-const ERROR = COLORS.ERROR;
-const WARNING = COLORS.WARNING;
 
 export default function Register() {
   const { register } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [nameError, setNameError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [confirmPasswordError, setConfirmPasswordError] = useState("");
 
-  const handleRegister = async () => {
-    // Input validation
+  // Enhanced validation functions
+  const validateName = (name) => {
     if (!name.trim()) {
-      setError("Please enter your name");
-      return;
+      return "Name is required";
     }
+    if (name.trim().length < 2) {
+      return "Name must be at least 2 characters";
+    }
+    return "";
+  };
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim()) {
-      setError("Please enter your email");
-      return;
+      return "Email is required";
     }
+    if (!emailRegex.test(email.trim())) {
+      return "Please enter a valid email address";
+    }
+    return "";
+  };
+
+  const validatePassword = (password) => {
     if (!password) {
-      setError("Please enter a password");
-      return;
+      return "Password is required";
     }
     if (password.length < 8) {
-      setError("Password must be at least 8 characters long");
+      return "Password must be at least 8 characters";
+    }
+    if (!/(?=.*[a-z])/.test(password)) {
+      return "Password must contain at least one lowercase letter";
+    }
+    if (!/(?=.*[A-Z])/.test(password)) {
+      return "Password must contain at least one uppercase letter";
+    }
+    if (!/(?=.*\d)/.test(password)) {
+      return "Password must contain at least one number";
+    }
+    return "";
+  };
+
+  const validateConfirmPassword = (confirmPassword, password) => {
+    if (!confirmPassword) {
+      return "Please confirm your password";
+    }
+    if (confirmPassword !== password) {
+      return "Passwords do not match";
+    }
+    return "";
+  };
+
+  const handleRegister = async () => {
+    // Clear previous errors
+    setNameError("");
+    setEmailError("");
+    setPasswordError("");
+    setConfirmPasswordError("");
+    setError("");
+
+    // Validate inputs
+    const nameValidation = validateName(name);
+    const emailValidation = validateEmail(email);
+    const passwordValidation = validatePassword(password);
+    const confirmPasswordValidation = validateConfirmPassword(confirmPassword, password);
+
+    if (nameValidation) {
+      setNameError(nameValidation);
+    }
+    if (emailValidation) {
+      setEmailError(emailValidation);
+    }
+    if (passwordValidation) {
+      setPasswordError(passwordValidation);
+    }
+    if (confirmPasswordValidation) {
+      setConfirmPasswordError(confirmPasswordValidation);
+    }
+
+    // If there are validation errors, don't proceed
+    if (nameValidation || emailValidation || passwordValidation || confirmPasswordValidation) {
       return;
     }
 
@@ -63,209 +124,226 @@ export default function Register() {
     }
   };
 
-  const handleGoogleRegister = async () => {
-    try {
-      setError("");
-      setGoogleLoading(true);
-      console.log('🔄 Starting Google registration...');
-      
-      // TODO: Implement Google OAuth registration
-      // await registerWithGoogle();
-      
-      console.log('✅ Google registration successful');
-    } catch (err) {
-      console.error('❌ Google registration error:', err);
-      setError("Google sign-up failed. Please try again.");
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
+
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
-      <StatusBar barStyle="dark-content" backgroundColor={BG} />
-      
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
+
       {/* Header Section */}
-      <View style={{ 
-        alignItems: "center", 
-        paddingTop: 80, 
-        paddingBottom: 40,
-        paddingHorizontal: 24
-      }}>
-        <View style={{
-          width: 80,
-          height: 80,
-          borderRadius: 20,
-          backgroundColor: '#F3F4F6',
-          justifyContent: 'center',
-          alignItems: 'center',
-          marginBottom: 24
-        }}>
-          <Image
-            source={require("../../assets/images/logo.png")}
-            style={{ width: 50, height: 50 }}
-            resizeMode="contain"
-          />
+      <View style={styles.header}>
+        <View style={styles.logoContainer}>
+          <MaterialCommunityIcons name="account-plus" size={40} color="#02B97F" />
         </View>
-        <Text style={{ 
-          color: TEXT, 
-          fontSize: 28, 
-          fontFamily: 'Poppins-Medium',
-          marginBottom: 8,
-          textAlign: 'center'
-        }}>
-          Create Account
-        </Text>
-        <Text style={{ 
-          color: '#6B7280', 
-          fontSize: 16,
-          fontFamily: 'Poppins-Regular',
-          textAlign: 'center',
-          lineHeight: 22
-        }}>
-          Join MURAi to get started
-        </Text>
+        <Text style={styles.title}>Create Account</Text>
+        <Text style={styles.subtitle}>Join MURAi to get started</Text>
       </View>
 
       {/* Form Section */}
-      <View style={{ flex: 1, paddingHorizontal: 24 }}>
-        <View style={{ gap: 16, marginBottom: 24 }}>
+      <View style={styles.formContainer}>
+        <View style={styles.inputContainer}>
           <AppInput
             value={name}
-            onChangeText={setName}
-            placeholder="Enter your name"
-            style={{ marginBottom: 0 }}
+            onChangeText={(text) => {
+              setName(text);
+              if (nameError) setNameError("");
+            }}
+            placeholder="Enter your full name"
+            style={[styles.input, nameError ? styles.inputError : null]}
           />
-
-          <AppInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Enter your email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={{ marginBottom: 0 }}
-          />
-
-          <AppInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Enter your password"
-            secureTextEntry
-            style={{ marginBottom: 0 }}
-          />
-
-          {error ? (
-            <View style={{ 
-              backgroundColor: `${ERROR}10`,
-              padding: 16,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: `${ERROR}30`
-            }}>
-              <Text style={{ 
-                color: ERROR,
-                fontSize: 14,
-                fontFamily: 'Poppins-Medium'
-              }}>
-                {error}
-              </Text>
-            </View>
+          {nameError ? (
+            <Text style={styles.errorText}>{nameError}</Text>
           ) : null}
         </View>
 
-        {/* Create Account Button */}
-        <AppButton
-          title={loading ? "Creating Account..." : "Create Account"}
-          onPress={handleRegister}
-          loading={loading}
-          style={{ marginBottom: 16 }}
-        />
-
-        {/* Divider */}
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          marginVertical: 24
-        }}>
-          <View style={{ flex: 1, height: 1, backgroundColor: '#E5E7EB' }} />
-          <Text style={{
-            marginHorizontal: 16,
-            color: '#9CA3AF',
-            fontSize: 14,
-            fontFamily: 'Poppins-Regular'
-          }}>
-            or continue with
-          </Text>
-          <View style={{ flex: 1, height: 1, backgroundColor: '#E5E7EB' }} />
+        <View style={styles.inputContainer}>
+          <AppInput
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (emailError) setEmailError("");
+            }}
+            placeholder="Enter your email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={[styles.input, emailError ? styles.inputError : null]}
+          />
+          {emailError ? (
+            <Text style={styles.errorText}>{emailError}</Text>
+          ) : null}
         </View>
 
-        {/* Google Sign Up Button */}
-        <TouchableOpacity
-          onPress={handleGoogleRegister}
-          disabled={googleLoading}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#FFFFFF',
-            borderWidth: 1,
-            borderColor: '#E5E7EB',
-            borderRadius: 12,
-            paddingVertical: 16,
-            marginBottom: 24,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.05,
-            shadowRadius: 2,
-            elevation: 1,
-          }}
-        >
-          <View style={{
-            width: 20,
-            height: 20,
-            backgroundColor: '#4285F4',
-            borderRadius: 2,
-            marginRight: 12,
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>G</Text>
+        <View style={styles.inputContainer}>
+          <AppInput
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (passwordError) setPasswordError("");
+            }}
+            placeholder="Create a password"
+            secureTextEntry
+            style={[styles.input, passwordError ? styles.inputError : null]}
+          />
+          {passwordError ? (
+            <Text style={styles.errorText}>{passwordError}</Text>
+          ) : null}
+        </View>
+
+        <View style={styles.inputContainer}>
+          <AppInput
+            value={confirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              if (confirmPasswordError) setConfirmPasswordError("");
+            }}
+            placeholder="Confirm your password"
+            secureTextEntry
+            style={[styles.input, confirmPasswordError ? styles.inputError : null]}
+          />
+          {confirmPasswordError ? (
+            <Text style={styles.errorText}>{confirmPasswordError}</Text>
+          ) : null}
+        </View>
+
+        {error ? (
+          <View style={styles.generalErrorContainer}>
+            <MaterialCommunityIcons
+              name="alert-circle"
+              size={20}
+              color={COLORS.ERROR}
+              style={styles.errorIcon}
+            />
+            <Text style={styles.generalErrorText}>
+              {error}
+            </Text>
           </View>
-          <Text style={{
-            color: '#374151',
-            fontSize: 16,
-            fontFamily: 'Poppins-Medium'
-          }}>
-            {googleLoading ? "Creating account..." : "Continue with Google"}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Sign In Link */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: 6,
-            marginBottom: 32,
-          }}
-        >
-          <Text style={{ 
-            color: '#6B7280',
-            fontSize: 15,
-            fontFamily: 'Poppins-Regular'
-          }}>
-            Already have an account?
-          </Text>
-          <Link href="/(auth)/login" style={{ 
-            color: ACCENT,
-            fontSize: 15,
-            fontFamily: 'Poppins-Medium'
-          }}>
-            Sign In
-          </Link>
-        </View>
+        ) : null}
       </View>
-    </View>
+
+      {/* Create Account Button */}
+      <AppButton
+        title={loading ? "Creating Account..." : "Create Account"}
+        onPress={handleRegister}
+        loading={loading}
+        style={styles.createAccountButton}
+      />
+
+      {/* Sign In Link */}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          Already have an account?
+        </Text>
+        <Link href="/(auth)/login" style={styles.footerLink}>
+          Sign In
+        </Link>
+      </View>
+    </ScrollView>
   );
-} 
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+  },
+  header: {
+    alignItems: 'center',
+    paddingTop: 80,
+    paddingBottom: 40,
+    paddingHorizontal: 24,
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  title: {
+    fontSize: 32,
+    fontFamily: 'Poppins-Bold',
+    color: '#1f2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  formContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 30,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  input: {
+    marginBottom: 0,
+  },
+  inputError: {
+    borderColor: COLORS.ERROR,
+    borderWidth: 1,
+  },
+  errorText: {
+    color: COLORS.ERROR,
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  generalErrorContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: `${COLORS.ERROR}10`,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: `${COLORS.ERROR}30`,
+    marginTop: 10,
+  },
+  errorIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  generalErrorText: {
+    color: COLORS.ERROR,
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    flex: 1,
+  },
+  createAccountButton: {
+    marginHorizontal: 24,
+    marginBottom: 30,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    gap: 6,
+  },
+  footerText: {
+    color: '#6b7280',
+    fontSize: 15,
+    fontFamily: 'Poppins-Regular',
+  },
+  footerLink: {
+    color: '#02B97F',
+    fontSize: 15,
+    fontFamily: 'Poppins-SemiBold',
+  },
+});

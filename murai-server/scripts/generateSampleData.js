@@ -14,9 +14,20 @@ console.log('Loaded MONGO_URI:', process.env.MONGO_URI);
 const MONGO_URI = process.env.MONGO_URI;
 
 const harmfulWords = [
+  // English harmful words
   'hate', 'violence', 'threat', 'bullying', 'harassment', 'abuse', 'insult',
   'discrimination', 'racism', 'sexism', 'toxic', 'offensive', 'aggressive',
-  'cruel', 'mean', 'nasty', 'vicious', 'malicious', 'hostile', 'attack'
+  'cruel', 'mean', 'nasty', 'vicious', 'malicious', 'hostile', 'attack',
+
+  // Tagalog profanity and harmful words
+  'putangina', 'gago', 'tanga', 'bobo', 'ulol', 'tarantado', 'buwisit',
+  'pakyu', 'tangina', 'leche', 'peste', 'hudas', 'kingina', 'punyeta',
+  'hayop', 'walang hiya', 'bastos', 'sira ulo', 'lintik', 'pucha',
+  'bwisit', 'hinayupak', 'walang kwenta', 'pangit', 'kadiri', 'yawa',
+
+  // Taglish combinations
+  'gago ka', 'tanga mo', 'bobo naman', 'what the putangina', 'tangina naman',
+  'pakyu ka', 'gago this', 'tanga yan', 'bobo talaga', 'ulol ka ba'
 ];
 const patternTypes = ['Profanity', 'Hate Speech', 'Sensitive', 'Threat', 'Harassment', 'Insult'];
 const languages = ['English', 'Tagalog', 'Cebuano', 'Other'];
@@ -40,6 +51,7 @@ const websites = [
   'https://stackoverflow.com/questions'
 ];
 const contexts = [
+  // English contexts
   'Threatening message in comment section',
   'Inappropriate language in chat',
   'Bullying behavior detected',
@@ -54,7 +66,36 @@ const contexts = [
   'Hostile behavior in group chat',
   'Inappropriate language in live stream',
   'Offensive content shared in story',
-  'Threatening behavior observed'
+  'Threatening behavior observed',
+
+  // Tagalog contexts
+  'Nagsabi ng masasamang salita sa comment',
+  'Nang-aaway sa group chat',
+  'Nambubully sa mga kaklase',
+  'Nagsabi ng putangina sa post',
+  'Nag-trash talk sa laro',
+  'Nanlalait sa itsura ng iba',
+  'Nag-curse sa live stream',
+  'Nambabash sa social media',
+  'Nag-threat sa DM',
+  'Nanlalait ng kapamilya',
+  'Nagsabi ng gago sa comment',
+  'Nang-aaway dahil sa politics',
+  'Nambubully ng mga bata',
+  'Nagsabi ng tanga sa forum',
+  'Nag-harass sa messenger',
+
+  // Taglish contexts
+  'Nagsabi ng what the putangina sa chat',
+  'Nag-comment ng gago ka naman',
+  'Said tanga mo sa group',
+  'Posted bobo naman yan sa wall',
+  'Nag-reply ng pakyu ka sa thread',
+  'Commented tangina naman sa photo',
+  'Said ulol ka ba sa livestream',
+  'Nag-post ng bwisit na yan',
+  'Replied with gago this person',
+  'Nagsabi ng kadiri naman yan'
 ];
 const activityTypes = ['login', 'logout', 'update', 'visit', 'report', 'group_join', 'group_leave', 'flagged', 'other'];
 const activityCategories = ['security', 'content', 'system', 'user', 'group'];
@@ -189,6 +230,36 @@ async function createSampleGroupMembers(groups, users) {
   }
   console.log(`Added ${totalMembers} group members.`);
 }
+// Helper function to detect language from word and context
+function detectLanguageFromContent(word, context) {
+  const text = `${word} ${context}`.toLowerCase();
+
+  // Check for Tagalog words
+  const tagalogWords = ['putangina', 'gago', 'tanga', 'bobo', 'ulol', 'tarantado', 'buwisit',
+                       'pakyu', 'tangina', 'leche', 'peste', 'hudas', 'kingina', 'punyeta',
+                       'hayop', 'bastos', 'lintik', 'pucha', 'hinayupak', 'pangit', 'kadiri', 'yawa',
+                       'nagsabi', 'nang-aaway', 'nambubully', 'nanlalait', 'nag-curse', 'nambabash',
+                       'nag-threat', 'nag-harass', 'sa', 'ng', 'mga', 'ang', 'naman', 'talaga'];
+
+  // Check for English words
+  const englishWords = ['hate', 'violence', 'threat', 'bullying', 'harassment', 'abuse', 'insult',
+                       'discrimination', 'racism', 'sexism', 'toxic', 'offensive', 'aggressive',
+                       'threatening', 'inappropriate', 'behavior', 'detected', 'content', 'message'];
+
+  const hasTagalog = tagalogWords.some(word => text.includes(word));
+  const hasEnglish = englishWords.some(word => text.includes(word));
+
+  if (hasTagalog && hasEnglish) {
+    return 'Taglish';
+  } else if (hasTagalog) {
+    return 'Tagalog';
+  } else if (hasEnglish) {
+    return 'English';
+  } else {
+    return 'Other';
+  }
+}
+
 async function generateDetectedWords(users) {
   console.log('Generating detected words data...');
   const detectedWords = [];
@@ -196,16 +267,20 @@ async function generateDetectedWords(users) {
     const date = getRandomDate(day);
     const dailyCount = getRandomNumber(10, 30);
     for (let i = 0; i < dailyCount; i++) {
+      const selectedWord = getRandomElement(harmfulWords);
+      const selectedContext = getRandomElement(contexts);
+      const detectedLanguage = detectLanguageFromContent(selectedWord, selectedContext);
+
       const detectedWord = new DetectedWord({
-        word: getRandomElement(harmfulWords),
+        word: selectedWord,
         userId: getRandomElement(users)._id,
-        context: getRandomElement(contexts),
+        context: selectedContext,
         sentimentScore: getRandomFloat(-1, 0.5),
         url: getRandomElement(websites),
         accuracy: getRandomFloat(0.7, 0.99),
         responseTime: getRandomFloat(50, 500),
         patternType: getRandomElement(patternTypes),
-        language: getRandomElement(languages),
+        language: detectedLanguage,
         severity: getRandomElement(severities),
         siteType: getRandomElement(siteTypes),
         createdAt: date

@@ -1,13 +1,12 @@
+import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
-import { Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import Header from '../../components/common/Header';
+import { useEffect, useState } from "react";
+import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 
 export default function NotificationPreferences() {
   const navigation = useNavigation();
-  
+
   const defaultPrefs = {
     pushNotifications: true,
     emailAlerts: false,
@@ -18,7 +17,7 @@ export default function NotificationPreferences() {
   };
   const [notifications, setNotifications] = useState(defaultPrefs);
   const [loading, setLoading] = useState(true);
-  const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
+
 
   // Load preferences from AsyncStorage on mount
   useEffect(() => {
@@ -52,182 +51,267 @@ export default function NotificationPreferences() {
       key: 'pushNotifications',
       title: 'Push Notifications',
       description: 'Receive notifications on your device',
-      icon: 'bell-outline',
+      icon: 'bell',
+      category: 'general'
     },
     {
       key: 'emailAlerts',
       title: 'Email Alerts',
       description: 'Get important updates via email',
-      icon: 'email-outline',
+      icon: 'mail',
+      category: 'general'
     },
     {
       key: 'detectionAlerts',
       title: 'Detection Alerts',
       description: 'Immediate alerts for content detection',
-      icon: 'alert-circle-outline',
+      icon: 'alert-circle',
+      category: 'security'
     },
     {
       key: 'groupActivity',
       title: 'Group Activity',
       description: 'Updates about group member activity',
-      icon: 'account-group-outline',
+      icon: 'users',
+      category: 'social'
     },
     {
       key: 'weeklyReports',
       title: 'Weekly Reports',
       description: 'Summary of weekly activity',
-      icon: 'chart-line',
+      icon: 'trending-up',
+      category: 'reports'
     },
     {
       key: 'securityAlerts',
       title: 'Security Alerts',
       description: 'Important security notifications',
-      icon: 'shield-outline',
+      icon: 'shield',
+      category: 'security'
     },
   ];
 
   if (loading) {
-    return <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}><Text>Loading...</Text></View>;
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={styles.loadingText}>Loading preferences...</Text>
+      </View>
+    );
   }
+
+  // Group settings by category
+  const groupedSettings = notificationSettings.reduce((acc, setting) => {
+    if (!acc[setting.category]) acc[setting.category] = [];
+    acc[setting.category].push(setting);
+    return acc;
+  }, {});
+
+  const categoryInfo = {
+    general: { title: 'General Notifications', icon: 'bell' },
+    security: { title: 'Security & Alerts', icon: 'shield' },
+    social: { title: 'Social Activity', icon: 'users' },
+    reports: { title: 'Reports & Analytics', icon: 'trending-up' }
+  };
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <Header 
-        title="Notification Preferences"
-        showBackButton={true}
-        onBackPress={() => navigation.goBack()}
-        style={{ paddingHorizontal: 0 }}
-      />
-
-      {/* Notification Settings */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notification Settings</Text>
-        
-        {notificationSettings.map((setting) => (
-          <View key={setting.key} style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <MaterialCommunityIcons 
-                name={setting.icon} 
-                size={20} 
-                color="#6B7280" 
-              />
-              <View style={styles.settingContent}>
-                <Text style={styles.settingTitle}>{setting.title}</Text>
-                <Text style={styles.settingDescription}>{setting.description}</Text>
-              </View>
-            </View>
-            <Switch
-              value={notifications[setting.key]}
-              onValueChange={() => toggleNotification(setting.key)}
-              trackColor={{ false: '#E5E7EB', true: '#374151' }}
-              thumbColor={notifications[setting.key] ? '#FFFFFF' : '#FFFFFF'}
-            />
-          </View>
-        ))}
-      </View>
-
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        
-        <TouchableOpacity style={styles.actionItem} onPress={handleDisableAll}>
-          <View style={styles.actionLeft}>
-            <MaterialCommunityIcons name="bell-off-outline" size={20} color="#6B7280" />
-            <Text style={styles.actionText}>Disable All Notifications</Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
-        </TouchableOpacity>
-
-      </View>
-      {/* Notification Schedule Modal */}
-      <Modal
-        visible={scheduleModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setScheduleModalVisible(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '85%', maxWidth: 400, alignItems: 'center' }}>
-            <Text style={{ fontSize: 18, fontWeight: '600', color: '#111827', marginBottom: 16 }}>Notification Schedule</Text>
-            <Text style={{ color: '#6B7280', fontSize: 15, textAlign: 'center', marginBottom: 20 }}>
-              This feature will allow you to set a custom schedule for when notifications are delivered. Coming soon!
-            </Text>
-            <TouchableOpacity style={{ backgroundColor: '#3B82F6', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 32, alignItems: 'center' }} onPress={() => setScheduleModalVisible(false)}>
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '500' }}>Close</Text>
-            </TouchableOpacity>
-          </View>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Feather name="arrow-left" size={24} color="#1D1D1F" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Notification Preferences</Text>
+          <View style={styles.placeholderButton} />
         </View>
-      </Modal>
-    </ScrollView>
+
+        {/* Notification Settings */}
+        <View style={styles.settingsCard}>
+          <View style={styles.cardHeader}>
+            <Feather name="bell" size={20} color="#01B97F" />
+            <Text style={styles.cardTitle}>Notification Settings</Text>
+          </View>
+
+          {notificationSettings.map((setting) => (
+            <View key={setting.key} style={styles.settingItem}>
+              <View style={styles.settingLeft}>
+                <Feather
+                  name={setting.icon}
+                  size={20}
+                  color="#01B97F"
+                />
+                <View style={styles.settingContent}>
+                  <Text style={styles.settingTitle}>{setting.title}</Text>
+                  <Text style={styles.settingDescription}>{setting.description}</Text>
+                </View>
+              </View>
+              <Switch
+                value={notifications[setting.key]}
+                onValueChange={() => toggleNotification(setting.key)}
+                trackColor={{ false: '#E5E7EB', true: '#01B97F' }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor="#E5E7EB"
+              />
+            </View>
+          ))}
+        </View>
+
+        {/* Quick Actions Card */}
+        <View style={styles.actionsCard}>
+          <View style={styles.cardHeader}>
+            <Feather name="settings" size={20} color="#01B97F" />
+            <Text style={styles.cardTitle}>Quick Actions</Text>
+          </View>
+
+          <TouchableOpacity style={styles.actionItem} onPress={handleDisableAll}>
+            <View style={styles.actionLeft}>
+              <Feather name="bell-off" size={20} color="#01B97F" />
+              <Text style={styles.actionText}>Disable All Notifications</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#A8AAB0" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.bottomSpacing} />
+      </ScrollView>
+
+
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7F7F7',
   },
-  section: {
-    marginHorizontal: 24,
-    marginBottom: 32,
+  scrollContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 60,
   },
-  sectionTitle: {
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: '#1D1D1F',
+    flex: 1,
+    textAlign: 'center',
+  },
+  placeholderButton: {
+    width: 40,
+    height: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#A8AAB0',
+    textAlign: 'center',
+  },
+
+  settingsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  actionsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
+  },
+  cardTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1D1D1F',
   },
+
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    paddingHorizontal: 0,
+    marginBottom: 16,
   },
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 16,
   },
   settingContent: {
-    marginLeft: 12,
     flex: 1,
   },
   settingTitle: {
     fontSize: 16,
-    color: '#111827',
-    fontWeight: '500',
+    fontFamily: 'Poppins-Medium',
+    color: '#1D1D1F',
     marginBottom: 2,
   },
   settingDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
+    color: '#A8AAB0',
   },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    paddingHorizontal: 0,
+    marginBottom: 16,
   },
   actionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 16,
   },
   actionText: {
     fontSize: 16,
-    color: '#111827',
-    marginLeft: 12,
-    fontWeight: '500',
+    fontFamily: 'Poppins-Medium',
+    color: '#1D1D1F',
+  },
+  bottomSpacing: {
+    height: 40,
   },
 });

@@ -1,19 +1,12 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Link, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { Image, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ScrollView, StatusBar, StyleSheet, Text, View } from "react-native";
 import AppButton from "../components/common/AppButton";
 import AppInput from "../components/common/AppInput";
 import { COLORS } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
-
-const BG = COLORS.BG;
-const CARD_BG = COLORS.CARD_BG;
-const ACCENT = COLORS.ACCENT;
-const TEXT = COLORS.TEXT_MAIN;
-const SUBTLE = COLORS.SUBTLE;
-const ERROR = COLORS.ERROR;
-const WARNING = COLORS.WARNING;
 
 // Cooldown time in seconds
 const RATE_LIMIT_COOLDOWN = 60;
@@ -25,8 +18,9 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [cooldownTime, setCooldownTime] = useState(0);
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
   useEffect(() => {
     let timer;
@@ -46,25 +40,52 @@ export default function Login() {
     };
   }, [cooldownTime]);
 
+  // Enhanced validation functions
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim()) {
+      return "Email is required";
+    }
+    if (!emailRegex.test(email.trim())) {
+      return "Please enter a valid email address";
+    }
+    return "";
+  };
+
+  const validatePassword = (password) => {
+    if (!password) {
+      return "Password is required";
+    }
+    if (password.length < 6) {
+      return "Password must be at least 6 characters";
+    }
+    return "";
+  };
+
   const handleLogin = async () => {
     // Don't allow login during cooldown
     if (cooldownTime > 0) {
       return;
     }
 
-    // Input validation
-    if (!email.trim()) {
-      setError("Please enter your email");
-      return;
+    // Clear previous errors
+    setEmailError("");
+    setPasswordError("");
+    setError("");
+
+    // Validate inputs
+    const emailValidation = validateEmail(email);
+    const passwordValidation = validatePassword(password);
+
+    if (emailValidation) {
+      setEmailError(emailValidation);
     }
-    // Basic email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      setError("Please enter a valid email address");
-      return;
+    if (passwordValidation) {
+      setPasswordError(passwordValidation);
     }
-    if (!password) {
-      setError("Please enter your password");
+
+    // If there are validation errors, don't proceed
+    if (emailValidation || passwordValidation) {
       return;
     }
 
@@ -72,7 +93,7 @@ export default function Login() {
       setError("");
       setLoading(true);
       console.log('🔄 Starting login process...');
-      
+
       await login(email.trim(), password);
       // Get user from AsyncStorage
       const storedUser = await AsyncStorage.getItem('user');
@@ -89,7 +110,7 @@ export default function Login() {
         message: err.message,
         response: err.response
       });
-      
+
       // Handle specific Appwrite error codes
       if (err.message?.includes('Rate limit')) {
         setError(`Too many login attempts. Please wait ${RATE_LIMIT_COOLDOWN} seconds.`);
@@ -110,218 +131,219 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    try {
-      setError("");
-      setGoogleLoading(true);
-      console.log('🔄 Starting Google login...');
-      
-      // TODO: Implement Google OAuth
-      // await loginWithGoogle();
-      
-      console.log('✅ Google login successful');
-      router.replace('/(app)');
-    } catch (err) {
-      console.error('❌ Google login error:', err);
-      setError("Google sign-in failed. Please try again.");
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
+
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
-      <StatusBar barStyle="dark-content" backgroundColor={BG} />
-      
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
+
       {/* Header Section */}
-      <View style={{ 
-        alignItems: "center", 
-        paddingTop: 80, 
-        paddingBottom: 40,
-        paddingHorizontal: 24
-      }}>
-        <View style={{
-          width: 80,
-          height: 80,
-          borderRadius: 20,
-          backgroundColor: '#F3F4F6',
-          justifyContent: 'center',
-          alignItems: 'center',
-          marginBottom: 24
-        }}>
-          <Image
-            source={require("../../assets/images/logo.png")}
-            style={{ width: 50, height: 50 }}
-            resizeMode="contain"
-          />
+      <View style={styles.header}>
+        <View style={styles.logoContainer}>
+          <MaterialCommunityIcons name="shield-check" size={40} color="#02B97F" />
         </View>
-        <Text style={{ 
-          color: TEXT, 
-          fontSize: 28, 
-          fontFamily: 'Poppins-Medium',
-          marginBottom: 8,
-          textAlign: 'center'
-        }}>
-          Welcome Back
-        </Text>
-        <Text style={{ 
-          color: '#6B7280', 
-          fontSize: 16,
-          fontFamily: 'Poppins-Regular',
-          textAlign: 'center',
-          lineHeight: 22
-        }}>
-          Sign in to continue to MURAi
-        </Text>
+        <Text style={styles.title}>Welcome Back</Text>
+        <Text style={styles.subtitle}>Sign in to continue to MURAi</Text>
       </View>
 
       {/* Form Section */}
-      <View style={{ flex: 1, paddingHorizontal: 24 }}>
-        <View style={{ gap: 16, marginBottom: 24 }}>
+      <View style={styles.formContainer}>
+        <View style={styles.inputContainer}>
           <AppInput
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (emailError) setEmailError("");
+            }}
             placeholder="Enter your email"
             keyboardType="email-address"
             autoCapitalize="none"
-            style={{ marginBottom: 0 }}
+            style={[styles.input, emailError ? styles.inputError : null]}
           />
+          {emailError ? (
+            <Text style={styles.errorText}>{emailError}</Text>
+          ) : null}
+        </View>
 
+        <View style={styles.inputContainer}>
           <AppInput
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (passwordError) setPasswordError("");
+            }}
             placeholder="Enter your password"
             secureTextEntry
-            style={{ marginBottom: 0 }}
+            style={[styles.input, passwordError ? styles.inputError : null]}
           />
+          {passwordError ? (
+            <Text style={styles.errorText}>{passwordError}</Text>
+          ) : null}
+        </View>
 
-          {error ? (
-            <View style={{ 
-              backgroundColor: cooldownTime > 0 ? `${WARNING}10` : `${ERROR}10`,
-              padding: 16,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: cooldownTime > 0 ? `${WARNING}30` : `${ERROR}30`
-            }}>
-              <Text style={{ 
-                color: cooldownTime > 0 ? WARNING : ERROR,
-                marginBottom: cooldownTime > 0 ? 6 : 0,
-                fontSize: 14,
-                fontFamily: 'Poppins-Medium'
-              }}>
+        {error ? (
+          <View style={[styles.generalErrorContainer, cooldownTime > 0 ? styles.warningContainer : null]}>
+            <MaterialCommunityIcons
+              name={cooldownTime > 0 ? "clock-alert" : "alert-circle"}
+              size={20}
+              color={cooldownTime > 0 ? COLORS.WARNING : COLORS.ERROR}
+              style={styles.errorIcon}
+            />
+            <View style={styles.errorTextContainer}>
+              <Text style={[styles.generalErrorText, cooldownTime > 0 ? styles.warningText : null]}>
                 {error}
               </Text>
               {cooldownTime > 0 && (
-                <Text style={{ 
-                  color: WARNING, 
-                  fontSize: 13,
-                  fontFamily: 'Poppins-Regular',
-                  opacity: 0.8
-                }}>
+                <Text style={styles.cooldownText}>
                   Try again in {cooldownTime} seconds
                 </Text>
               )}
             </View>
-          ) : null}
-        </View>
-
-        {/* Sign In Button */}
-        <AppButton
-          title={loading ? "Signing In..." : "Sign In"}
-          onPress={handleLogin}
-          loading={loading}
-          style={{ marginBottom: 16 }}
-          disabled={cooldownTime > 0}
-        />
-
-        {/* Divider */}
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          marginVertical: 24
-        }}>
-          <View style={{ flex: 1, height: 1, backgroundColor: '#E5E7EB' }} />
-          <Text style={{
-            marginHorizontal: 16,
-            color: '#9CA3AF',
-            fontSize: 14,
-            fontFamily: 'Poppins-Regular'
-          }}>
-            or continue with
-          </Text>
-          <View style={{ flex: 1, height: 1, backgroundColor: '#E5E7EB' }} />
-        </View>
-
-        {/* Google Sign In Button */}
-        <TouchableOpacity
-          onPress={handleGoogleLogin}
-          disabled={googleLoading}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#FFFFFF',
-            borderWidth: 1,
-            borderColor: '#E5E7EB',
-            borderRadius: 12,
-            paddingVertical: 16,
-            marginBottom: 24,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.05,
-            shadowRadius: 2,
-            elevation: 1,
-          }}
-        >
-          <View style={{
-            width: 20,
-            height: 20,
-            backgroundColor: '#4285F4',
-            borderRadius: 2,
-            marginRight: 12,
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>G</Text>
           </View>
-          <Text style={{
-            color: '#374151',
-            fontSize: 16,
-            fontFamily: 'Poppins-Medium'
-          }}>
-            {googleLoading ? "Signing in..." : "Continue with Google"}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Sign Up Link */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: 6,
-            marginBottom: 16,
-          }}
-        >
-          <Text style={{ 
-            color: '#6B7280',
-            fontSize: 15,
-            fontFamily: 'Poppins-Regular'
-          }}>
-            Don&apos;t have an account?
-          </Text>
-          <Link href="/(auth)/register" style={{ 
-            color: ACCENT,
-            fontSize: 15,
-            fontFamily: 'Poppins-Medium'
-          }}>
-            Sign Up
-          </Link>
-        </View>
-
-         
-         
+        ) : null}
       </View>
-    </View>
+
+      {/* Sign In Button */}
+      <AppButton
+        title={loading ? "Signing In..." : "Sign In"}
+        onPress={handleLogin}
+        loading={loading}
+        style={styles.signInButton}
+        disabled={cooldownTime > 0}
+      />
+
+      {/* Sign Up Link */}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          Don&apos;t have an account?
+        </Text>
+        <Link href="/(auth)/register" style={styles.footerLink}>
+          Sign Up
+        </Link>
+      </View>
+    </ScrollView>
   );
-} 
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+  },
+  header: {
+    alignItems: 'center',
+    paddingTop: 80,
+    paddingBottom: 40,
+    paddingHorizontal: 24,
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  title: {
+    fontSize: 32,
+    fontFamily: 'Poppins-Bold',
+    color: '#1f2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  formContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 30,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  input: {
+    marginBottom: 0,
+  },
+  inputError: {
+    borderColor: COLORS.ERROR,
+    borderWidth: 1,
+  },
+  errorText: {
+    color: COLORS.ERROR,
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  generalErrorContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: `${COLORS.ERROR}10`,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: `${COLORS.ERROR}30`,
+    marginTop: 10,
+  },
+  warningContainer: {
+    backgroundColor: `${COLORS.WARNING}10`,
+    borderColor: `${COLORS.WARNING}30`,
+  },
+  errorIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  errorTextContainer: {
+    flex: 1,
+  },
+  generalErrorText: {
+    color: COLORS.ERROR,
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    marginBottom: 4,
+  },
+  warningText: {
+    color: COLORS.WARNING,
+  },
+  cooldownText: {
+    color: COLORS.WARNING,
+    fontSize: 13,
+    fontFamily: 'Poppins-Regular',
+    opacity: 0.8,
+  },
+  signInButton: {
+    marginHorizontal: 24,
+    marginBottom: 30,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    gap: 6,
+  },
+  footerText: {
+    color: '#6b7280',
+    fontSize: 15,
+    fontFamily: 'Poppins-Regular',
+  },
+  footerLink: {
+    color: '#02B97F',
+    fontSize: 15,
+    fontFamily: 'Poppins-SemiBold',
+  },
+});

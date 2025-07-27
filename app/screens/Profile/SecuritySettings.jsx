@@ -1,14 +1,12 @@
+import { Feather } from '@expo/vector-icons';
 import { useNavigation } from "@react-navigation/native";
-import React, { useState } from "react";
+import { useState } from "react";
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export default function SecuritySettings() {
   const navigation = useNavigation();
-  
+
   const [securitySettings, setSecuritySettings] = useState({
-    twoFactorAuth: false,
-    biometricAuth: true,
     sessionTimeout: true,
     loginAlerts: true,
   });
@@ -34,28 +32,16 @@ export default function SecuritySettings() {
 
   const securityOptions = [
     {
-      key: 'twoFactorAuth',
-      title: 'Two-Factor Authentication',
-      description: 'Add an extra layer of security',
-      icon: 'shield-check-outline',
-    },
-    {
-      key: 'biometricAuth',
-      title: 'Biometric Authentication',
-      description: 'Use fingerprint or face recognition',
-      icon: 'fingerprint',
-    },
-    {
       key: 'sessionTimeout',
       title: 'Auto Session Timeout',
       description: 'Automatically log out after inactivity',
-      icon: 'clock-outline',
+      icon: 'clock',
     },
     {
       key: 'loginAlerts',
       title: 'Login Alerts',
       description: 'Get notified of new login attempts',
-      icon: 'bell-outline',
+      icon: 'bell',
     },
   ];
 
@@ -63,228 +49,290 @@ export default function SecuritySettings() {
     {
       title: 'Change Password',
       description: 'Update your account password',
-      icon: 'key-outline',
+      icon: 'key',
       onPress: handleChangePassword,
     },
     {
       title: 'Active Sessions',
       description: 'View and manage active sessions',
-      icon: 'monitor-multiple',
+      icon: 'monitor',
       onPress: handleViewSessions,
     },
     {
       title: 'Security Audit',
       description: 'Review your security settings',
-      icon: 'security',
+      icon: 'search',
       onPress: handleSecurityAudit,
     },
   ];
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#111827" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Security Settings</Text>
-        <View style={styles.placeholder} />
-      </View>
-
-      {/* Security Options */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Security Options</Text>
-        
-        {securityOptions.map((option) => (
-          <View key={option.key} style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <MaterialCommunityIcons 
-                name={option.icon} 
-                size={20} 
-                color="#6B7280" 
-              />
-              <View style={styles.settingContent}>
-                <Text style={styles.settingTitle}>{option.title}</Text>
-                <Text style={styles.settingDescription}>{option.description}</Text>
-              </View>
-            </View>
-            <Switch
-              value={securitySettings[option.key]}
-              onValueChange={() => toggleSetting(option.key)}
-              trackColor={{ false: '#E5E7EB', true: '#374151' }}
-              thumbColor={securitySettings[option.key] ? '#FFFFFF' : '#FFFFFF'}
-            />
-          </View>
-        ))}
-      </View>
-
-      {/* Security Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Security Actions</Text>
-        
-        {securityActions.map((action, index) => (
-          <TouchableOpacity 
-            key={index}
-            style={styles.actionItem}
-            onPress={action.onPress}
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
           >
-            <View style={styles.actionLeft}>
-              <MaterialCommunityIcons 
-                name={action.icon} 
-                size={20} 
-                color="#6B7280" 
-              />
-              <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>{action.title}</Text>
-                <Text style={styles.actionDescription}>{action.description}</Text>
-              </View>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
+            <Feather name="arrow-left" size={24} color="#1D1D1F" />
           </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Security Status */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Security Status</Text>
-        
-        <View style={styles.statusCard}>
-          <View style={styles.statusHeader}>
-            <MaterialCommunityIcons name="shield-check" size={24} color="#10B981" />
-            <Text style={styles.statusTitle}>Account Secure</Text>
-          </View>
-          <Text style={styles.statusDescription}>
-            Your account security is up to date. Keep your settings current to maintain protection.
-          </Text>
+          <Text style={styles.headerTitle}>Security Settings</Text>
+          <View style={styles.placeholderButton} />
         </View>
-      </View>
-    </ScrollView>
+
+        {/* Security Options Card */}
+        <View style={styles.settingsCard}>
+          <View style={styles.cardHeader}>
+            <Feather name="shield" size={20} color="#01B97F" />
+            <Text style={styles.cardTitle}>Security Options</Text>
+          </View>
+
+          {securityOptions.map((option) => (
+            <View key={option.key} style={styles.settingItem}>
+              <View style={styles.settingLeft}>
+                <Feather
+                  name={option.icon}
+                  size={20}
+                  color="#01B97F"
+                />
+                <View style={styles.settingContent}>
+                  <Text style={styles.settingTitle}>{option.title}</Text>
+                  <Text style={styles.settingDescription}>{option.description}</Text>
+                </View>
+              </View>
+              <Switch
+                value={securitySettings[option.key]}
+                onValueChange={() => toggleSetting(option.key)}
+                trackColor={{ false: '#E5E7EB', true: '#01B97F' }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor="#E5E7EB"
+              />
+            </View>
+          ))}
+        </View>
+
+        {/* Security Actions Card */}
+        <View style={styles.actionsCard}>
+          <View style={styles.cardHeader}>
+            <Feather name="settings" size={20} color="#01B97F" />
+            <Text style={styles.cardTitle}>Security Actions</Text>
+          </View>
+
+          {securityActions.map((action, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.actionItem}
+              onPress={action.onPress}
+            >
+              <View style={styles.actionLeft}>
+                <Feather
+                  name={action.icon}
+                  size={20}
+                  color="#01B97F"
+                />
+                <View style={styles.actionContent}>
+                  <Text style={styles.actionTitle}>{action.title}</Text>
+                  <Text style={styles.actionDescription}>{action.description}</Text>
+                </View>
+              </View>
+              <Feather name="chevron-right" size={20} color="#A8AAB0" />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Security Status Card */}
+        <View style={styles.statusCard}>
+          <View style={styles.cardHeader}>
+            <Feather name="check-circle" size={20} color="#01B97F" />
+            <Text style={styles.cardTitle}>Security Status</Text>
+          </View>
+
+          <View style={styles.statusContent}>
+            <View style={styles.statusIcon}>
+              <Feather name="shield" size={32} color="#01B97F" />
+            </View>
+            <Text style={styles.statusTitle}>Account Secure</Text>
+            <Text style={styles.statusDescription}>
+              Your account security is up to date. Keep your settings current to maintain protection.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.bottomSpacing} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7F7F7',
+  },
+  scrollContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
     paddingTop: 60,
   },
-  header: {
+  headerContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingBottom: 32,
+    alignItems: 'center',
+    marginBottom: 24,
   },
   backButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
+  headerTitle: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: '#1D1D1F',
     flex: 1,
     textAlign: 'center',
-    marginHorizontal: 16,
   },
-  placeholder: {
+  placeholderButton: {
     width: 40,
+    height: 40,
   },
-  section: {
-    marginHorizontal: 24,
-    marginBottom: 32,
+  settingsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  sectionTitle: {
+  actionsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  statusCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
+  },
+  cardTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1D1D1F',
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    paddingHorizontal: 0,
+    marginBottom: 16,
   },
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 16,
   },
   settingContent: {
-    marginLeft: 12,
     flex: 1,
   },
   settingTitle: {
     fontSize: 16,
-    color: '#111827',
-    fontWeight: '500',
+    fontFamily: 'Poppins-Medium',
+    color: '#1D1D1F',
     marginBottom: 2,
   },
   settingDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
+    color: '#A8AAB0',
   },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    paddingHorizontal: 0,
+    marginBottom: 16,
   },
   actionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 16,
   },
   actionContent: {
-    marginLeft: 12,
     flex: 1,
   },
   actionTitle: {
     fontSize: 16,
-    color: '#111827',
-    fontWeight: '500',
+    fontFamily: 'Poppins-Medium',
+    color: '#1D1D1F',
     marginBottom: 2,
   },
   actionDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
+    color: '#A8AAB0',
   },
-  statusCard: {
-    backgroundColor: '#F0FDF4',
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-  },
-  statusHeader: {
-    flexDirection: 'row',
+  statusContent: {
     alignItems: 'center',
-    marginBottom: 12,
+    textAlign: 'center',
+  },
+  statusIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F0FDF4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   statusTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#065F46',
-    marginLeft: 12,
+    fontSize: 20,
+    fontFamily: 'Poppins-Bold',
+    color: '#1D1D1F',
+    marginBottom: 12,
+    textAlign: 'center',
   },
   statusDescription: {
-    fontSize: 14,
-    color: '#047857',
-    lineHeight: 20,
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#A8AAB0',
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  bottomSpacing: {
+    height: 40,
   },
 });

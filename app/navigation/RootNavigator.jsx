@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import React from "react";
+import { View } from "react-native";
 import DashboardStack from "./DashboardStack";
 import ExtensionStack from "./ExtensionStack";
 import GroupStack from "./GroupStack";
@@ -17,23 +17,23 @@ export default function RootNavigator() {
         tabBarShowLabel: true,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#F3F4F6',
-          height: 70,
-          paddingBottom: 10,
-          paddingTop: 8,
+          borderTopWidth: 0,
+          height: 85,
+          paddingBottom: 20,
+          paddingTop: 12,
+          paddingHorizontal: 10,
           shadowColor: '#000',
           shadowOffset: {
             width: 0,
-            height: -2,
+            height: -4,
           },
-          shadowOpacity: 0.05,
-          shadowRadius: 8,
-          elevation: 8,
+          shadowOpacity: 0.1,
+          shadowRadius: 12,
+          elevation: 15,
         },
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({ focused }) => {
           let iconName;
-          
+
           switch (route.name) {
             case "Home":
               iconName = "home";
@@ -54,15 +54,43 @@ export default function RootNavigator() {
               iconName = "circle";
           }
 
-          return <Feather name={iconName} size={24} color={color} />;
+          const iconColor = focused ? '#02B97F' : '#9CA3AF';
+          const iconSize = focused ? 26 : 24;
+
+          return (
+            <View style={{
+              backgroundColor: focused ? '#e8f5f0' : 'transparent',
+              borderRadius: 16,
+              paddingHorizontal: 18,
+              paddingVertical: 10,
+              minWidth: 55,
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: focused ? '#02B97F' : 'transparent',
+              shadowOffset: {
+                width: 0,
+                height: 2,
+              },
+              shadowOpacity: focused ? 0.15 : 0,
+              shadowRadius: 4,
+              elevation: focused ? 3 : 0,
+            }}>
+              <Feather name={iconName} size={iconSize} color={iconColor} />
+            </View>
+          );
         },
-        tabBarActiveTintColor: '#374151',
+        tabBarActiveTintColor: '#02B97F',
         tabBarInactiveTintColor: '#9CA3AF',
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontFamily: 'Poppins-Medium',
-          marginTop: 4,
+          fontSize: 11,
+          fontFamily: 'Poppins-SemiBold',
+          marginTop: 6,
+          letterSpacing: 0.3,
         },
+        tabBarItemStyle: {
+          paddingVertical: 4,
+        },
+        tabBarHideOnKeyboard: true,
         headerShown: false,
       })}
     >
