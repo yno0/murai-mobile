@@ -526,6 +526,42 @@ export default function ExtensionSettings({ onClose }) {
                 </TouchableOpacity>
               ))}
             </View>
+
+            {/* Flag Preview */}
+            <Text style={styles.cardLabel}>Preview</Text>
+            <View style={styles.previewContainer}>
+              <Text style={styles.previewLabel}>How flagged content will appear:</Text>
+              <View style={styles.previewContent}>
+                <Text style={styles.previewText}>This is some sample text with </Text>
+                {flagStyle === 'blur' ? (
+                  <View style={[styles.previewFlag, styles.previewBlur, { backgroundColor: flagColor }]}>
+                    <Text style={styles.previewFlagText}>inappropriate</Text>
+                  </View>
+                ) : flagStyle === 'asterisk' ? (
+                  <Text style={[styles.previewAsterisk, { color: flagColor }]}>***********</Text>
+                ) : (
+                  <View style={[styles.previewHighlight, { backgroundColor: flagColor + '30' }]}>
+                    <Text style={[styles.previewHighlightText, { color: flagColor }]}>inappropriate</Text>
+                  </View>
+                )}
+                <Text style={styles.previewText}> content in it.</Text>
+              </View>
+              {showHighlight && flagStyle !== 'highlight' && (
+                <View style={styles.previewContent}>
+                  <Text style={styles.previewText}>With highlight enabled: </Text>
+                  <View style={[styles.previewHighlight, { backgroundColor: flagColor + '30' }]}>
+                    {flagStyle === 'blur' ? (
+                      <View style={[styles.previewFlag, styles.previewBlur, { backgroundColor: flagColor }]}>
+                        <Text style={styles.previewFlagText}>inappropriate</Text>
+                      </View>
+                    ) : (
+                      <Text style={[styles.previewAsterisk, { color: flagColor }]}>***********</Text>
+                    )}
+                  </View>
+                  <Text style={styles.previewText}> content</Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -541,26 +577,62 @@ export default function ExtensionSettings({ onClose }) {
         onRequestClose={() => setConfirmVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalIconCircle}>
-              <MaterialCommunityIcons name="check-circle" size={48} color="#36DCA6" />
+          <View style={styles.saveModalContent}>
+            <View style={styles.saveModalIconContainer}>
+              <MaterialCommunityIcons name="content-save" size={32} color="#36DCA6" />
             </View>
-            <Text style={styles.modalTitleCentered}>Save Changes?</Text>
-            <Text style={styles.modalDescCentered}>Are you sure you want to save your changes to extension settings?</Text>
-            <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={[styles.modalBtn, styles.modalBtnCancel]} onPress={() => setConfirmVisible(false)}>
-                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+            <Text style={styles.saveModalTitle}>Save Changes?</Text>
+            <Text style={styles.saveModalDescription}>
+              Your extension settings will be updated and applied immediately.
+            </Text>
+            <View style={styles.saveModalButtons}>
+              <TouchableOpacity
+                style={[styles.saveModalButton, styles.saveModalCancelButton]}
+                onPress={() => setConfirmVisible(false)}
+              >
+                <Text style={styles.saveModalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, styles.modalBtnDiscard]} onPress={() => { setConfirmVisible(false); onClose(); }}>
-                <Text style={styles.modalBtnDiscardText}>Discard</Text>
+              <TouchableOpacity
+                style={[styles.saveModalButton, styles.saveModalDiscardButton]}
+                onPress={() => { setConfirmVisible(false); onClose(); }}
+              >
+                <Text style={styles.saveModalDiscardText}>Discard</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, styles.modalBtnSave]} onPress={handleSave}>
-                <Text style={styles.modalBtnSaveText}>Save</Text>
+              <TouchableOpacity
+                style={[styles.saveModalButton, styles.saveModalSaveButton]}
+                onPress={handleSave}
+                disabled={saving}
+              >
+                {saving ? (
+                  <MaterialCommunityIcons name="loading" size={16} color="#ffffff" />
+                ) : (
+                  <Text style={styles.saveModalSaveText}>Save</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
+      {/* Success Modal */}
+      <Modal
+        visible={saving}
+        transparent
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModalContent}>
+            <View style={styles.successModalIconContainer}>
+              <MaterialCommunityIcons name="check-circle" size={40} color="#10b981" />
+            </View>
+            <Text style={styles.successModalTitle}>Saving Settings...</Text>
+            <Text style={styles.successModalDescription}>
+              Please wait while we update your preferences.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         visible={deleteConfirm.show}
         transparent
@@ -568,15 +640,26 @@ export default function ExtensionSettings({ onClose }) {
         onRequestClose={() => setDeleteConfirm({ show: false, item: null, type: null })}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Remove from Whitelist?</Text>
-            <Text style={styles.modalDesc}>Are you sure you want to remove &quot;{deleteConfirm.item}&quot; from the whitelist?</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#f3f4f6' }]} onPress={() => setDeleteConfirm({ show: false, item: null, type: null })}>
-                <Text style={{ color: '#374151' }}>Cancel</Text>
+          <View style={styles.deleteModalContent}>
+            <View style={styles.deleteModalIconContainer}>
+              <MaterialCommunityIcons name="delete" size={32} color="#ef4444" />
+            </View>
+            <Text style={styles.deleteModalTitle}>Remove from Whitelist?</Text>
+            <Text style={styles.deleteModalDescription}>
+              Are you sure you want to remove "{deleteConfirm.item}" from the whitelist?
+            </Text>
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteModalCancelButton]}
+                onPress={() => setDeleteConfirm({ show: false, item: null, type: null })}
+              >
+                <Text style={styles.deleteModalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#374151' }]} onPress={handleRemoveConfirmed}>
-                <Text style={{ color: '#fff' }}>Remove</Text>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteModalRemoveButton]}
+                onPress={handleRemoveConfirmed}
+              >
+                <Text style={styles.deleteModalRemoveText}>Remove</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -623,13 +706,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontFamily: 'Poppins-Bold',
+    fontWeight: '500',
     color: '#374151',
     letterSpacing: 0.2,
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
+    paddingBottom: 100, // Add padding to prevent overlap with save button
   },
   section: {
     marginTop: 32,
@@ -913,24 +997,24 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     position: 'absolute',
-    bottom: 32,
-    left: 24,
-    right: 24,
+    bottom: 24,
+    left: 20,
+    right: 20,
     backgroundColor: '#36DCA6',
-    paddingVertical: 18,
-    borderRadius: 14,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    zIndex: 1,
+    zIndex: 10,
     shadowColor: '#36DCA6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
   },
   saveButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    fontWeight: '500',
     letterSpacing: 0.5,
   },
   modalOverlay: {
@@ -951,63 +1035,175 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  modalIconCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#e0f2fe', // Light blue background
-    justifyContent: 'center',
+  saveModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 32,
+    marginHorizontal: 24,
     alignItems: 'center',
-    marginBottom: 16,
+    maxWidth: 400,
+    width: '90%',
   },
-  modalTitleCentered: {
+  saveModalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#f0fdf4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  saveModalTitle: {
     fontSize: 20,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#374151',
-    marginBottom: 8,
+    fontWeight: '500',
+    color: '#111827',
+    marginBottom: 12,
     textAlign: 'center',
   },
-  modalDescCentered: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
+  saveModalDescription: {
+    fontSize: 16,
+    fontWeight: '400',
     color: '#6b7280',
     textAlign: 'center',
-    marginBottom: 24,
+    lineHeight: 22,
+    marginBottom: 28,
   },
-  modalBtnRow: {
+  saveModalButtons: {
     flexDirection: 'row',
     gap: 12,
     width: '100%',
   },
-  modalBtn: {
+  saveModalButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
   },
-  modalBtnCancel: {
-    backgroundColor: '#f3f4f6',
+  saveModalCancelButton: {
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  modalBtnDiscard: {
-    backgroundColor: '#374151',
+  saveModalDiscardButton: {
+    backgroundColor: '#ef4444',
   },
-  modalBtnSave: {
+  saveModalSaveButton: {
     backgroundColor: '#36DCA6',
   },
-  modalBtnCancelText: {
+  saveModalCancelText: {
     color: '#374151',
     fontSize: 14,
-    fontFamily: 'Poppins-Medium',
+    fontWeight: '500',
   },
-  modalBtnDiscardText: {
-    color: '#fff',
+  saveModalDiscardText: {
+    color: '#ffffff',
     fontSize: 14,
-    fontFamily: 'Poppins-Medium',
+    fontWeight: '500',
   },
-  modalBtnSaveText: {
-    color: '#fff',
+  saveModalSaveText: {
+    color: '#ffffff',
     fontSize: 14,
-    fontFamily: 'Poppins-Medium',
+    fontWeight: '500',
+  },
+  successModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 32,
+    marginHorizontal: 24,
+    alignItems: 'center',
+    maxWidth: 320,
+    width: '80%',
+  },
+  successModalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#f0fdf4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  successModalTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#111827',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  successModalDescription: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  deleteModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 32,
+    marginHorizontal: 24,
+    alignItems: 'center',
+    maxWidth: 400,
+    width: '90%',
+  },
+  deleteModalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#fef2f2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  deleteModalTitle: {
+    fontSize: 20,
+    fontWeight: '500',
+    color: '#111827',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  deleteModalDescription: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 28,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  deleteModalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  deleteModalCancelButton: {
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  deleteModalRemoveButton: {
+    backgroundColor: '#ef4444',
+  },
+  deleteModalCancelText: {
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  deleteModalRemoveText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
   },
   inputError: {
     borderColor: '#ef4444',
@@ -1061,5 +1257,63 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontFamily: 'Poppins-Medium',
+  },
+  previewContainer: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginTop: 8,
+  },
+  previewLabel: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  previewContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  previewText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#374151',
+    lineHeight: 24,
+  },
+  previewFlag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginHorizontal: 2,
+  },
+  previewBlur: {
+    opacity: 0.7,
+  },
+  previewFlagText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  previewAsterisk: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginHorizontal: 2,
+  },
+  previewHighlight: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginHorizontal: 2,
+  },
+  previewHighlightText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
