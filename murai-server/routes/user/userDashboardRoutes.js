@@ -23,7 +23,7 @@ function authenticateToken(req, res, next) {
 router.get('/overview', authenticateToken, async (req, res) => {
   try {
     const { timeRange = 'today' } = req.query;
-    const userId = req.user.id; // Get current user ID from JWT
+    const userId = new mongoose.Types.ObjectId(req.user.id); // Get current user ID from JWT
     let dateFilter = { userId }; // Filter by current user
     
     const now = new Date();
@@ -86,24 +86,36 @@ router.get('/overview', authenticateToken, async (req, res) => {
       })
     ]);
 
-    const protectionEffectiveness = avgAccuracy.length > 0 ? avgAccuracy[0].avgAccuracy : 95;
+    const protectionEffectiveness = avgAccuracy.length > 0 ? avgAccuracy[0].avgAccuracy * 100 : 0;
     const detectionChange = previousDetections > 0 ? ((userDetections - previousDetections) / previousDetections * 100) : 0;
 
-    // Multiply detections by 100
-    const scaledDetections = userDetections * 100;
+    // Calculate previous websites for comparison
+    const previousWebsites = await DetectedWord.distinct('url', {
+      userId,
+      createdAt: {
+        $gte: new Date(now.getTime() - (
+          timeRange === 'today' ? 14 * 24 * 60 * 60 * 1000 : // Previous 2 weeks for comparison
+          timeRange === 'month' ? 365 * 24 * 60 * 60 * 1000 : // Previous year for comparison
+          2 * 365 * 24 * 60 * 60 * 1000 // Previous 2 years for comparison
+        )),
+        $lt: dateFilter.createdAt?.$gte || new Date(0)
+      }
+    }).then(urls => urls.length);
+
+    const websiteChange = previousWebsites > 0 ? userWebsites - previousWebsites : userWebsites;
 
     res.json({
       harmfulContentDetected: {
-        value: scaledDetections >= 1000 ? `${(scaledDetections / 1000).toFixed(1)}k` : scaledDetections.toString(),
+        value: userDetections.toString(),
         change: `${detectionChange > 0 ? '+' : ''}${detectionChange.toFixed(0)}%`
       },
       websitesMonitored: {
-        value: userWebsites >= 1000 ? `${(userWebsites / 1000).toFixed(1)}k` : `+${userWebsites}`,
-        change: `+${Math.floor(Math.random() * 5) + 1}`
+        value: userWebsites.toString(),
+        change: `${websiteChange > 0 ? '+' : ''}${websiteChange}`
       },
       protectionEffectiveness: {
         value: `${protectionEffectiveness.toFixed(1)}%`,
-        change: `+${Math.floor(Math.random() * 3) + 1}%`
+        change: protectionEffectiveness > 0 ? `+${(protectionEffectiveness - 95).toFixed(1)}%` : '0%'
       }
     });
   } catch (err) {
@@ -116,7 +128,7 @@ router.get('/overview', authenticateToken, async (req, res) => {
 router.get('/activity-chart', authenticateToken, async (req, res) => {
   try {
     const { timeRange = 'day', year } = req.query;
-    const userId = req.user.id; // Get current user ID from JWT
+    const userId = new mongoose.Types.ObjectId(req.user.id); // Get current user ID from JWT
 
     const chartData = [];
     const labels = [];
@@ -138,7 +150,7 @@ router.get('/activity-chart', authenticateToken, async (req, res) => {
           createdAt: { $gte: startHour, $lt: endHour }
         });
 
-        chartData.push({ protected: detections * 100, monitored: 0 });
+        chartData.push({ protected: detections, monitored: 0 });
         labels.push(`${hour.toString().padStart(2, '0')}:00`);
       }
     } else if (timeRange.toLowerCase() === 'week') {
@@ -158,7 +170,7 @@ router.get('/activity-chart', authenticateToken, async (req, res) => {
           createdAt: { $gte: date, $lt: nextDate }
         });
 
-        chartData.push({ protected: detections * 100, monitored: 0 });
+        chartData.push({ protected: detections, monitored: 0 });
         labels.push(date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
       }
     } else if (timeRange.toLowerCase() === 'month') {
@@ -176,7 +188,7 @@ router.get('/activity-chart', authenticateToken, async (req, res) => {
           createdAt: { $gte: date, $lt: nextMonth }
         });
 
-        chartData.push({ protected: detections * 100, monitored: 0 });
+        chartData.push({ protected: detections, monitored: 0 });
         labels.push(monthNames[date.getMonth()]);
       }
     } else if (timeRange.toLowerCase() === 'year') {
@@ -205,7 +217,7 @@ router.get('/activity-chart', authenticateToken, async (req, res) => {
             createdAt: { $gte: startDate, $lt: endDate }
           });
 
-          chartData.push({ protected: detections * 100, monitored: 0 });
+          chartData.push({ protected: detections, monitored: 0 });
           labels.push(yearValue.toString());
         }
       }
@@ -234,7 +246,7 @@ router.get('/activity-chart', authenticateToken, async (req, res) => {
 router.get('/user-activity', authenticateToken, async (req, res) => {
   try {
     const { timeRange = 'today' } = req.query;
-    const userId = req.user.id; // Get current user ID from JWT
+    const userId = new mongoose.Types.ObjectId(req.user.id); // Get current user ID from JWT
     let dateFilter = { userId }; // Filter by current user
 
     const now = new Date();
@@ -426,5 +438,287 @@ function determineSeverityFromSentiment(sentimentScore) {
   if (sentimentScore < -0.2) return 'medium';
   return 'low';
 }
+
+// GET /api/user-dashboard/threat-distribution - Get threat distribution with URL deduplication
+router.get('/threat-distribution', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { timeRange = 'week' } = req.query;
+
+    let dateFilter = { userId: new mongoose.Types.ObjectId(userId) };
+
+    const now = new Date();
+    switch (timeRange.toLowerCase()) {
+      case 'today':
+        dateFilter.createdAt = {
+          $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        };
+        break;
+      case 'week':
+        dateFilter.createdAt = {
+          $gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        };
+        break;
+      case 'month':
+        dateFilter.createdAt = {
+          $gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        };
+        break;
+      case 'year':
+        dateFilter.createdAt = {
+          $gte: new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+        };
+        break;
+    }
+
+    // Aggregate threats by URL to ensure each URL is counted only once
+    const threatsByUrl = await DetectedWord.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: '$url',
+          maxSeverity: { $max: '$severity' },
+          avgSentiment: { $avg: '$sentimentScore' },
+          detectionCount: { $sum: 1 },
+          languages: { $addToSet: '$language' },
+          patterns: { $addToSet: '$patternType' },
+          siteTypes: { $addToSet: '$siteType' },
+          lastDetection: { $max: '$createdAt' }
+        }
+      }
+    ]);
+
+    // Process threat distribution counts
+    const severityCount = { low: 0, medium: 0, high: 0 };
+    const languageCount = {};
+    const patternCount = {};
+    const siteTypeCount = {};
+
+    threatsByUrl.forEach(threat => {
+      // Determine final severity (use max severity or calculate from sentiment)
+      let severity = threat.maxSeverity;
+      if (!severity) {
+        if (threat.avgSentiment < -0.5) severity = 'high';
+        else if (threat.avgSentiment < -0.2) severity = 'medium';
+        else severity = 'low';
+      }
+
+      // Count unique threats by severity
+      severityCount[severity] = (severityCount[severity] || 0) + 1;
+
+      // Count unique threats by language (take first language if multiple)
+      const language = threat.languages[0] || 'Unknown';
+      languageCount[language] = (languageCount[language] || 0) + 1;
+
+      // Count unique threats by pattern (take first pattern if multiple)
+      const pattern = threat.patterns[0] || 'General';
+      patternCount[pattern] = (patternCount[pattern] || 0) + 1;
+
+      // Count unique threats by site type (take first site type if multiple)
+      const siteType = threat.siteTypes[0] || 'Unknown';
+      siteTypeCount[siteType] = (siteTypeCount[siteType] || 0) + 1;
+    });
+
+    res.json({
+      severityDistribution: severityCount,
+      languageDistribution: languageCount,
+      patternDistribution: patternCount,
+      siteTypeDistribution: siteTypeCount,
+      totalUniqueThreats: threatsByUrl.length,
+      totalDetections: threatsByUrl.reduce((sum, threat) => sum + threat.detectionCount, 0)
+    });
+  } catch (err) {
+    console.error('Threat distribution error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/user-dashboard/websites - Get website analytics for current user
+router.get('/websites', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { timeRange = 'week' } = req.query;
+
+    let dateFilter = { userId: new mongoose.Types.ObjectId(userId) };
+
+    const now = new Date();
+    switch (timeRange.toLowerCase()) {
+      case 'today':
+        dateFilter.createdAt = {
+          $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        };
+        break;
+      case 'week':
+        dateFilter.createdAt = {
+          $gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        };
+        break;
+      case 'month':
+        dateFilter.createdAt = {
+          $gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        };
+        break;
+      case 'year':
+        dateFilter.createdAt = {
+          $gte: new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+        };
+        break;
+    }
+
+    // Get website analytics aggregated by URL
+    const websiteStats = await DetectedWord.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: '$url',
+          detectionCount: { $sum: 1 },
+          avgSentiment: { $avg: '$sentimentScore' },
+          avgAccuracy: { $avg: '$accuracy' },
+          lastDetection: { $max: '$createdAt' },
+          patterns: { $addToSet: '$patternType' },
+          severities: { $push: '$severity' }
+        }
+      },
+      { $sort: { detectionCount: -1 } },
+      { $limit: 20 }
+    ]);
+
+    // Calculate previous period data for comparison
+    let previousDateFilter = { userId: new mongoose.Types.ObjectId(userId) };
+    const previousPeriodStart = new Date();
+
+    switch (timeRange.toLowerCase()) {
+      case 'today':
+        // Compare with yesterday
+        previousPeriodStart.setDate(previousPeriodStart.getDate() - 1);
+        previousDateFilter.createdAt = {
+          $gte: new Date(previousPeriodStart.getFullYear(), previousPeriodStart.getMonth(), previousPeriodStart.getDate()),
+          $lt: new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        };
+        break;
+      case 'week':
+        // Compare with previous week
+        previousDateFilter.createdAt = {
+          $gte: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
+          $lt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        };
+        break;
+      case 'month':
+        // Compare with previous month
+        previousDateFilter.createdAt = {
+          $gte: new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000),
+          $lt: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        };
+        break;
+      case 'year':
+        // Compare with previous year
+        previousDateFilter.createdAt = {
+          $gte: new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000),
+          $lt: new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+        };
+        break;
+    }
+
+    // Get previous period data for comparison
+    const previousWebsiteStats = await DetectedWord.aggregate([
+      { $match: previousDateFilter },
+      {
+        $group: {
+          _id: '$url',
+          detectionCount: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Create a map for quick lookup of previous data
+    const previousDataMap = {};
+    previousWebsiteStats.forEach(site => {
+      previousDataMap[site._id] = site.detectionCount;
+    });
+
+    // Process website data with accurate change calculations
+    const topWebsites = websiteStats.map(site => {
+      const domain = site._id.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+
+      // Determine risk level based on sentiment and detection count
+      let riskLevel = 'low';
+      if (site.avgSentiment < -0.5 || site.detectionCount > 10) {
+        riskLevel = 'high';
+      } else if (site.avgSentiment < -0.2 || site.detectionCount > 5) {
+        riskLevel = 'medium';
+      }
+
+      // Calculate accurate change from previous period
+      const previousCount = previousDataMap[site._id] || 0;
+      const change = site.detectionCount - previousCount;
+      const changeText = change > 0 ? `+${change}` : change < 0 ? `${change}` : '0';
+
+      return {
+        domain,
+        url: site._id,
+        detectionCount: site.detectionCount,
+        riskLevel,
+        accuracy: Math.round(site.avgAccuracy * 100),
+        lastDetection: site.lastDetection,
+        patterns: site.patterns.filter(p => p), // Remove null/undefined patterns
+        threats: site.detectionCount,
+        change: changeText
+      };
+    });
+
+    // Get overall statistics for current and previous periods
+    const [
+      totalWebsites,
+      totalDetections,
+      avgAccuracy,
+      previousTotalWebsites,
+      previousTotalDetections,
+      previousAvgAccuracy
+    ] = await Promise.all([
+      DetectedWord.distinct('url', dateFilter).then(urls => urls.length),
+      DetectedWord.countDocuments(dateFilter),
+      DetectedWord.aggregate([
+        { $match: dateFilter },
+        { $group: { _id: null, avgAccuracy: { $avg: '$accuracy' } } }
+      ]),
+      DetectedWord.distinct('url', previousDateFilter).then(urls => urls.length),
+      DetectedWord.countDocuments(previousDateFilter),
+      DetectedWord.aggregate([
+        { $match: previousDateFilter },
+        { $group: { _id: null, avgAccuracy: { $avg: '$accuracy' } } }
+      ])
+    ]);
+
+    // Calculate monitoring stats with accurate changes
+    const highRiskSites = topWebsites.filter(site => site.riskLevel === 'high').length;
+    const activeMonitoring = totalWebsites;
+    const aiAccuracy = avgAccuracy.length > 0 ? avgAccuracy[0].avgAccuracy * 100 : 0;
+
+    // Calculate changes from previous period
+    const websiteChange = totalWebsites - previousTotalWebsites;
+    const detectionChange = totalDetections - previousTotalDetections;
+    const previousAiAccuracy = previousAvgAccuracy.length > 0 ? previousAvgAccuracy[0].avgAccuracy * 100 : 0;
+    const accuracyChange = aiAccuracy - previousAiAccuracy;
+
+    res.json({
+      topWebsites,
+      totalWebsites,
+      totalDetections,
+      monitoringStats: {
+        activeMonitoring,
+        highRiskSites,
+        aiAccuracy: Math.round(aiAccuracy * 10) / 10, // Round to 1 decimal place
+        changes: {
+          websites: websiteChange > 0 ? `+${websiteChange}` : websiteChange < 0 ? `${websiteChange}` : '0',
+          detections: detectionChange > 0 ? `+${detectionChange}` : detectionChange < 0 ? `${detectionChange}` : '0',
+          accuracy: accuracyChange > 0 ? `+${accuracyChange.toFixed(1)}%` : accuracyChange < 0 ? `${accuracyChange.toFixed(1)}%` : '0%'
+        }
+      }
+    });
+  } catch (err) {
+    console.error('User website analytics error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 export default router;

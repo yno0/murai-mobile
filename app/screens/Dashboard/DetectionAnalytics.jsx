@@ -74,57 +74,80 @@ function DetectionAnalyticsScreen({ navigation }) {
                              timeRangeParam === 'Last Year' ? 'year' :
                              timeRangeParam.toLowerCase();
 
-      const [flaggedWordsRes, detectedWordsRes] = await Promise.all([
-        // Get flagged words data
-        api.get(`/dashboard/flagged-words?timeRange=${mappedTimeRange}`).catch(() => ({
-          data: { topWords: [], recentDetections: [], totalCount: 0, summary: { avgAccuracy: 95, avgResponseTime: 120 } }
+      const [overviewRes, detectedWordsRes, threatDistributionRes] = await Promise.all([
+        // Get overview data for summary statistics
+        api.get(`/user-dashboard/overview?timeRange=${mappedTimeRange}`).catch(() => ({
+          data: { harmfulContentDetected: { value: '0' }, websitesMonitored: { value: '0' }, protectionEffectiveness: { value: '0%' } }
         })),
         // Get detected words with language and pattern information
         api.get(`/user-dashboard/detected-words?timeRange=${mappedTimeRange}&includeLanguage=true&includePatterns=true`).catch(() => ({
           data: { detectedWords: [], totalCount: 0 }
+        })),
+        // Get threat distribution with URL deduplication
+        api.get(`/user-dashboard/threat-distribution?timeRange=${mappedTimeRange}`).catch(() => ({
+          data: {
+            severityDistribution: { low: 0, medium: 0, high: 0 },
+            languageDistribution: {},
+            patternDistribution: {},
+            siteTypeDistribution: {},
+            totalUniqueThreats: 0,
+            totalDetections: 0
+          }
         }))
       ]);
 
-      const flaggedWords = flaggedWordsRes.data;
+      const overview = overviewRes.data;
       const detectedWords = detectedWordsRes.data.detectedWords || [];
+      const totalCount = detectedWordsRes.data.totalCount || 0;
+      const threatDistribution = threatDistributionRes.data;
 
-      // Process language distribution
-      const languageCount = {};
-      const patternCount = {};
-      const severityCount = { low: 0, medium: 0, high: 0 };
-      const siteTypeCount = {};
+      // Use server-calculated threat distribution (already deduplicated by URL)
+      const languageCount = threatDistribution.languageDistribution || {};
+      const patternCount = threatDistribution.patternDistribution || {};
+      const severityCount = threatDistribution.severityDistribution || { low: 0, medium: 0, high: 0 };
+      const siteTypeCount = threatDistribution.siteTypeDistribution || {};
 
-      detectedWords.forEach(word => {
-        // Language processing
-        const lang = detectLanguage(word.context || word.word || '');
-        languageCount[lang] = (languageCount[lang] || 0) + 1;
+      // Calculate summary statistics from detected words
+      const avgAccuracy = detectedWords.length > 0
+        ? detectedWords.reduce((sum, word) => sum + (word.accuracy || 0), 0) / detectedWords.length * 100
+        : 0;
+      const avgResponseTime = detectedWords.length > 0
+        ? detectedWords.reduce((sum, word) => sum + (word.responseTime || 0), 0) / detectedWords.length
+        : 0;
 
-        // Pattern processing
-        const pattern = word.patternType || 'General';
-        patternCount[pattern] = (patternCount[pattern] || 0) + 1;
+      // Create summary object compatible with existing UI
+      const summary = {
+        totalCount: totalCount,
+        uniqueThreats: threatDistribution.totalUniqueThreats || 0,
+        avgAccuracy: avgAccuracy,
+        avgResponseTime: avgResponseTime,
+        topWords: Object.entries(patternCount)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 10)
+          .map(([word, count]) => ({ word, count })),
+        recentDetections: detectedWords.slice(0, 10)
+      };
 
-        // Severity processing
-        const severity = word.severity || determineSeverity(word.sentimentScore);
-        severityCount[severity] = (severityCount[severity] || 0) + 1;
+      // Convert to chart format with iterative scaling
+      const languageDistribution = createPieChartData(languageCount, 'language');
+      const trendPatterns = createBarChartData(patternCount, 'pattern');
+      const severityAnalysis = createPieChartData(severityCount, 'severity');
+      const siteTypeAnalysis = createPieChartData(siteTypeCount, 'sitetype');
 
-        // Site type processing
-        const siteType = word.siteType || 'Unknown';
-        siteTypeCount[siteType] = (siteTypeCount[siteType] || 0) + 1;
-      });
-
-      // Convert to chart format
-      const languageDistribution = createPieChartData(languageCount, ['#02B97F', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444']);
-      const trendPatterns = createBarChartData(patternCount);
-      const severityAnalysis = createPieChartData(severityCount, ['#10b981', '#f59e0b', '#ef4444']);
-      const siteTypeAnalysis = createPieChartData(siteTypeCount, ['#02B97F', '#3b82f6', '#f59e0b', '#8b5cf6']);
+      // Debug logging
+      console.log('Final Chart Data:');
+      console.log('Language Distribution:', languageDistribution);
+      console.log('Trend Patterns:', trendPatterns);
+      console.log('Severity Analysis:', severityAnalysis);
+      console.log('Site Type Analysis:', siteTypeAnalysis);
 
       setDetectionData({
-        flaggedWords,
+        flaggedWords: { ...summary },
         languageDistribution,
         trendPatterns,
         severityAnalysis,
         siteTypeAnalysis,
-        totalDetections: detectedWords.length,
+        totalDetections: totalCount,
         detectedWords
       });
     } catch (err) {
@@ -132,7 +155,7 @@ function DetectionAnalyticsScreen({ navigation }) {
       setError('Failed to load detection analytics. Please check server connection.');
       // Set default data on error
       setDetectionData({
-        flaggedWords: { topWords: [], recentDetections: [], totalCount: 0, summary: { avgAccuracy: 95, avgResponseTime: 120 } },
+        flaggedWords: { topWords: [], recentDetections: [], totalCount: 0, avgAccuracy: 0, avgResponseTime: 0 },
         languageDistribution: [],
         trendPatterns: { labels: [], datasets: [{ data: [] }] },
         severityAnalysis: [],
@@ -171,33 +194,96 @@ function DetectionAnalyticsScreen({ navigation }) {
     return 'low';
   };
 
-  // Create pie chart data helper
-  const createPieChartData = (dataObj, colors) => {
-    return Object.entries(dataObj)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 6)
-      .map(([name, count], index) => ({
-        name,
-        population: count,
-        color: colors[index] || '#6b7280',
-        legendFontColor: '#374151',
-        legendFontSize: 12,
-      }));
+  // Dynamic color generation based on data intensity
+  const generateIterativeColors = (dataCount, baseHue = 180, type = 'pie') => {
+    const colors = [];
+    for (let i = 0; i < dataCount; i++) {
+      if (type === 'severity') {
+        // Severity-specific color progression: green -> yellow -> red
+        const intensity = i / Math.max(dataCount - 1, 1);
+        const hue = 120 - (intensity * 120); // 120 (green) to 0 (red)
+        const saturation = 70 + (intensity * 30); // 70% to 100%
+        const lightness = 50 + (intensity * 10); // 50% to 60%
+        colors.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
+      } else if (type === 'language') {
+        // Language-specific color progression: cool to warm
+        const hue = (baseHue + (i * 60)) % 360; // Spread across color wheel
+        const saturation = 65 + (i * 5); // Gradually increase saturation
+        const lightness = 55 - (i * 3); // Gradually decrease lightness
+        colors.push(`hsl(${hue}, ${Math.min(saturation, 85)}%, ${Math.max(lightness, 35)}%)`);
+      } else {
+        // Default iterative progression
+        const hue = (baseHue + (i * 45)) % 360;
+        const saturation = 60 + (i * 8);
+        const lightness = 50 + (i * 5);
+        colors.push(`hsl(${hue}, ${Math.min(saturation, 90)}%, ${Math.min(lightness, 70)}%)`);
+      }
+    }
+    return colors;
   };
 
-  // Create bar chart data helper
-  const createBarChartData = (dataObj) => {
+  // Create pie chart data with iterative scaling
+  const createPieChartData = (dataObj, type = 'default') => {
+    const entries = Object.entries(dataObj);
+    if (entries.length === 0) {
+      return [];
+    }
+
+    const sortedEntries = entries.sort(([,a], [,b]) => b - a).slice(0, 6);
+    const totalValue = sortedEntries.reduce((sum, [,count]) => sum + count, 0);
+    const colors = generateIterativeColors(sortedEntries.length,
+      type === 'severity' ? 120 : type === 'language' ? 240 : 180, type);
+
+    return sortedEntries.map(([name, count], index) => {
+      const percentage = totalValue > 0 ? Math.round((count / totalValue) * 100) : 0;
+      const intensity = count / Math.max(...sortedEntries.map(([,c]) => c));
+
+      return {
+        name,
+        population: count,
+        percentage,
+        color: colors[index],
+        legendFontColor: '#374151',
+        legendFontSize: Math.max(10, 12 - (index * 0.5)), // Iterative font sizing
+        intensity: intensity // For potential future use
+      };
+    });
+  };
+
+  // Create bar chart data with iterative scaling and colors
+  const createBarChartData = (dataObj, type = 'pattern') => {
     const entries = Object.entries(dataObj).sort(([,a], [,b]) => b - a).slice(0, 8);
+    if (entries.length === 0) {
+      return {
+        labels: ['No Data'],
+        datasets: [{
+          data: [0],
+          color: (opacity = 1) => `rgba(156, 163, 175, ${opacity})`,
+        }]
+      };
+    }
+
+    const maxValue = Math.max(...entries.map(([,count]) => count));
+    const colors = generateIterativeColors(entries.length,
+      type === 'pattern' ? 300 : 180, 'bar');
+
     return {
       labels: entries.map(([name]) => name.length > 8 ? name.substring(0, 8) + '...' : name),
       datasets: [{
         data: entries.map(([,count]) => count),
-        color: (opacity = 1) => `rgba(2, 185, 127, ${opacity})`,
+        colors: entries.map((_, index) => {
+          const intensity = entries[index][1] / maxValue;
+          return (opacity = 1) => {
+            // Convert HSL color to rgba with iterative opacity
+            const baseOpacity = 0.7 + (intensity * 0.3); // 0.7 to 1.0 based on value
+            return colors[index].replace('hsl', 'hsla').replace(')', `, ${baseOpacity * opacity})`);
+          };
+        }),
       }]
     };
   };
 
-  // Create flagged words bar chart data
+  // Create flagged words bar chart with iterative scaling
   const createFlaggedWordsBarChart = (flaggedWords) => {
     if (!flaggedWords?.topWords || flaggedWords.topWords.length === 0) {
       return {
@@ -209,12 +295,21 @@ function DetectionAnalyticsScreen({ navigation }) {
       };
     }
 
-    const topWords = flaggedWords.topWords.slice(0, 6);
+    const topWords = flaggedWords.topWords.slice(0, 8);
+    const maxCount = Math.max(...topWords.map(word => word.count));
+    const colors = generateIterativeColors(topWords.length, 0, 'words'); // Red-based for flagged words
+
     return {
       labels: topWords.map(word => word.word.length > 8 ? word.word.substring(0, 8) + '...' : word.word),
       datasets: [{
         data: topWords.map(word => word.count),
-        color: (opacity = 1) => `rgba(2, 185, 127, ${opacity})`,
+        colors: topWords.map((word, index) => {
+          const intensity = word.count / maxCount;
+          const baseOpacity = 0.6 + (intensity * 0.4); // More intense = more opaque
+          return (opacity = 1) => {
+            return colors[index].replace('hsl', 'hsla').replace(')', `, ${baseOpacity * opacity})`);
+          };
+        }),
       }]
     };
   };
@@ -295,14 +390,14 @@ function DetectionAnalyticsScreen({ navigation }) {
       icon: 'shield-alert'
     },
     {
-      value: detectionData.flaggedWords.topWords?.length?.toString() || '0',
-      label: 'Unique Words',
+      value: detectionData.flaggedWords.uniqueThreats?.toString() || '0',
+      label: 'Unique Threats',
       change: '+8%',
-      color: 'rgba(59, 130, 246, 1)',
-      icon: 'format-text'
+      color: 'rgba(239, 68, 68, 1)',
+      icon: 'alert-triangle'
     },
     {
-      value: Math.round(detectionData.flaggedWords.summary?.avgAccuracy || 95) + '%',
+      value: Math.round(detectionData.flaggedWords.avgAccuracy || 0) + '%',
       label: 'Accuracy Rate',
       change: '+2%',
       color: 'rgba(16, 185, 129, 1)',
@@ -567,7 +662,7 @@ function DetectionAnalyticsScreen({ navigation }) {
             <Text style={styles.sectionTitle}>Language Distribution</Text>
           </View>
           <View style={styles.sectionBadge}>
-            <Text style={styles.sectionBadgeText}>Pie Chart</Text>
+            <Text style={styles.sectionBadgeText}>Unique URLs</Text>
           </View>
         </View>
 
@@ -588,12 +683,12 @@ function DetectionAnalyticsScreen({ navigation }) {
             <PieChart
               data={detectionData.languageDistribution}
               width={width - 40}
-              height={220}
+              height={200}
               chartConfig={chartConfig}
               accessor="population"
               backgroundColor="transparent"
-              paddingLeft="15"
-              center={[10, 10]}
+              paddingLeft="0"
+              center={[0, 0]}
               absolute
             />
             <Animated.View
@@ -698,10 +793,10 @@ function DetectionAnalyticsScreen({ navigation }) {
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
             <MaterialCommunityIcons name="alert-octagon" size={24} color="#ef4444" />
-            <Text style={styles.sectionTitle}>Severity Distribution</Text>
+            <Text style={styles.sectionTitle}>Threat Distribution</Text>
           </View>
           <View style={styles.sectionBadge}>
-            <Text style={styles.sectionBadgeText}>Risk Level</Text>
+            <Text style={styles.sectionBadgeText}>Unique URLs</Text>
           </View>
         </View>
 
@@ -714,12 +809,12 @@ function DetectionAnalyticsScreen({ navigation }) {
             <PieChart
               data={detectionData.severityAnalysis}
               width={width - 40}
-              height={220}
+              height={200}
               chartConfig={chartConfig}
               accessor="population"
               backgroundColor="transparent"
-              paddingLeft="15"
-              center={[10, 10]}
+              paddingLeft="0"
+              center={[0, 0]}
               absolute
             />
             <View style={styles.severityStatsContainer}>
@@ -757,7 +852,7 @@ function DetectionAnalyticsScreen({ navigation }) {
             <Text style={styles.sectionTitle}>Site Type Analysis</Text>
           </View>
           <View style={styles.sectionBadge}>
-            <Text style={styles.sectionBadgeText}>Sources</Text>
+            <Text style={styles.sectionBadgeText}>Unique URLs</Text>
           </View>
         </View>
 
@@ -770,12 +865,12 @@ function DetectionAnalyticsScreen({ navigation }) {
             <PieChart
               data={detectionData.siteTypeAnalysis}
               width={width - 40}
-              height={220}
+              height={200}
               chartConfig={chartConfig}
               accessor="population"
               backgroundColor="transparent"
-              paddingLeft="15"
-              center={[10, 10]}
+              paddingLeft="0"
+              center={[0, 0]}
               absolute
             />
             <View style={styles.siteTypeStatsContainer}>

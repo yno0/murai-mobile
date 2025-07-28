@@ -1,17 +1,18 @@
 import React from 'react';
 import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Animated,
+    Dimensions,
+    FlatList,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import NotificationDetailModal from '../../components/notifications/NotificationDetailModal';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
@@ -29,6 +30,13 @@ function HomeScreen({ navigation }) {
   const [notifications, setNotifications] = React.useState([]);
   const [notifModalVisible, setNotifModalVisible] = React.useState(false);
   const [notifLoading, setNotifLoading] = React.useState(false);
+  const [selectedNotification, setSelectedNotification] = React.useState(null);
+  const [notifDetailModalVisible, setNotifDetailModalVisible] = React.useState(false);
+  const [markingAllAsRead, setMarkingAllAsRead] = React.useState(false);
+  const [homeStats, setHomeStats] = React.useState({
+    overall: { threatsBlocked: 0, sitesMonitored: 0, averageAccuracy: 0 },
+    today: { inappropriateWordsFlagged: 0 }
+  });
 
   const timeRange = 'today';
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -98,6 +106,23 @@ function HomeScreen({ navigation }) {
     return user.name.split(' ')[0];
   };
 
+  const formatNotificationTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+
+    return date.toLocaleDateString();
+  };
+
   const fetchNotifications = async () => {
     setNotifLoading(true);
     try {
@@ -118,19 +143,71 @@ function HomeScreen({ navigation }) {
   const markAsRead = async (id) => {
     try {
       await api.put(`/notifications/${id}/read`);
+      // Update the notifications state to mark as read
       setNotifications((prev) => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
     } catch (_err) {}
   };
+
+  const openNotificationDetail = async (notification) => {
+    setSelectedNotification(notification);
+    setNotifDetailModalVisible(true);
+    setNotifModalVisible(false); // Close the list modal
+
+    // Automatically mark as read when opened (if not already read)
+    if (!notification.isRead) {
+      await markAsRead(notification._id);
+    }
+  };
+
+  const closeNotificationDetail = () => {
+    setNotifDetailModalVisible(false);
+    setSelectedNotification(null);
+  };
+
+  const markAllAsRead = async () => {
+    if (markingAllAsRead) return; // Prevent multiple calls
+
+    setMarkingAllAsRead(true);
+    try {
+      const unreadNotifications = notifications.filter(n => !n.isRead);
+
+      // Mark all unread notifications as read on the server
+      await Promise.all(
+        unreadNotifications.map(notification =>
+          api.put(`/notifications/${notification._id}/read`)
+        )
+      );
+
+      // Update local state to mark all as read
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch (_err) {
+      console.error('Failed to mark all notifications as read');
+    } finally {
+      setMarkingAllAsRead(false);
+    }
+  };
+
+  const fetchHomeStats = React.useCallback(async () => {
+    try {
+      const response = await api.get('/api/home-stats');
+      if (response.data.success) {
+        setHomeStats(response.data.data);
+      }
+    } catch (err) {
+      console.error('Home Stats API Error:', err);
+    }
+  }, []);
 
   const fetchData = React.useCallback(async (selectedTimeRange = timeRange) => {
     setLoading(true);
     setError('');
     try {
-      // Use user-specific endpoints
+      // Fetch home stats and dashboard data in parallel
       const [statsRes, chartRes, activityRes] = await Promise.all([
         api.get(`/user-dashboard/overview?timeRange=${selectedTimeRange}`),
         api.get(`/user-dashboard/activity-chart?timeRange=${selectedTimeRange}`),
         api.get(`/user-dashboard/user-activity?timeRange=${selectedTimeRange}`),
+        fetchHomeStats() // Fetch real home stats
       ]);
       setStats(statsRes.data);
       setChartData(chartRes.data);
@@ -141,7 +218,7 @@ function HomeScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [timeRange]);
+  }, [timeRange, fetchHomeStats]);
 
   React.useEffect(() => {
     fetchData();
@@ -249,17 +326,17 @@ function HomeScreen({ navigation }) {
                 <Text style={styles.heroSubtitle}>Your digital safety is being monitored 24/7</Text>
               </View>
               <View style={styles.heroBadge}>
-                <Text style={styles.heroBadgeText}>{stats.protectionEffectiveness.value}</Text>
+                <Text style={styles.heroBadgeText}>{homeStats.overall.averageAccuracy}%</Text>
               </View>
             </View>
             <View style={styles.heroStats}>
               <View style={styles.heroStatItem}>
-                <Text style={styles.heroStatNumber}>{stats.harmfulContentDetected.value}</Text>
+                <Text style={styles.heroStatNumber}>{homeStats.overall.threatsBlocked}</Text>
                 <Text style={styles.heroStatLabel}>Threats Blocked</Text>
               </View>
               <View style={styles.heroStatDivider} />
               <View style={styles.heroStatItem}>
-                <Text style={styles.heroStatNumber}>{stats.websitesMonitored.value}</Text>
+                <Text style={styles.heroStatNumber}>{homeStats.overall.sitesMonitored}</Text>
                 <Text style={styles.heroStatLabel}>Sites Monitored</Text>
               </View>
             </View>
@@ -278,9 +355,34 @@ function HomeScreen({ navigation }) {
           <View style={styles.notifModalContent}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#374151' }}>Notifications</Text>
-              <TouchableOpacity onPress={() => setNotifModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="rgba(81, 7, 192, 1)" />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                {unreadCount > 0 && (
+                  <TouchableOpacity
+                    onPress={markAllAsRead}
+                    disabled={markingAllAsRead}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      backgroundColor: markingAllAsRead ? 'rgba(2, 185, 127, 0.05)' : 'rgba(2, 185, 127, 0.1)',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: markingAllAsRead ? 'rgba(2, 185, 127, 0.1)' : 'rgba(2, 185, 127, 0.2)',
+                      opacity: markingAllAsRead ? 0.6 : 1
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 12,
+                      fontWeight: '600',
+                      color: markingAllAsRead ? 'rgba(2, 185, 127, 0.6)' : '#02B97F'
+                    }}>
+                      {markingAllAsRead ? 'Marking...' : 'Mark All Read'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => setNotifModalVisible(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color="#02B97F" />
+                </TouchableOpacity>
+              </View>
             </View>
             {notifLoading ? (
               <Text style={{ textAlign: 'center', color: '#6b7280' }}>Loading...</Text>
@@ -294,7 +396,7 @@ function HomeScreen({ navigation }) {
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={[styles.notifItem, !item.isRead && styles.notifItemUnread]}
-                    onPress={() => { markAsRead(item._id); }}
+                    onPress={() => openNotificationDetail(item)}
                   >
                     <View style={styles.notifIconWrap}>
                       <MaterialCommunityIcons
@@ -306,17 +408,24 @@ function HomeScreen({ navigation }) {
                         }
                         size={22}
                         color={
-                          item.type === 'alert' ? 'rgba(81, 7, 192, 1)' :
-                          item.type === 'warning' ? 'rgba(81, 7, 192, 0.7)' :
-                          item.type === 'success' ? 'rgba(81, 7, 192, 0.5)' :
-                          'rgba(81, 7, 192, 0.3)'
+                          item.type === 'alert' ? '#ef4444' :
+                          item.type === 'warning' ? '#f59e0b' :
+                          item.type === 'success' ? '#02B97F' :
+                          '#02B97F'
                         }
                       />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.notifTitle}>{item.title}</Text>
                       <Text style={styles.notifMessage}>{item.message}</Text>
-                      <Text style={styles.notifTime}>{new Date(item.createdAt).toLocaleString()}</Text>
+                      <Text style={styles.notifTime}>{formatNotificationTime(item.createdAt)}</Text>
+                    </View>
+                    <View style={{ alignItems: 'center', justifyContent: 'center', paddingLeft: 8 }}>
+                      <MaterialCommunityIcons
+                        name="chevron-right"
+                        size={20}
+                        color="rgba(2, 185, 127, 0.4)"
+                      />
                     </View>
                   </TouchableOpacity>
                 )}
@@ -325,6 +434,14 @@ function HomeScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* Notification Detail Modal */}
+      <NotificationDetailModal
+        visible={notifDetailModalVisible}
+        notification={selectedNotification}
+        onClose={closeNotificationDetail}
+        onMarkAsRead={markAsRead}
+      />
 
       {/* Stats Card */}
       <Animated.View
@@ -339,11 +456,13 @@ function HomeScreen({ navigation }) {
         <View style={styles.statsCard}>
           <View style={styles.statsHeader}>
             <View style={styles.statsLeft}>
-              <Text style={styles.statsNumber}>{loading || !stats ? '...' : stats.harmfulContentDetected.value}</Text>
+              <Text style={styles.statsNumber}>{loading ? '...' : homeStats.today.inappropriateWordsFlagged}</Text>
               <Text style={styles.statsLabel}>{`inappropriate words\nwere flagged today`}</Text>
             </View>
             <View style={styles.statsRight}>
-              <Text style={[styles.percentage, { color: '#01B97F' }]}>{loading || !stats ? '' : stats.harmfulContentDetected.change + ' ↗'}</Text>
+              <Text style={[styles.percentage, { color: '#01B97F' }]}>
+                {loading ? '' : `+${homeStats.today.inappropriateWordsFlagged} ↗`}
+              </Text>
             </View>
           </View>
           {/* Chart */}

@@ -1,18 +1,15 @@
-import * as React from 'react';
-import Logo from '../assets/Logo.svg';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import * as React from 'react';
+import Logo from '../assets/Logo.svg';
 
 export default function Register() {
-    const [step, setStep] = React.useState(1);
     const [form, setForm] = React.useState({
         name: '',
         email: '',
         password: '',
-        confirmPassword: '',
-        otp: '',
-        phoneNumber: ''
+        confirmPassword: ''
     });
     const [showPassword, setShowPassword] = React.useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
@@ -24,15 +21,34 @@ export default function Register() {
         setForm({ ...form, [e.target.name]: e.target.value });
     };
 
-    // Step 1: Register (name, email, password, confirmPassword)
+    // Register user directly
     const handleRegister = async (e) => {
         e.preventDefault();
         setError('');
         setSuccess('');
+
+        // Validation
+        if (!form.name.trim()) {
+            setError('Name is required');
+            return;
+        }
+        if (!form.email.trim()) {
+            setError('Email is required');
+            return;
+        }
+        if (!form.password) {
+            setError('Password is required');
+            return;
+        }
         if (form.password !== form.confirmPassword) {
             setError('Passwords do not match');
             return;
         }
+        if (form.password.length < 6) {
+            setError('Password must be at least 6 characters long');
+            return;
+        }
+
         setLoading(true);
         try {
             const res = await fetch('http://localhost:3000/api/auth/register', {
@@ -47,70 +63,25 @@ export default function Register() {
             });
             const data = await res.json();
             if (res.ok) {
-                setStep(2);
-                setSuccess('OTP sent to your email.');
+                // Store token and redirect to dashboard or login
+                if (data.token) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    setSuccess('Registration successful! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = '/dashboard'; // or wherever you want to redirect
+                    }, 1500);
+                } else {
+                    setSuccess('Registration successful! You can now log in.');
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 1500);
+                }
             } else {
                 setError(data.message || 'Registration failed');
             }
         } catch {
-            setError('Registration failed');
-        }
-        setLoading(false);
-    };
-
-    // Step 2: Verify OTP
-    const handleVerifyOtp = async (e) => {
-        e.preventDefault();
-        setError('');
-        setSuccess('');
-        setLoading(true);
-        try {
-            const res = await fetch('http://localhost:3000/api/auth/verify-otp', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: form.email,
-                    otp: form.otp
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setStep(3);
-                setSuccess('OTP verified. Complete your profile.');
-            } else {
-                setError(data.message || 'OTP verification failed');
-            }
-        } catch {
-            setError('OTP verification failed');
-        }
-        setLoading(false);
-    };
-
-    // Step 3: Complete Profile
-    const handleCompleteProfile = async (e) => {
-        e.preventDefault();
-        setError('');
-        setSuccess('');
-        setLoading(true);
-        try {
-            const res = await fetch('http://localhost:3000/api/auth/complete-profile', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: form.email,
-                    name: form.name,
-                    phoneNumber: form.phoneNumber
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setSuccess('Registration complete! You can now log in.');
-                setStep(4);
-            } else {
-                setError(data.message || 'Profile completion failed');
-            }
-        } catch {
-            setError('Profile completion failed');
+            setError('Registration failed. Please try again.');
         }
         setLoading(false);
     };
@@ -130,146 +101,90 @@ export default function Register() {
                     </div>
                     <h2 className="text-3xl font-bold text-white mb-2">Create an Account</h2>
                     <p className="text-neutral-300 mb-8">Join now to streamline your experience from day one.</p>
-                    {step === 1 && (
-                        <form onSubmit={handleRegister} className="flex flex-col gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="name" className="text-white">Name</Label>
+                    <form onSubmit={handleRegister} className="flex flex-col gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="name" className="text-white">Name</Label>
+                            <Input
+                                id="name"
+                                type="text"
+                                name="name"
+                                placeholder="Name"
+                                className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-white focus:ring-white"
+                                value={form.name}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="email" className="text-white">Email</Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                name="email"
+                                placeholder="Email"
+                                className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-white focus:ring-white"
+                                value={form.email}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="password" className="text-white">Password</Label>
+                            <div className="relative">
                                 <Input
-                                    id="name"
-                                    type="text"
-                                    name="name"
-                                    placeholder="Name"
-                                    className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-white focus:ring-white"
-                                    value={form.name}
+                                    id="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    name="password"
+                                    placeholder="Password (min 6 characters)"
+                                    className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-white focus:ring-white pr-10"
+                                    value={form.password}
                                     onChange={handleChange}
                                     required
                                 />
+                                <button
+                                    type="button"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+                                    onClick={() => setShowPassword((v) => !v)}
+                                    tabIndex={-1}
+                                >
+                                    {showPassword ? '🙈' : '👁️'}
+                                </button>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="email" className="text-white">Email</Label>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="confirmPassword" className="text-white">Confirm Password</Label>
+                            <div className="relative">
                                 <Input
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    placeholder="Email"
-                                    className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-white focus:ring-white"
-                                    value={form.email}
+                                    id="confirmPassword"
+                                    type={showConfirmPassword ? 'text' : 'password'}
+                                    name="confirmPassword"
+                                    placeholder="Confirm Password"
+                                    className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-white focus:ring-white pr-10"
+                                    value={form.confirmPassword}
                                     onChange={handleChange}
                                     required
                                 />
+                                <button
+                                    type="button"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+                                    onClick={() => setShowConfirmPassword((v) => !v)}
+                                    tabIndex={-1}
+                                >
+                                    {showConfirmPassword ? '🙈' : '👁️'}
+                                </button>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="password" className="text-white">Password</Label>
-                                <div className="relative">
-                                    <Input
-                                        id="password"
-                                        type={showPassword ? 'text' : 'password'}
-                                        name="password"
-                                        placeholder="Password"
-                                        className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-white focus:ring-white pr-10"
-                                        value={form.password}
-                                        onChange={handleChange}
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
-                                        onClick={() => setShowPassword((v) => !v)}
-                                        tabIndex={-1}
-                                    >
-                                        {showPassword ? '🙈' : '👁️'}
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="confirmPassword" className="text-white">Confirm Password</Label>
-                                <div className="relative">
-                                    <Input
-                                        id="confirmPassword"
-                                        type={showConfirmPassword ? 'text' : 'password'}
-                                        name="confirmPassword"
-                                        placeholder="Confirm Password"
-                                        className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-white focus:ring-white pr-10"
-                                        value={form.confirmPassword}
-                                        onChange={handleChange}
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
-                                        onClick={() => setShowConfirmPassword((v) => !v)}
-                                        tabIndex={-1}
-                                    >
-                                        {showConfirmPassword ? '🙈' : '👁️'}
-                                    </button>
-                                </div>
-                            </div>
-                            <Button
-                                type="submit"
-                                className="w-full bg-white text-black hover:bg-neutral-100 text-lg py-3 rounded-xl font-semibold mt-2"
-                                disabled={loading}
-                            >
-                                {loading ? 'Registering...' : 'Register'}
-                            </Button>
-                            {error && <div className="text-red-500 text-center mt-2">{error}</div>}
-                            {success && <div className="text-green-600 text-center mt-2">{success}</div>}
-                        </form>
-                    )}
-                    {step === 2 && (
-                        <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="otp" className="text-white">OTP</Label>
-                                <Input
-                                    id="otp"
-                                    type="text"
-                                    name="otp"
-                                    placeholder="Enter OTP"
-                                    className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-white focus:ring-white"
-                                    value={form.otp}
-                                    onChange={handleChange}
-                                    required
-                                />
-                            </div>
-                            <Button
-                                type="submit"
-                                className="w-full bg-white text-black hover:bg-neutral-100 text-lg py-3 rounded-xl font-semibold mt-2"
-                                disabled={loading}
-                            >
-                                {loading ? 'Verifying...' : 'Verify OTP'}
-                            </Button>
-                            {error && <div className="text-red-500 text-center mt-2">{error}</div>}
-                            {success && <div className="text-green-600 text-center mt-2">{success}</div>}
-                        </form>
-                    )}
-                    {step === 3 && (
-                        <form onSubmit={handleCompleteProfile} className="flex flex-col gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="phoneNumber" className="text-white">Phone Number</Label>
-                                <Input
-                                    id="phoneNumber"
-                                    type="text"
-                                    name="phoneNumber"
-                                    placeholder="Phone number"
-                                    className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-white focus:ring-white"
-                                    value={form.phoneNumber}
-                                    onChange={handleChange}
-                                    required
-                                />
-                            </div>
-                            <Button
-                                type="submit"
-                                className="w-full bg-white text-black hover:bg-neutral-100 text-lg py-3 rounded-xl font-semibold mt-2"
-                                disabled={loading}
-                            >
-                                {loading ? 'Saving...' : 'Complete Registration'}
-                            </Button>
-                            {error && <div className="text-red-500 text-center mt-2">{error}</div>}
-                            {success && <div className="text-green-600 text-center mt-2">{success}</div>}
-                        </form>
-                    )}
-                    {step === 4 && (
-                        <div className="text-green-600 text-center text-lg font-semibold mt-8">Registration complete! You can now <a href="/login" className="underline">log in</a>.</div>
-                    )}
+                        </div>
+                        <Button
+                            type="submit"
+                            className="w-full bg-white text-black hover:bg-neutral-100 text-lg py-3 rounded-xl font-semibold mt-2"
+                            disabled={loading}
+                        >
+                            {loading ? 'Creating Account...' : 'Create Account'}
+                        </Button>
+                        {error && <div className="text-red-500 text-center mt-2">{error}</div>}
+                        {success && <div className="text-green-600 text-center mt-2">{success}</div>}
+                    </form>
+
                     <div className="flex items-center my-6">
                         <div className="flex-grow h-px bg-neutral-700" />
                         <span className="mx-4 text-neutral-400 text-sm">Or Register With</span>

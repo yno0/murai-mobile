@@ -19,7 +19,7 @@ const { width } = Dimensions.get('window');
 
 function DashboardScreen({ navigation }) {
   // const { user } = useAuth(); // Get user from auth context
-  const [selectedTimeRange, setSelectedTimeRange] = useState('Today');
+  const [selectedTimeRange, setSelectedTimeRange] = useState('Last 7 Days');
 
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -70,6 +70,8 @@ function DashboardScreen({ navigation }) {
     setIsLoading(true);
     setError('');
     try {
+      console.log('Fetching dashboard data for time range:', timeRangeParam);
+
       // Map time range to match server expectations
       const mappedTimeRange = timeRangeParam === 'Today' ? 'today' :
                              timeRangeParam === 'Last 7 Days' ? 'week' :
@@ -77,22 +79,27 @@ function DashboardScreen({ navigation }) {
                              timeRangeParam === 'Last Year' ? 'year' :
                              timeRangeParam.toLowerCase();
 
+      console.log('Mapped time range:', mappedTimeRange);
+
       // Use detection-focused endpoints
       const yearParam = '';
 
+      console.log('Making API calls to dashboard endpoints...');
+
       const [overviewRes, detectionChartRes, userActivityRes] = await Promise.all([
         // Get overview data with detection focus
-        api.get(`/user-dashboard/overview?timeRange=${mappedTimeRange}${yearParam}`).catch(() =>
-          api.get(`/dashboard/overview?timeRange=${mappedTimeRange}${yearParam}`)
-        ),
+        api.get(`/user-dashboard/overview?timeRange=${mappedTimeRange}${yearParam}`),
         // Get detection chart data (using user dashboard activity chart)
-        api.get(`/user-dashboard/activity-chart?timeRange=${mappedTimeRange}${yearParam}`).catch(() =>
-          api.get(`/dashboard/activity-chart?timeRange=${mappedTimeRange}${yearParam}`)
-        ),
-        api.get(`/user-dashboard/user-activity?timeRange=${mappedTimeRange}${yearParam}`).catch(() =>
-          api.get(`/dashboard/user-activity?timeRange=${mappedTimeRange}${yearParam}`)
-        ),
+        api.get(`/user-dashboard/activity-chart?timeRange=${mappedTimeRange}${yearParam}`),
+        // Get user activity data
+        api.get(`/user-dashboard/user-activity?timeRange=${mappedTimeRange}${yearParam}`),
       ]);
+
+      console.log('API calls successful:', {
+        overview: overviewRes.data,
+        chart: detectionChartRes.data,
+        activity: userActivityRes.data
+      });
 
       setDashboardData({
         overview: overviewRes.data,
@@ -204,7 +211,7 @@ function DashboardScreen({ navigation }) {
       subtitle: 'Flagged words, trending terms & changes',
       color: '#fef2f2',
       iconColor: '#ef4444',
-      screen: 'FlaggedWordsAnalytics',
+      screen: 'DetectionAnalytics',
     },
     {
       icon: '🌍',

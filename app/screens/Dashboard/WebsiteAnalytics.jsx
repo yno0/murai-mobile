@@ -39,29 +39,37 @@ function WebsiteAnalyticsScreen({ navigation }) {
 
   // Animation functions
   const startEntranceAnimation = () => {
-    Animated.parallel([
+    // Reset animations first to ensure clean state
+    fadeAnim.setValue(0);
+    slideAnim.setValue(30);
+    scaleAnim.setValue(0.95);
+
+    // Staggered animation for better visual flow
+    Animated.sequence([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 800,
+        duration: 400,
         useNativeDriver: true,
       }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 700,
-        useNativeDriver: true,
-      }),
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ])
     ]).start();
   };
 
   const resetAnimations = () => {
     fadeAnim.setValue(0);
-    slideAnim.setValue(50);
-    scaleAnim.setValue(0.8);
+    slideAnim.setValue(30);
+    scaleAnim.setValue(0.95);
   };
 
   // Fetch user's flagged websites data
@@ -76,29 +84,30 @@ function WebsiteAnalyticsScreen({ navigation }) {
                              timeRange.toLowerCase() === 'year' ? 'year' :
                              timeRange.toLowerCase();
 
-      // For now, use mock data that represents user's flagged websites
-      const mockWebsiteData = {
-        topWebsites: [
-          { domain: 'facebook.com', detectionCount: 25, riskLevel: 'high', lastDetection: new Date() },
-          { domain: 'twitter.com', detectionCount: 18, riskLevel: 'medium', lastDetection: new Date() },
-          { domain: 'tiktok.com', detectionCount: 15, riskLevel: 'high', lastDetection: new Date() },
-          { domain: 'instagram.com', detectionCount: 12, riskLevel: 'medium', lastDetection: new Date() },
-          { domain: 'youtube.com', detectionCount: 8, riskLevel: 'low', lastDetection: new Date() },
-          { domain: 'discord.com', detectionCount: 5, riskLevel: 'medium', lastDetection: new Date() },
-        ],
-        totalWebsites: 15,
-        totalDetections: 83,
-        monitoringStats: {
-          activeMonitoring: 12,
-          highRiskSites: 4,
-          aiAccuracy: 98.2
-        }
-      };
+      // Import API service
+      const { default: api } = await import('../../services/api');
 
-      setWebsiteData(mockWebsiteData);
+      // Fetch real website analytics data
+      const response = await api.get(`/user-dashboard/websites?timeRange=${mappedTimeRange}`);
+
+      console.log('Website Analytics API Response:', response.data);
+
+      setWebsiteData(response.data);
     } catch (err) {
       console.error('Failed to fetch website data:', err);
       setError('Failed to load website data. Please try again.');
+
+      // Fallback to empty data structure
+      setWebsiteData({
+        topWebsites: [],
+        totalWebsites: 0,
+        totalDetections: 0,
+        monitoringStats: {
+          activeMonitoring: 0,
+          highRiskSites: 0,
+          aiAccuracy: 0
+        }
+      });
     } finally {
       setIsLoading(false);
     }
@@ -124,6 +133,7 @@ function WebsiteAnalyticsScreen({ navigation }) {
   // Generate chart data from real website data
   const generateChartData = () => {
     if (!websiteData.topWebsites || websiteData.topWebsites.length === 0) {
+      console.log('No website data available for chart');
       return {
         labels: ['No Data'],
         datasets: [{ data: [0] }],
@@ -131,6 +141,8 @@ function WebsiteAnalyticsScreen({ navigation }) {
     }
 
     const top6Sites = websiteData.topWebsites.slice(0, 6);
+    console.log('Top 6 sites for chart:', top6Sites);
+
     const labels = top6Sites.map(site => {
       // Create short labels for chart
       const domain = site.domain.toLowerCase();
@@ -143,12 +155,15 @@ function WebsiteAnalyticsScreen({ navigation }) {
       return domain.substring(0, 3).toUpperCase();
     });
 
-    return {
+    const chartData = {
       labels,
       datasets: [{
         data: top6Sites.map(site => site.detectionCount),
       }],
     };
+
+    console.log('Generated chart data:', chartData);
+    return chartData;
   };
 
   const chartData = generateChartData();
@@ -175,8 +190,8 @@ function WebsiteAnalyticsScreen({ navigation }) {
   // Use real data from API
   const topWebsites = websiteData.topWebsites?.map(site => ({
     name: site.domain,
-    threats: site.detectionCount,
-    change: `+${Math.floor(Math.random() * 15) + 1}`, // Calculate real change from historical data
+    threats: site.threats || site.detectionCount,
+    change: site.change || '+0',
     risk: site.riskLevel,
     icon: getDomainIcon(site.domain)
   })) || [];
@@ -210,12 +225,28 @@ function WebsiteAnalyticsScreen({ navigation }) {
   };
 
 
-  // Use real data from API response
+  // Use real data from API response with accurate changes
   const monitoringStats = [
-    { metric: 'Total Websites', value: websiteData.totalWebsites?.toString() || '0', change: '+3' },
-    { metric: 'Active Monitoring', value: websiteData.monitoringStats?.activeMonitoring?.toString() || '0', change: '+2' },
-    { metric: 'High-Risk Sites', value: websiteData.monitoringStats?.highRiskSites?.toString() || '0', change: '+1' },
-    { metric: 'AI Accuracy', value: `${websiteData.monitoringStats?.aiAccuracy || 95}%`, change: '+0.5%' },
+    {
+      metric: 'Total Websites',
+      value: websiteData.totalWebsites?.toString() || '0',
+      change: websiteData.monitoringStats?.changes?.websites || '0'
+    },
+    {
+      metric: 'Active Monitoring',
+      value: websiteData.monitoringStats?.activeMonitoring?.toString() || '0',
+      change: websiteData.monitoringStats?.changes?.websites || '0'
+    },
+    {
+      metric: 'High-Risk Sites',
+      value: websiteData.monitoringStats?.highRiskSites?.toString() || '0',
+      change: '0' // High-risk sites don't have a direct comparison metric
+    },
+    {
+      metric: 'AI Accuracy',
+      value: `${websiteData.monitoringStats?.aiAccuracy || 0}%`,
+      change: websiteData.monitoringStats?.changes?.accuracy || '0%'
+    },
   ];
 
   return (
@@ -279,7 +310,7 @@ function WebsiteAnalyticsScreen({ navigation }) {
         </View>
       </Animated.View>
 
-      {/* Monitoring Stats */}
+      {/* MURAi Monitoring Status - Moved to left side */}
       <Animated.View
         style={[
           styles.section,
@@ -289,8 +320,10 @@ function WebsiteAnalyticsScreen({ navigation }) {
         ]}
       >
         <View style={styles.sectionHeader}>
-          <MaterialCommunityIcons name="monitor-dashboard" size={24} color="#02B97F" />
-          <Text style={styles.sectionTitle}>MURAi Monitoring Status</Text>
+          <View style={styles.sectionTitleContainer}>
+            <MaterialCommunityIcons name="monitor-dashboard" size={24} color="#02B97F" />
+            <Text style={styles.sectionTitle}>MURAi Monitoring Status</Text>
+          </View>
         </View>
         {isLoading ? (
           <View style={styles.loadingCard}>
@@ -303,26 +336,26 @@ function WebsiteAnalyticsScreen({ navigation }) {
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : (
-          <View style={styles.statsGrid}>
+          <Animated.View
+            style={[
+              styles.statsGrid,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
             {monitoringStats.map((stat, index) => (
-              <Animated.View
+              <View
                 key={index}
-                style={[
-                  styles.statCard,
-                  {
-                    opacity: fadeAnim,
-                    transform: [{
-                      translateY: slideAnim
-                    }]
-                  }
-                ]}
+                style={styles.statCard}
               >
                 <Text style={styles.statValue}>{stat.value}</Text>
                 <Text style={styles.statLabel}>{stat.metric}</Text>
                 <Text style={styles.statChange}>{stat.change}</Text>
-              </Animated.View>
+              </View>
             ))}
-          </View>
+          </Animated.View>
         )}
       </Animated.View>
 
@@ -340,7 +373,6 @@ function WebsiteAnalyticsScreen({ navigation }) {
               styles.chartContainer,
               {
                 opacity: fadeAnim,
-                transform: [{ scale: scaleAnim }]
               }
             ]}
           >
@@ -396,19 +428,19 @@ function WebsiteAnalyticsScreen({ navigation }) {
             <Text style={styles.emptySubtext}>MURAi is protecting you from harmful content</Text>
           </View>
         ) : (
-          <View style={styles.websitesContainer}>
+          <Animated.View
+            style={[
+              styles.websitesContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
             {topWebsites.map((website, index) => (
-              <Animated.View
+              <View
                 key={index}
-                style={[
-                  styles.websiteItem,
-                  {
-                    opacity: fadeAnim,
-                    transform: [{
-                      translateY: Animated.add(slideAnim, new Animated.Value(index * 5))
-                    }]
-                  }
-                ]}
+                style={styles.websiteItem}
               >
                 <View style={styles.websiteCard}>
                   <View style={styles.websiteMainInfo}>
@@ -462,9 +494,9 @@ function WebsiteAnalyticsScreen({ navigation }) {
                     </View>
                   </View>
                 </View>
-              </Animated.View>
+              </View>
             ))}
-          </View>
+          </Animated.View>
         )}
       </Animated.View>
 
@@ -532,6 +564,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
     paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   timeRangeSelectorHeader: {
     flexDirection: 'row',
@@ -601,7 +634,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   section: {
-    marginBottom: 30,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -688,16 +721,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 12,
   },
   statCard: {
     width: (width - 60) / 2,
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#f3f4f6',
+    minHeight: 100,
+    justifyContent: 'center',
   },
   statValue: {
     fontSize: 20,
@@ -725,6 +760,8 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: '#f3f4f6',
+    overflow: 'hidden',
+    minHeight: 260,
   },
   chart: {
     marginVertical: 8,
@@ -738,7 +775,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   websitesContainer: {
-    gap: 12,
+    gap: 16,
+    paddingBottom: 8,
   },
   websiteItem: {
     backgroundColor: '#ffffff',

@@ -1,5 +1,5 @@
-import { Feather } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { Feather } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Dimensions,
@@ -10,22 +10,27 @@ import {
     Text,
     TouchableOpacity,
     View,
-} from 'react-native';
-import { LineChart } from 'react-native-chart-kit';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import MainHeader from '../../../components/common/MainHeader';
+} from "react-native";
+import { LineChart } from "react-native-chart-kit";
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import MainHeader from "../../../components/common/MainHeader";
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = "http://localhost:3000/api";
 
 const dashboardService = {
   getOverview: async (timeRange) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/dashboard/overview?timeRange=${encodeURIComponent(timeRange)}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/dashboard/overview?timeRange=${encodeURIComponent(
+          timeRange
+        )}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -37,12 +42,17 @@ const dashboardService = {
   },
   getActivityChart: async (timeRange) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/dashboard/activity-chart?timeRange=${encodeURIComponent(timeRange)}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/dashboard/activity-chart?timeRange=${encodeURIComponent(
+          timeRange
+        )}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -55,9 +65,9 @@ const dashboardService = {
   getInsights: async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/dashboard/insights`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       });
       if (!response.ok) {
@@ -71,10 +81,10 @@ const dashboardService = {
   },
 };
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 export default function AdminDashboardScreen({ navigation }) {
-  const [selectedTimeRange, setSelectedTimeRange] = useState('Today');
+  const [selectedTimeRange, setSelectedTimeRange] = useState("Today");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -89,29 +99,29 @@ export default function AdminDashboardScreen({ navigation }) {
   });
 
   const defaultChartData = {
-    labels: ['', '', '', '', '', '', ''],
+    labels: ["", "", "", "", "", "", ""],
     datasets: [
       {
         data: [0, 0, 0, 0, 0, 0, 0],
         strokeWidth: 2,
         color: (opacity = 1) => `rgba(34, 197, 94, ${opacity})`,
-        fillShadowGradient: 'rgba(34, 197, 94, 0.1)',
+        fillShadowGradient: "rgba(34, 197, 94, 0.1)",
         fillShadowGradientOpacity: 0.1,
       },
       {
         data: [0, 0, 0, 0, 0, 0, 0],
         strokeWidth: 2,
         color: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-        fillShadowGradient: 'rgba(107, 114, 128, 0.1)',
+        fillShadowGradient: "rgba(107, 114, 128, 0.1)",
         fillShadowGradientOpacity: 0.1,
       },
     ],
   };
 
   const chartConfig = {
-    backgroundColor: 'transparent',
-    backgroundGradientFrom: '#ffffff',
-    backgroundGradientTo: '#ffffff',
+    backgroundColor: "transparent",
+    backgroundGradientFrom: "#ffffff",
+    backgroundGradientTo: "#ffffff",
     decimalPlaces: 0,
     color: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
     labelColor: (opacity = 1) => `rgba(156, 163, 175, ${opacity})`,
@@ -119,7 +129,7 @@ export default function AdminDashboardScreen({ navigation }) {
       borderRadius: 16,
     },
     propsForDots: {
-      r: '0',
+      r: "0",
     },
     propsForBackgroundLines: {
       strokeWidth: 0,
@@ -130,7 +140,7 @@ export default function AdminDashboardScreen({ navigation }) {
     withOuterLines: false,
   };
 
-  const timeRanges = ['Today', 'Last 7 days', 'Last 30 days', 'All Time'];
+  const timeRanges = ["Today", "Last 7 days", "Last 30 days", "All Time"];
 
   const fetchDashboardData = async (timeRange) => {
     try {
@@ -144,19 +154,19 @@ export default function AdminDashboardScreen({ navigation }) {
 
       // Placeholder for new analytics data - these would typically come from new API calls
       const topFlaggedContent = [
-        { id: 1, term: 'badword', count: 120 },
-        { id: 2, term: 'anotherbad', count: 90 },
-        { id: 3, term: 'offensive', count: 75 },
+        { id: 1, term: "badword", count: 120 },
+        { id: 2, term: "anotherbad", count: 90 },
+        { id: 3, term: "offensive", count: 75 },
       ];
       const topMonitoredWebsites = [
-        { id: 1, url: 'socialmedia.com', issues: 50 },
-        { id: 2, url: 'forum.net', issues: 35 },
-        { id: 3, url: 'chat.app', issues: 20 },
+        { id: 1, url: "socialmedia.com", issues: 50 },
+        { id: 2, url: "forum.net", issues: 35 },
+        { id: 3, url: "chat.app", issues: 20 },
       ];
       const keyUserActivity = [
-        { id: 1, user: 'Alice', actions: 250 },
-        { id: 2, user: 'Bob', actions: 180 },
-        { id: 3, user: 'Charlie', actions: 150 },
+        { id: 1, user: "Alice", actions: 250 },
+        { id: 2, user: "Bob", actions: 180 },
+        { id: 3, user: "Charlie", actions: 150 },
       ];
 
       setDashboardData({
@@ -172,20 +182,24 @@ export default function AdminDashboardScreen({ navigation }) {
       setError("Failed to load dashboard data. Please try again later.");
       setDashboardData({
         overview: {
-          harmfulContentDetected: { value: '0', change: '+0%' },
-          websitesMonitored: { value: '0', change: '+0' },
-          protectionEffectiveness: { value: '95%', change: '+0%' },
+          harmfulContentDetected: { value: "0", change: "+0%" },
+          websitesMonitored: { value: "0", change: "+0" },
+          protectionEffectiveness: { value: "95%", change: "+0%" },
         },
         chartData: {
-          labels: ['', '', '', '', '', '', ''],
+          labels: ["", "", "", "", "", "", ""],
           datasets: [
-            { label: 'Protected', data: [0, 0, 0, 0, 0, 0, 0] },
-            { label: 'Monitored', data: [0, 0, 0, 0, 0, 0, 0] },
+            { label: "Protected", data: [0, 0, 0, 0, 0, 0, 0] },
+            { label: "Monitored", data: [0, 0, 0, 0, 0, 0, 0] },
           ],
         },
         insights: {
           insights: [
-            { icon: 'shield-alert', text: 'Unable to load insights', color: '#ef4444' },
+            {
+              icon: "shield-alert",
+              text: "Unable to load insights",
+              color: "#ef4444",
+            },
           ],
         },
       });
@@ -207,22 +221,37 @@ export default function AdminDashboardScreen({ navigation }) {
   // Detection and Reports counts mock data for each time range
   const detectionReportsData = {
     Today: {
-      labels: ['12AM', '4AM', '8AM', '12PM', '4PM', '8PM'],
+      labels: ["12AM", "4AM", "8AM", "12PM", "4PM", "8PM"],
       detections: [5, 8, 12, 20, 15, 10],
       reports: [2, 3, 4, 6, 5, 3],
     },
-    'Last 7 days': {
-      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    "Last 7 days": {
+      labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
       detections: [45, 52, 38, 67, 89, 74, 92],
       reports: [12, 15, 10, 18, 20, 16, 22],
     },
-    'Last 30 days': {
+    "Last 30 days": {
       labels: Array.from({ length: 30 }, (_, i) => `Day ${i + 1}`),
-      detections: Array.from({ length: 30 }, () => Math.floor(Math.random() * 100)),
+      detections: Array.from({ length: 30 }, () =>
+        Math.floor(Math.random() * 100)
+      ),
       reports: Array.from({ length: 30 }, () => Math.floor(Math.random() * 30)),
     },
-    'All Time': {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    "All Time": {
+      labels: [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ],
       detections: [320, 280, 350, 400, 420, 390, 410, 430, 390, 370, 360, 400],
       reports: [80, 70, 90, 100, 110, 95, 105, 120, 100, 90, 85, 110],
     },
@@ -235,96 +264,124 @@ export default function AdminDashboardScreen({ navigation }) {
       {
         data: selectedData.detections,
         color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
-        fillShadowGradient: 'rgba(1, 185, 127, 0.1)',
+        fillShadowGradient: "rgba(1, 185, 127, 0.1)",
         fillShadowGradientOpacity: 0.1,
       },
       {
         data: selectedData.reports,
         color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
-        fillShadowGradient: 'rgba(59, 130, 246, 0.1)',
+        fillShadowGradient: "rgba(59, 130, 246, 0.1)",
         fillShadowGradientOpacity: 0.1,
       },
     ],
   };
 
-  const overallStats = dashboardData.overview ? [
-    {
-      value: dashboardData.overview.harmfulContentDetected?.value || '0',
-      label: 'HARMFUL CONTENT\nDETECTED',
-      change: dashboardData.overview.harmfulContentDetected?.change || '+0%',
-      color: '#6b7280',
-      icon: 'shield-alert'
-    },
-    {
-      value: dashboardData.overview.websitesMonitored?.value || '0',
-      label: 'WEBSITES\nMONITORED',
-      change: dashboardData.overview.websitesMonitored?.change || '+0',
-      color: '#6b7280',
-      icon: 'web'
-    },
-    {
-      value: dashboardData.overview.protectionEffectiveness?.value || '95%',
-      label: 'PROTECTION\nEFFECTIVENESS',
-      change: dashboardData.overview.protectionEffectiveness?.change || '+0%',
-      color: '#6b7280',
-      icon: 'shield-check'
-    },
-  ] : [];
+  const overallStats = dashboardData.overview
+    ? [
+        {
+          value: dashboardData.overview.harmfulContentDetected?.value || "0",
+          label: "HARMFUL CONTENT\nDETECTED",
+          change:
+            dashboardData.overview.harmfulContentDetected?.change || "+0%",
+          color: "#6b7280",
+          icon: "shield-alert",
+        },
+        {
+          value: dashboardData.overview.websitesMonitored?.value || "0",
+          label: "WEBSITES\nMONITORED",
+          change: dashboardData.overview.websitesMonitored?.change || "+0",
+          color: "#6b7280",
+          icon: "web",
+        },
+        {
+          value: dashboardData.overview.protectionEffectiveness?.value || "95%",
+          label: "PROTECTION\nEFFECTIVENESS",
+          change:
+            dashboardData.overview.protectionEffectiveness?.change || "+0%",
+          color: "#6b7280",
+          icon: "shield-check",
+        },
+      ]
+    : [];
 
   const insightsData = dashboardData.insights?.insights || [
-    { icon: 'shield-alert', text: 'Loading insights...', color: '#6b7280' },
+    { icon: "shield-alert", text: "Loading insights...", color: "#6b7280" },
   ];
 
   const menuOptions = [
     {
-      icon: 'shield-alert',
-      title: 'Detection',
-      subtitle: 'Detection analytics and details',
-      color: '#e8f5f0',
-      iconColor: '#01B97F',
-      screen: 'AdminDetection',
+      icon: "shield-alert",
+      title: "Detection",
+      subtitle: "Detection analytics and details",
+      color: "#e8f5f0",
+      iconColor: "#01B97F",
+      screen: "AdminDetection",
     },
     {
-      icon: 'web',
-      title: 'Sites',
-      subtitle: 'Sites analytics and details',
-      color: '#e8f5f0',
-      iconColor: '#01B97F',
-      screen: 'AdminSites',
+      icon: "web",
+      title: "Sites",
+      subtitle: "Sites analytics and details",
+      color: "#e8f5f0",
+      iconColor: "#01B97F",
+      screen: "AdminSites",
     },
     {
-      icon: 'translate',
-      title: 'Languages',
-      subtitle: 'Languages analytics and details',
-      color: '#e8f5f0',
-      iconColor: '#01B97F',
-      screen: 'AdminLanguages',
+      icon: "translate",
+      title: "Languages",
+      subtitle: "Languages analytics and details",
+      color: "#e8f5f0",
+      iconColor: "#01B97F",
+      screen: "AdminLanguages",
     },
     {
-      icon: 'account-group',
-      title: 'Groups',
-      subtitle: 'Groups analytics and details',
-      color: '#e8f5f0',
-      iconColor: '#01B97F',
-      screen: 'AdminGroups',
+      icon: "account-group",
+      title: "Groups",
+      subtitle: "Groups analytics and details",
+      color: "#e8f5f0",
+      iconColor: "#01B97F",
+      screen: "AdminGroups",
     },
     {
-      icon: 'chart-timeline-variant',
-      title: 'Patterns Over Time',
-      subtitle: 'Patterns over time analytics and details',
-      color: '#e8f5f0',
-      iconColor: '#01B97F',
-      screen: 'AdminPatternsOverTime',
+      icon: "chart-timeline-variant",
+      title: "Patterns Over Time",
+      subtitle: "Patterns over time analytics and details",
+      color: "#e8f5f0",
+      iconColor: "#01B97F",
+      screen: "AdminPatternsOverTime",
     },
   ];
 
   const sideMenuItems = [
-    { title: 'Dashboard Overview', icon: 'bar-chart-2', action: () => setIsMenuOpen(false) },
-    { title: 'Detection', icon: 'alert-circle', action: () => navigation.navigate('AdminDetection') },
-    { title: 'Sites', icon: 'web', action: () => navigation.navigate('AdminSites') },
-    { title: 'Languages', icon: 'translate', action: () => navigation.navigate('AdminLanguages') },
-    { title: 'Groups', icon: 'account-group', action: () => navigation.navigate('AdminGroups') },
-    { title: 'Patterns Over Time', icon: 'trending-up', action: () => navigation.navigate('AdminPatternsOverTime') },
+    {
+      title: "Dashboard Overview",
+      icon: "bar-chart-2",
+      action: () => setIsMenuOpen(false),
+    },
+    {
+      title: "Detection",
+      icon: "alert-circle",
+      action: () => navigation.navigate("AdminDetection"),
+    },
+    {
+      title: "Sites",
+      icon: "web",
+      action: () => navigation.navigate("AdminSites"),
+    },
+    {
+      title: "Languages",
+      icon: "translate",
+      action: () => navigation.navigate("AdminLanguages"),
+    },
+    {
+      title: "Groups",
+      icon: "account-group",
+      action: () => navigation.navigate("AdminGroups"),
+    },
+    {
+      title: "Patterns Over Time",
+      icon: "trending-up",
+      action: () => navigation.navigate("AdminPatternsOverTime"),
+    },
   ];
 
   const toggleMenu = () => {
@@ -348,8 +405,8 @@ export default function AdminDashboardScreen({ navigation }) {
         <RefreshControl
           refreshing={isRefreshing}
           onRefresh={onRefresh}
-          colors={['#3b82f6']}
-          tintColor={'#3b82f6'}
+          colors={["#3b82f6"]}
+          tintColor={"#3b82f6"}
         />
       }
     >
@@ -358,10 +415,10 @@ export default function AdminDashboardScreen({ navigation }) {
         subtitle="Admin real-time protection insights"
         rightActions={[
           {
-            icon: 'menu',
-            iconType: 'feather',
-            onPress: toggleMenu
-          }
+            icon: "menu",
+            iconType: "feather",
+            onPress: toggleMenu,
+          },
         ]}
         style={{ paddingHorizontal: 0 }}
       />
@@ -388,7 +445,11 @@ export default function AdminDashboardScreen({ navigation }) {
       </View>
       {error ? (
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#ef4444" />
+          <MaterialCommunityIcons
+            name="alert-circle-outline"
+            size={24}
+            color="#ef4444"
+          />
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : isLoading ? (
@@ -402,14 +463,19 @@ export default function AdminDashboardScreen({ navigation }) {
             <View key={index} style={styles.statCard}>
               <Text style={styles.statValue}>{stat.value}</Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
-              <Text style={[styles.statChange, { color: stat.color }]}> {stat.change} </Text>
+              <Text style={[styles.statChange, { color: stat.color }]}>
+                {" "}
+                {stat.change}{" "}
+              </Text>
             </View>
           ))}
         </View>
       )}
       <View style={styles.chartContainer}>
         <View style={styles.chartHeader}>
-          <Text style={styles.chartTitle}>Detection & Reports ({selectedTimeRange})</Text>
+          <Text style={styles.chartTitle}>
+            Detection & Reports ({selectedTimeRange})
+          </Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <LineChart
@@ -421,7 +487,7 @@ export default function AdminDashboardScreen({ navigation }) {
                   color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
                   strokeWidth: 3,
                   withDots: true,
-                  fillShadowGradient: 'rgba(16, 185, 129, 0.6)', // More vibrant green
+                  fillShadowGradient: "rgba(16, 185, 129, 0.6)", // More vibrant green
                   fillShadowGradientOpacity: 0.6,
                 },
                 {
@@ -429,17 +495,17 @@ export default function AdminDashboardScreen({ navigation }) {
                   color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
                   strokeWidth: 3,
                   withDots: true,
-                  fillShadowGradient: 'rgba(59, 130, 246, 0.6)', // More vibrant blue
+                  fillShadowGradient: "rgba(59, 130, 246, 0.6)", // More vibrant blue
                   fillShadowGradientOpacity: 0.6,
                 },
               ],
             }}
-            width={Math.max((detectionChartData.labels.length * 80), width - 40)}
+            width={Math.max(detectionChartData.labels.length * 80, width - 40)}
             height={220}
             chartConfig={{
               ...chartConfig,
-              propsForBackgroundLines: { stroke: '#f3f4f6' },
-              propsForLabels: { fontFamily: 'Poppins-Medium' },
+              propsForBackgroundLines: { stroke: "#f3f4f6" },
+              propsForLabels: { fontFamily: "Poppins-Medium" },
             }}
             style={styles.chart}
             fromZero
@@ -452,11 +518,11 @@ export default function AdminDashboardScreen({ navigation }) {
         </ScrollView>
         <View style={styles.chartLegend}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#01B97F' }]} />
+            <View style={[styles.legendDot, { backgroundColor: "#01B97F" }]} />
             <Text style={styles.legendText}>Detections</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
+            <View style={[styles.legendDot, { backgroundColor: "#3B82F6" }]} />
             <Text style={styles.legendText}>Reports</Text>
           </View>
         </View>
@@ -470,7 +536,11 @@ export default function AdminDashboardScreen({ navigation }) {
             onPress={() => navigation.navigate(option.screen)}
           >
             <View style={[styles.menuIcon, { backgroundColor: option.color }]}>
-              <MaterialCommunityIcons name={option.icon} size={24} color={option.iconColor} />
+              <MaterialCommunityIcons
+                name={option.icon}
+                size={24}
+                color={option.iconColor}
+              />
             </View>
             <View style={styles.menuContent}>
               <Text style={styles.menuItemTitle}>{option.title}</Text>
@@ -487,7 +557,9 @@ export default function AdminDashboardScreen({ navigation }) {
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color="#3b82f6" />
-            <Text style={styles.loadingText}>Loading top flagged content...</Text>
+            <Text style={styles.loadingText}>
+              Loading top flagged content...
+            </Text>
           </View>
         ) : (
           <View style={styles.analyticsList}>
@@ -506,7 +578,9 @@ export default function AdminDashboardScreen({ navigation }) {
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color="#3b82f6" />
-            <Text style={styles.loadingText}>Loading top monitored websites...</Text>
+            <Text style={styles.loadingText}>
+              Loading top monitored websites...
+            </Text>
           </View>
         ) : (
           <View style={styles.analyticsList}>
@@ -532,25 +606,9 @@ export default function AdminDashboardScreen({ navigation }) {
             {dashboardData.keyUserActivity.map((item, index) => (
               <View key={item.id} style={styles.analyticsListItem}>
                 <Text style={styles.analyticsListItemText}>{item.user}</Text>
-                <Text style={styles.analyticsListItemValue}>{item.actions}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-      <View style={styles.summaryContainer}>
-        <Text style={styles.summaryTitle}>MURAi AI Insights</Text>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#3b82f6" />
-            <Text style={styles.loadingText}>Loading insights...</Text>
-          </View>
-        ) : (
-          <View style={styles.summaryItems}>
-            {insightsData.map((insight, index) => (
-              <View key={index} style={styles.summaryItem}>
-                <MaterialCommunityIcons name={insight.icon} size={20} color={insight.color} />
-                <Text style={styles.summaryText}>{insight.text}</Text>
+                <Text style={styles.analyticsListItemValue}>
+                  {item.actions}
+                </Text>
               </View>
             ))}
           </View>
@@ -568,11 +626,21 @@ export default function AdminDashboardScreen({ navigation }) {
               <View style={styles.handleBar} />
               <View style={styles.menuHeader}>
                 <Text style={styles.menuTitle}>Admin Dashboard</Text>
-                <TouchableOpacity style={styles.closeButton} onPress={toggleMenu}>
-                  <MaterialCommunityIcons name="close" size={24} color="#374151" />
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={toggleMenu}
+                >
+                  <MaterialCommunityIcons
+                    name="close"
+                    size={24}
+                    color="#374151"
+                  />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={styles.menuScroll}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.menuSection}>
                   <Text style={styles.sectionTitle}>Analytics</Text>
                   {sideMenuItems.map((item, index) => (
@@ -582,26 +650,39 @@ export default function AdminDashboardScreen({ navigation }) {
                       onPress={() => handleMenuAction(item.action)}
                     >
                       <View style={styles.menuItemIcon}>
-                        <MaterialCommunityIcons name={item.icon} size={24} color="#374151" />
+                        <MaterialCommunityIcons
+                          name={item.icon}
+                          size={24}
+                          color="#374151"
+                        />
                       </View>
                       <View style={styles.menuItemContent}>
                         <Text style={styles.menuItemText}>{item.title}</Text>
                         <Text style={styles.menuItemSubtitle}>
-                          {index === 0 ? 'Main dashboard overview' :
-                            index === 1 ? 'Detection analytics and details' :
-                            index === 2 ? 'Sites analytics and details' :
-                            index === 3 ? 'Languages analytics and details' :
-                            index === 4 ? 'Groups analytics and details' :
-                            'Patterns over time analytics and details'}
+                          {index === 0
+                            ? "Main dashboard overview"
+                            : index === 1
+                            ? "Detection analytics and details"
+                            : index === 2
+                            ? "Sites analytics and details"
+                            : index === 3
+                            ? "Languages analytics and details"
+                            : index === 4
+                            ? "Groups analytics and details"
+                            : "Patterns over time analytics and details"}
                         </Text>
                       </View>
-                      <MaterialCommunityIcons name="chevron-right" size={20} color="#9ca3af" />
+                      <MaterialCommunityIcons
+                        name="chevron-right"
+                        size={20}
+                        color="#9ca3af"
+                      />
                     </TouchableOpacity>
                   ))}
                 </View>
               </ScrollView>
             </View>
-    </View>
+          </View>
         </TouchableOpacity>
       </Modal>
     </ScrollView>
@@ -611,11 +692,11 @@ export default function AdminDashboardScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     paddingHorizontal: 10,
   },
   timeRangeContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 20,
     gap: 8,
   },
@@ -625,67 +706,67 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   timeRangeButtonActive: {
-    backgroundColor: '#01B97F',
+    backgroundColor: "#01B97F",
   },
   timeRangeText: {
     fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: '#374151',
+    fontFamily: "Poppins-Regular",
+    color: "#374151",
   },
   timeRangeTextActive: {
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
+    fontFamily: "Poppins-SemiBold",
+    color: "#ffffff",
   },
   overallStatsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 30,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     borderRadius: 12,
     padding: 20,
     marginHorizontal: 4,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: "#f3f4f6",
   },
   statValue: {
     fontSize: 20,
-    fontFamily: 'Poppins-Bold',
-    color: '#111827',
+    fontFamily: "Poppins-Bold",
+    color: "#111827",
     marginBottom: 4,
   },
   statChange: {
     fontSize: 12,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: "Poppins-Medium",
     marginTop: 4,
   },
   statLabel: {
     fontSize: 10,
-    fontFamily: 'Poppins-Medium',
-    color: '#9ca3af',
-    textTransform: 'uppercase',
+    fontFamily: "Poppins-Medium",
+    color: "#9ca3af",
+    textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   chartContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     borderRadius: 12,
     padding: 20,
     marginBottom: 30,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: "#f3f4f6",
   },
   chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
   },
   chartTitle: {
     fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#111827',
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
     marginBottom: 15,
   },
   chart: {
@@ -693,13 +774,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   chartLegend: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     marginTop: 15,
   },
   legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   legendDot: {
     width: 10,
@@ -709,34 +790,34 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
-    fontFamily: 'Poppins-Medium',
-    color: '#6b7280',
+    fontFamily: "Poppins-Medium",
+    color: "#6b7280",
   },
   menuContainer: {
     marginBottom: 30,
   },
   menuTitle: {
     fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#111827',
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
     marginBottom: 16,
   },
   menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
     borderRadius: 8,
     padding: 16,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: "#f3f4f6",
   },
   menuIcon: {
     width: 40,
     height: 40,
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
 
@@ -745,88 +826,88 @@ const styles = StyleSheet.create({
   },
   menuItemTitle: {
     fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#111827',
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
     marginBottom: 2,
   },
   menuItemSubtitle: {
     fontSize: 12,
-    fontFamily: 'Poppins-Regular',
-    color: '#6b7280',
+    fontFamily: "Poppins-Regular",
+    color: "#6b7280",
   },
   summaryContainer: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: "#f9fafb",
     borderRadius: 12,
     padding: 20,
     marginBottom: 40,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: "#f3f4f6",
   },
   summaryTitle: {
     fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#111827',
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
     marginBottom: 16,
   },
   summaryItems: {
     gap: 12,
   },
   summaryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   summaryText: {
     fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-    color: '#6b7280',
+    fontFamily: "Poppins-Regular",
+    color: "#6b7280",
     marginLeft: 12,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 40,
   },
   loadingText: {
     fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    color: '#6b7280',
+    fontFamily: "Poppins-Medium",
+    color: "#6b7280",
     marginTop: 12,
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 40,
-    backgroundColor: '#fef2f2',
+    backgroundColor: "#fef2f2",
     borderRadius: 12,
     marginHorizontal: 4,
     borderWidth: 1,
-    borderColor: '#ef4444',
+    borderColor: "#ef4444",
   },
   errorText: {
     fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    color: '#ef4444',
+    fontFamily: "Poppins-Medium",
+    color: "#ef4444",
     marginTop: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
   bottomSheetContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'transparent',
+    justifyContent: "flex-end",
+    backgroundColor: "transparent",
   },
   bottomSheet: {
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
@@ -835,15 +916,15 @@ const styles = StyleSheet.create({
   handleBar: {
     width: 40,
     height: 4,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: "#e5e7eb",
     borderRadius: 2,
-    alignSelf: 'center',
+    alignSelf: "center",
     marginBottom: 15,
   },
   menuHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
   },
   menuScroll: {
@@ -854,16 +935,16 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#374151',
+    fontFamily: "Poppins-SemiBold",
+    color: "#374151",
     marginBottom: 12,
   },
   menuItemIcon: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 16,
   },
   menuItemContent: {
@@ -871,51 +952,51 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     fontSize: 16,
-    fontFamily: 'Poppins-Medium',
-    color: '#111827',
+    fontFamily: "Poppins-Medium",
+    color: "#111827",
     marginLeft: 16,
   },
   closeButton: {
     width: 40,
     height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: "#f3f4f6",
   },
   analyticsSectionContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     borderRadius: 12,
     padding: 20,
     marginBottom: 30,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: "#f3f4f6",
   },
   analyticsSectionTitle: {
     fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#111827',
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
     marginBottom: 16,
   },
   analyticsList: {
     gap: 10,
   },
   analyticsListItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: "#f3f4f6",
   },
   analyticsListItemText: {
     fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: '#374151',
+    fontFamily: "Poppins-Regular",
+    color: "#374151",
   },
   analyticsListItemValue: {
     fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    color: '#111827',
+    fontFamily: "Poppins-Medium",
+    color: "#111827",
   },
 });

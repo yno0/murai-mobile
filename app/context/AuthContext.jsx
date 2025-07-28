@@ -62,8 +62,15 @@ export function AuthProvider({ children }) {
       if (!response.ok) {
         throw { code: response.status, message: data.message || 'Registration failed' };
       }
-      // Registration step 1: OTP sent, redirect to login or OTP page
-      router.replace('/(auth)/login');
+
+      // Registration successful - user is automatically logged in
+      // Store token and user info in AsyncStorage
+      await AsyncStorage.setItem('token', data.token);
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      setUser(data.user);
+
+      // Redirect to main app
+      router.replace('/(app)');
     } catch (error) {
       throw error;
     }
