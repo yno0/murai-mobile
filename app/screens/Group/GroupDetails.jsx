@@ -53,26 +53,37 @@ export default function GroupDetailsScreen() {
   const { user } = useAuth();
   const { groupId, groupName } = route.params || {};
   const [groupData, setGroupData] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('members');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editGroupName, setEditGroupName] = useState('');
+  const [editGroupDescription, setEditGroupDescription] = useState('');
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [copied, setCopied] = useState(false);
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
+  const [adminMenuVisible, setAdminMenuVisible] = useState(false);
+  const [removeMemberModalVisible, setRemoveMemberModalVisible] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState(null);
+  const [removeLoading, setRemoveLoading] = useState(false);
   const [activities, setActivities] = useState([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
 
-  // Helper to check if current user is admin
+  // Helper to check if current user is admin (creator of the group)
   const isAdmin = groupData && user && (
-    (groupData.adminId && (groupData.adminId === user.id || groupData.adminId === user._id)) ||
-    (groupData.members && groupData.members.find(m => m.role === 'admin' && (m.id === user.id || m.id === user._id)))
+    groupData.userId === user.id ||
+    groupData.userId === user._id ||
+    groupData.userId?.toString() === user.id?.toString() ||
+    groupData.userId?.toString() === user._id?.toString()
   );
+
   console.log('user:', user);
   console.log('groupData:', groupData);
+  console.log('groupData.userId:', groupData?.userId);
+  console.log('user.id:', user?.id);
+  console.log('user._id:', user?._id);
   console.log('isAdmin:', isAdmin);
 
   useEffect(() => {
@@ -87,9 +98,14 @@ export default function GroupDetailsScreen() {
     setError('');
     try {
       const res = await api.get(`/users/groups/${id}`);
+      console.log('Group Details Response:', res.data);
+      console.log('Group userId (admin):', res.data.userId);
+      console.log('Group members:', res.data.members);
+      console.log('Admin info:', res.data.adminInfo);
       setGroupData(res.data);
     } catch (err) {
       setError('Failed to load group details');
+      console.error('Failed to fetch group details:', err);
     } finally {
       setLoading(false);
     }
@@ -202,8 +218,97 @@ export default function GroupDetailsScreen() {
 
   const openEditModal = () => {
     setEditGroupName(groupData?.name || '');
+    setEditGroupDescription(groupData?.description || '');
     setEditError('');
     setEditModalVisible(true);
+  };
+
+  const handleRemoveMember = (memberId, memberName) => {
+    console.log('🚀 handleRemoveMember FUNCTION CALLED!');
+    console.log('handleRemoveMember called with:', memberId, memberName);
+    console.log('memberId type:', typeof memberId);
+    console.log('memberId toString:', memberId?.toString());
+    console.log('groupData.id:', groupData?.id);
+    console.log('isAdmin:', isAdmin);
+
+    if (!groupData || !memberId) {
+      console.log('Missing groupData or memberId');
+      return;
+    }
+
+    // Set member to remove and show modal
+    setMemberToRemove({
+      id: memberId,
+      name: memberName
+    });
+    setRemoveMemberModalVisible(true);
+  };
+
+  const confirmRemoveMember = async () => {
+    if (!memberToRemove) return;
+
+    setRemoveLoading(true);
+    try {
+      console.log('Attempting to remove member...');
+      const apiUrl = `/users/groups/${groupData.id}/members/${memberToRemove.id}`;
+      console.log('API URL:', apiUrl);
+
+      const response = await api.delete(apiUrl);
+      console.log('Remove member response:', response.data);
+
+      // Record activity
+      await recordActivity(
+        'member_removed',
+        `${memberToRemove.name || 'Member'} was removed from the group`,
+        { removedMemberId: memberToRemove.id, removedMemberName: memberToRemove.name }
+      );
+
+      // Refresh group data to update member list
+      fetchGroupDetails(groupData.id);
+
+      // Close modal and reset state
+      setRemoveMemberModalVisible(false);
+      setMemberToRemove(null);
+
+    } catch (err) {
+      console.error('Remove member error:', err);
+      // You could show an error modal here instead of Alert
+    } finally {
+      setRemoveLoading(false);
+    }
+  };
+
+  const handleRegenerateCode = async () => {
+    if (!groupData) return;
+
+    Alert.alert(
+      'Regenerate Group Code',
+      'This will create a new group code and invalidate the old one. Members with the old code will no longer be able to join.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Regenerate',
+          style: 'default',
+          onPress: async () => {
+            try {
+              const response = await api.post(`/users/groups/${groupData.id}/regenerate-code`);
+              console.log('Regenerate code response:', response.data);
+
+              // Update group data with new code
+              setGroupData(prev => ({
+                ...prev,
+                shortCode: response.data.shortCode
+              }));
+
+              Alert.alert('Success', 'New group code generated successfully');
+            } catch (err) {
+              console.error('Regenerate code error:', err);
+              Alert.alert('Error', err.response?.data?.message || 'Failed to regenerate code');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleEditGroup = async () => {
@@ -215,19 +320,39 @@ export default function GroupDetailsScreen() {
     setEditError('');
     try {
       const oldName = groupData.name;
-      await api.put(`/users/groups/${groupData.id}`, { name: editGroupName.trim() });
+      const oldDescription = groupData.description;
+
+      await api.put(`/users/groups/${groupData.id}`, {
+        name: editGroupName.trim(),
+        description: editGroupDescription.trim()
+      });
 
       // Record activity
-      await recordActivity(
-        'group_updated',
-        `Group name changed from "${oldName}" to "${editGroupName.trim()}"`,
-        { oldName, newName: editGroupName.trim() }
-      );
+      const changes = [];
+      if (oldName !== editGroupName.trim()) {
+        changes.push(`name from "${oldName}" to "${editGroupName.trim()}"`);
+      }
+      if (oldDescription !== editGroupDescription.trim()) {
+        changes.push(`description updated`);
+      }
+
+      if (changes.length > 0) {
+        await recordActivity(
+          'group_updated',
+          `Group ${changes.join(' and ')}`,
+          {
+            oldName,
+            newName: editGroupName.trim(),
+            oldDescription,
+            newDescription: editGroupDescription.trim()
+          }
+        );
+      }
 
       setEditModalVisible(false);
       fetchGroupDetails(groupData.id);
     } catch (err) {
-      setEditError('Failed to update group name');
+      setEditError('Failed to update group');
     } finally {
       setEditLoading(false);
     }
@@ -253,23 +378,61 @@ export default function GroupDetailsScreen() {
     }
   };
 
-  const renderMemberItem = ({ item }) => (
-    <View style={styles.memberItem}>
-      <View style={styles.memberInfo}>
-        <View style={styles.memberAvatar}>
-          <Text style={styles.memberInitial}>{item.name.charAt(0)}</Text>
+  const renderMemberItem = ({ item }) => {
+    // ALL items in groupData.members are just members (from GroupUserModel)
+    // The admin is ONLY the user in groupData.userId (from Group model)
+    // So this item is NEVER an admin, always a member
+
+    return (
+      <View style={styles.memberItem}>
+        <View style={styles.memberInfo}>
+          <View style={styles.memberAvatar}>
+            <Text style={styles.memberInitial}>{item.name?.charAt(0).toUpperCase() || 'U'}</Text>
+          </View>
+          <View style={styles.memberDetails}>
+            <Text style={styles.memberName}>{item.name || 'Unknown User'}</Text>
+            <View style={styles.memberMetaRow}>
+              <View style={styles.roleTag}>
+                <MaterialCommunityIcons
+                  name="account"
+                  size={12}
+                  color="#6b7280"
+                />
+                <Text style={styles.roleText}>
+                  Member
+                </Text>
+              </View>
+              <Text style={styles.memberJoined}>
+                Joined {item.joinedAt ? new Date(item.joinedAt).toLocaleDateString() : 'Unknown'}
+              </Text>
+            </View>
+          </View>
         </View>
-        <View style={styles.memberDetails}>
-          <Text style={styles.memberName}>{item.name}</Text>
-          <Text style={styles.memberRole}>{item.role}</Text>
+        <View style={styles.memberActions}>
+          <View style={styles.statusIndicator}>
+            <View style={[styles.statusDot, { backgroundColor: Math.random() > 0.5 ? '#10b981' : '#d1d5db' }]} />
+            <Text style={styles.statusText}>
+              {Math.random() > 0.5 ? 'Online' : 'Offline'}
+            </Text>
+          </View>
+          {/* Admin can remove any member since all items here are members */}
+          {isAdmin && (
+            <TouchableOpacity
+              style={styles.removeButton}
+              onPress={() => {
+                console.log('🔴 REMOVE BUTTON PRESSED!');
+                const memberId = item.userId || item.id || item._id;
+                console.log('Calling handleRemoveMember with:', memberId, item.name);
+                handleRemoveMember(memberId, item.name);
+              }}
+            >
+              <MaterialCommunityIcons name="account-minus" size={16} color="#ef4444" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
-      <View style={styles.memberStatus}>
-        <View style={[styles.statusDot, { backgroundColor: item.status === 'online' ? '#10B981' : '#9CA3AF' }]} />
-        <Text style={styles.memberJoined}>Joined {item.joinedAt}</Text>
-      </View>
-    </View>
-  );
+    );
+  };
 
   const getActivityIcon = (type) => {
     switch (type) {
@@ -355,13 +518,67 @@ export default function GroupDetailsScreen() {
     switch (activeTab) {
       case 'members':
         return (
-          <FlatList
-            data={groupData.members}
-            renderItem={renderMemberItem}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.listContainer}
-          />
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.membersContainer}>
+
+
+            {/* Admin Section - Info from Group.userId joined with User */}
+            <View style={styles.adminSection}>
+              <Text style={styles.sectionTitle}>Group Admin</Text>
+              <View style={styles.adminCard}>
+                <View style={styles.memberInfo}>
+                  <View style={[styles.memberAvatar, styles.adminAvatar]}>
+                    <Text style={styles.memberInitial}>
+                      {groupData.adminInfo?.name?.charAt(0).toUpperCase() ||
+                       groupData.adminInfo?.username?.charAt(0).toUpperCase() ||
+                       'A'}
+                    </Text>
+                  </View>
+                  <View style={styles.memberDetails}>
+                    <Text style={styles.memberName}>
+                      {groupData.adminInfo?.name ||
+                       groupData.adminInfo?.username ||
+                       'Group Creator'}
+                    </Text>
+                    <View style={styles.memberMetaRow}>
+                      <View style={[styles.roleTag, styles.adminRoleTag]}>
+                        <MaterialCommunityIcons
+                          name="crown"
+                          size={12}
+                          color="#f59e0b"
+                        />
+                        <Text style={[styles.roleText, styles.adminRoleText]}>
+                          Admin
+                        </Text>
+                      </View>
+                      <Text style={styles.memberJoined}>
+                        Created {groupData.createAt ? new Date(groupData.createAt).toLocaleDateString() : 'Unknown'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Members Section */}
+            <View style={styles.membersSection}>
+              <Text style={styles.sectionTitle}>
+                Members ({groupData.members?.length || 0})
+              </Text>
+              {groupData.members && groupData.members.length > 0 ? (
+                groupData.members.map((item, index) => (
+                  <View key={item.id || index}>
+                    {renderMemberItem({ item })}
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyMembersContainer}>
+                  <MaterialCommunityIcons name="account-group-outline" size={48} color="#9ca3af" />
+                  <Text style={styles.emptyMembersText}>No members yet</Text>
+                  <Text style={styles.emptyMembersSubtext}>Invite people to join this group</Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
         );
       case 'activity':
         return (
@@ -391,25 +608,13 @@ export default function GroupDetailsScreen() {
         );
       default:
         return (
-          <ScrollView showsVerticalScrollIndicator={false} style={styles.overviewContainer}>
-            <View style={styles.statsCardBetter}>
-              <Text style={styles.infoTitle}>Statistics</Text>
-              <View style={styles.statsGridBetter}>
-                <View style={styles.statItemBetter}>
-                  <Text style={styles.statNumberBetter}>{typeof groupData.memberCount === 'number' ? groupData.memberCount : (groupData.members ? groupData.members.length : 0)}</Text>
-                  <Text style={styles.statLabelBetter}>Members</Text>
-                </View>
-                <View style={styles.statItemBetter}>
-                  <Text style={styles.statNumberBetter}>3</Text>
-                  <Text style={styles.statLabelBetter}>Online</Text>
-                </View>
-                <View style={styles.statItemBetter}>
-                  <Text style={styles.statNumberBetter}>12</Text>
-                  <Text style={styles.statLabelBetter}>Detections</Text>
-                </View>
-              </View>
-            </View>
-          </ScrollView>
+          <FlatList
+            data={groupData.members}
+            renderItem={renderMemberItem}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContainer}
+          />
         );
     }
   };
@@ -438,14 +643,36 @@ export default function GroupDetailsScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Group Name</Text>
-            <TextInput
-              style={styles.input}
-              value={editGroupName}
-              onChangeText={setEditGroupName}
-              placeholder="Group name"
-              placeholderTextColor="#9CA3AF"
-            />
+            <View style={styles.modalHeader}>
+              <MaterialCommunityIcons name="pencil" size={24} color="#02B97F" />
+              <Text style={styles.modalTitle}>Edit Group</Text>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Group Name</Text>
+              <TextInput
+                style={styles.input}
+                value={editGroupName}
+                onChangeText={setEditGroupName}
+                placeholder="Enter group name"
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Description (Optional)</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={editGroupDescription}
+                onChangeText={setEditGroupDescription}
+                placeholder="Enter group description"
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+            </View>
+
             {editError ? <Text style={styles.errorText}>{editError}</Text> : null}
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
               <TouchableOpacity
@@ -633,24 +860,157 @@ export default function GroupDetailsScreen() {
           </View>
         </View>
       </Modal>
-      {/* Header */}
+
+      {/* Admin Menu Modal */}
+      <Modal
+        visible={adminMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAdminMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.adminMenuOverlay}
+          activeOpacity={1}
+          onPress={() => setAdminMenuVisible(false)}
+        >
+          <View style={styles.adminMenuContainer}>
+            <View style={styles.adminMenuHeader}>
+              <MaterialCommunityIcons name="shield-account" size={24} color="#02B97F" />
+              <Text style={styles.adminMenuTitle}>Admin Actions</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.adminMenuItem}
+              onPress={() => {
+                setAdminMenuVisible(false);
+                openEditModal();
+              }}
+            >
+              <MaterialCommunityIcons name="pencil" size={20} color="#02B97F" />
+              <Text style={styles.adminMenuText}>Rename Group</Text>
+              <MaterialCommunityIcons name="chevron-right" size={16} color="#9ca3af" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.adminMenuItem}
+              onPress={() => {
+                setAdminMenuVisible(false);
+                setInfoModalVisible(true);
+              }}
+            >
+              <MaterialCommunityIcons name="information" size={20} color="#02B97F" />
+              <Text style={styles.adminMenuText}>Group Info</Text>
+              <MaterialCommunityIcons name="chevron-right" size={16} color="#9ca3af" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.adminMenuItem}
+              onPress={() => {
+                setAdminMenuVisible(false);
+                handleRegenerateCode();
+              }}
+            >
+              <MaterialCommunityIcons name="refresh" size={20} color="#02B97F" />
+              <Text style={styles.adminMenuText}>Regenerate Code</Text>
+              <MaterialCommunityIcons name="chevron-right" size={16} color="#9ca3af" />
+            </TouchableOpacity>
+
+            <View style={styles.adminMenuDivider} />
+
+            <TouchableOpacity
+              style={[styles.adminMenuItem, styles.dangerMenuItem]}
+              onPress={() => {
+                setAdminMenuVisible(false);
+                handleDeleteGroup();
+              }}
+            >
+              <MaterialCommunityIcons name="delete" size={20} color="#ef4444" />
+              <Text style={[styles.adminMenuText, styles.dangerText]}>Delete Group</Text>
+              <MaterialCommunityIcons name="chevron-right" size={16} color="#9ca3af" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Remove Member Modal */}
+      <Modal
+        visible={removeMemberModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRemoveMemberModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <MaterialCommunityIcons name="account-minus" size={24} color="#ef4444" />
+              <Text style={styles.modalTitle}>Remove Member</Text>
+            </View>
+
+            <Text style={styles.confirmationText}>
+              Are you sure you want to remove "{memberToRemove?.name || 'this member'}" from the group?
+            </Text>
+
+            <Text style={styles.warningText}>
+              This action cannot be undone. The member will need a new invite to rejoin.
+            </Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={() => {
+                  setRemoveMemberModalVisible(false);
+                  setMemberToRemove(null);
+                }}
+                disabled={removeLoading}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: '#ef4444' }]}
+                onPress={confirmRemoveMember}
+                disabled={removeLoading}
+              >
+                {removeLoading ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <Text style={styles.removeButtonText}>Remove</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Enhanced Header with Icon */}
       <Header
-        title={groupData?.name || 'Group Details'}
+        title={
+          <View style={styles.headerTitleContainer}>
+            <MaterialCommunityIcons name="account-group" size={24} color="#02B97F" />
+            <Text style={styles.headerTitle}>{groupData?.name || 'Group Details'}</Text>
+          </View>
+        }
         showBackButton={true}
         onBackPress={() => navigation.goBack()}
         rightContent={
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {isAdmin && (
-              <TouchableOpacity style={styles.headerBtn} onPress={openEditModal}>
-                <MaterialCommunityIcons name="pencil" size={20} color="#374151" />
-              </TouchableOpacity>
-            )}
+          <View style={styles.headerActions}>
             <TouchableOpacity style={styles.headerBtn} onPress={() => setInviteModalVisible(true)}>
-              <MaterialCommunityIcons name="account-plus" size={20} color="#10B981" />
+              <MaterialCommunityIcons name="account-plus" size={18} color="#02B97F" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.headerBtn} onPress={() => setInfoModalVisible(true)}>
-              <MaterialCommunityIcons name="information-outline" size={20} color="#3B82F6" />
+              <MaterialCommunityIcons name="information-outline" size={18} color="#02B97F" />
             </TouchableOpacity>
+            {isAdmin && (
+              <TouchableOpacity
+                style={[styles.headerBtn, styles.adminMenuBtn]}
+                onPress={() => {
+                  console.log('Admin menu button pressed');
+                  setAdminMenuVisible(true);
+                }}
+              >
+                <MaterialCommunityIcons name="dots-vertical" size={18} color="#02B97F" />
+              </TouchableOpacity>
+            )}
           </View>
         }
         style={{ paddingHorizontal: 0 }}
@@ -659,20 +1019,18 @@ export default function GroupDetailsScreen() {
 
 
 
-      {/* Tab Navigation */}
+      {/* Enhanced Tab Navigation with Icons */}
       <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
-          onPress={() => setActiveTab('overview')}
-        >
-          <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>
-            Overview
-          </Text>
-        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'members' && styles.activeTab]}
           onPress={() => setActiveTab('members')}
         >
+          <MaterialCommunityIcons
+            name="account-group"
+            size={18}
+            color={activeTab === 'members' ? '#02B97F' : '#6b7280'}
+            style={styles.tabIcon}
+          />
           <Text style={[styles.tabText, activeTab === 'members' && styles.activeTabText]}>
             Members ({groupData?.memberCount || (groupData?.members?.length || 0)})
           </Text>
@@ -681,6 +1039,12 @@ export default function GroupDetailsScreen() {
           style={[styles.tab, activeTab === 'activity' && styles.activeTab]}
           onPress={() => setActiveTab('activity')}
         >
+          <MaterialCommunityIcons
+            name="history"
+            size={18}
+            color={activeTab === 'activity' ? '#02B97F' : '#6b7280'}
+            style={styles.tabIcon}
+          />
           <Text style={[styles.tabText, activeTab === 'activity' && styles.activeTabText]}>
             Activity
           </Text>
@@ -716,57 +1080,173 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
+  // Enhanced Header Styles
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginLeft: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   headerBtn: {
-    padding: 10,
-    marginLeft: 4,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(2, 185, 127, 0.1)',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(2, 185, 127, 0.2)',
+  },
+  adminMenuBtn: {
+    backgroundColor: 'rgba(2, 185, 127, 0.15)',
+  },
+
+  // Admin Menu Styles
+  adminMenuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  adminMenuContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 320,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  adminMenuHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  adminMenuTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginLeft: 12,
+  },
+  adminMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: '#f8fafc',
+  },
+  dangerMenuItem: {
+    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+  },
+  adminMenuText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+    marginLeft: 12,
+  },
+  dangerText: {
+    color: '#ef4444',
+  },
+  adminMenuDivider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 8,
+    marginHorizontal: 12,
+  },
+
+  // Remove Member Modal Styles
+  confirmationText: {
+    fontSize: 16,
+    color: '#374151',
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 24,
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelButton: {
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  cancelButtonText: {
+    color: '#374151',
+    fontWeight: '500',
+  },
+  removeButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
   },
 
 
+  // Enhanced Tab Styles
   tabContainer: {
     flexDirection: 'row',
     marginHorizontal: 20,
     marginTop: 20,
     backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    padding: 6,
+    borderRadius: 12,
+    padding: 4,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
   },
   tab: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   activeTab: {
     backgroundColor: '#ffffff',
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: 'rgba(2, 185, 127, 0.2)',
+    shadowColor: 'rgba(2, 185, 127, 0.3)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
+  tabIcon: {
+    marginRight: 6,
+  },
   tabText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
+    fontSize: 13,
+    fontWeight: '500',
     color: '#6b7280',
   },
   activeTabText: {
-    color: '#1f2937',
+    color: '#02B97F',
     fontWeight: '600',
   },
   content: {
@@ -775,9 +1255,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     paddingTop: 8,
   },
-  overviewContainer: {
-    paddingTop: 20,
-  },
+
   infoCard: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
@@ -849,6 +1327,53 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingTop: 24,
   },
+
+  // Members Tab Styles
+  membersContainer: {
+    flex: 1,
+    paddingTop: 16,
+  },
+  adminSection: {
+    marginBottom: 24,
+  },
+  membersSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  adminCard: {
+    backgroundColor: 'rgba(245, 158, 11, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.2)',
+  },
+  adminAvatar: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  emptyMembersContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyMembersText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#6b7280',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyMembersSubtext: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
   memberItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -896,14 +1421,53 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     marginBottom: 4,
   },
-  memberRole: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
+  memberMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  roleTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  adminRoleTag: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+  },
+  roleText: {
+    fontSize: 12,
+    fontWeight: '500',
     color: '#6b7280',
+    marginLeft: 4,
     textTransform: 'capitalize',
   },
-  memberStatus: {
+  adminRoleText: {
+    color: '#f59e0b',
+  },
+  memberJoined: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  memberActions: {
     alignItems: 'flex-end',
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginLeft: 6,
+  },
+  removeButton: {
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
   },
   statusDot: {
     width: 12,
@@ -1108,11 +1672,25 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   modalTitle: {
     fontSize: 20,
-    fontFamily: 'Poppins-SemiBold',
+    fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 20,
+    marginLeft: 12,
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
@@ -1126,6 +1704,10 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 12,
     backgroundColor: '#f8fafc',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
   },
   button: {
     flex: 1,

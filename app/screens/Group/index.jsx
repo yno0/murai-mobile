@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
 import {
+    Animated,
     Dimensions,
     FlatList,
     Modal,
+    RefreshControl,
     StyleSheet,
     Text,
     TextInput,
@@ -24,6 +27,7 @@ function GroupsScreen({ navigation }) {
   const [groupName, setGroupName] = useState('');
   const [groupCode, setGroupCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [addBtnPressed, setAddBtnPressed] = useState(false);
@@ -33,13 +37,40 @@ function GroupsScreen({ navigation }) {
   const [modalMessage, setModalMessage] = useState('');
   const [modalTitle, setModalTitle] = useState('');
 
-  // Fetch groups on mount
-  React.useEffect(() => {
-    fetchGroups();
-  }, []);
+  // Animation values for enhanced UI
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [slideAnim] = useState(new Animated.Value(50));
 
-  const fetchGroups = async () => {
-    setLoading(true);
+  // Real-time refresh when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchGroups();
+      startAnimations();
+    }, [])
+  );
+
+  // Start entrance animations
+  const startAnimations = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const fetchGroups = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError('');
     try {
       const res = await api.get('/users/groups');
@@ -47,9 +78,18 @@ function GroupsScreen({ navigation }) {
     } catch (err) {
       setError('Failed to load groups');
     } finally {
-      setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
+
+  // Pull to refresh handler
+  const onRefresh = useCallback(() => {
+    fetchGroups(true);
+  }, []);
 
   const handleCreateGroup = async () => {
     if (!groupName.trim()) {
@@ -115,25 +155,47 @@ function GroupsScreen({ navigation }) {
     navigation.navigate('GroupDetails', { groupId: group._id, groupName: group.name });
   };
 
-  const renderGroupItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.groupCard}
-      onPress={() => handleGroupPress(item)}
-      activeOpacity={0.8}
+  const renderGroupItem = ({ item, index }) => (
+    <Animated.View
+      style={[
+        styles.groupCardContainer,
+        {
+          opacity: fadeAnim,
+          transform: [
+            {
+              translateY: slideAnim.interpolate({
+                inputRange: [0, 50],
+                outputRange: [0, 50],
+              }),
+            },
+          ],
+        },
+      ]}
     >
-      <View style={styles.groupRow}>
-        <View style={styles.groupIconContainer}>
-          <MaterialCommunityIcons name="account-group" size={28} color="#02B97F" />
+      <TouchableOpacity
+        style={styles.groupCard}
+        onPress={() => handleGroupPress(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.groupRow}>
+          <View style={styles.groupIconContainer}>
+            <MaterialCommunityIcons name="account-group" size={28} color="#02B97F" />
+          </View>
+          <View style={styles.groupInfo}>
+            <Text style={styles.groupName}>{item.name}</Text>
+            <View style={styles.groupMeta}>
+              <MaterialCommunityIcons name="account-multiple" size={16} color="#6b7280" />
+              <Text style={styles.memberCount}>
+                {(typeof item.memberCount === 'number' ? item.memberCount : (item.members ? item.members.length : 0))} members
+              </Text>
+            </View>
+          </View>
+          <View style={styles.groupActions}>
+            <MaterialCommunityIcons name="chevron-right" size={24} color="#9ca3af" />
+          </View>
         </View>
-        <View style={styles.groupInfo}>
-          <Text style={styles.groupName}>{item.name}</Text>
-          <Text style={styles.memberCount}>
-            {(typeof item.memberCount === 'number' ? item.memberCount : (item.members ? item.members.length : 0))} members
-          </Text>
-        </View>
-        <MaterialCommunityIcons name="chevron-right" size={20} color="#9ca3af" />
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 
   // Helper to normalize strings for diacritic-insensitive search
@@ -153,7 +215,7 @@ function GroupsScreen({ navigation }) {
         rightActions={[
           {
             icon: 'plus',
-            color: '#01B97F',
+            color: '#02B97F',
             onPress: () => setModalVisible(true)
           }
         ]}
@@ -195,6 +257,17 @@ function GroupsScreen({ navigation }) {
           keyExtractor={(item) => item._id || item.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#02B97F']}
+              tintColor="#02B97F"
+              title="Pull to refresh"
+              titleColor="#6b7280"
+            />
+          }
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
       {/* Error message */}
@@ -374,15 +447,19 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     paddingTop: 8,
   },
+  separator: {
+    height: 8,
+  },
+  groupCardContainer: {
+    marginBottom: 4,
+  },
   groupCard: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginHorizontal: 2,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   groupRow: {
     flexDirection: 'row',
@@ -406,7 +483,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#111827',
-    marginBottom: 2,
+    marginBottom: 4,
+  },
+  groupMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  groupActions: {
+    padding: 8,
   },
   adminBadge: {
     fontSize: 12,
@@ -425,8 +509,9 @@ const styles = StyleSheet.create({
   },
   memberCount: {
     fontSize: 14,
-    color: '#6b7280',
     fontWeight: '400',
+    color: '#6b7280',
+    marginLeft: 6,
   },
   chevron: {
     position: 'absolute',
@@ -453,11 +538,12 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginTop: 16,
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 16,
-    color: '#6b7280',
     fontWeight: '400',
+    color: '#6b7280',
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -569,8 +655,8 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#111827',
     fontWeight: '400',
+    color: '#111827',
     padding: 0,
   },
   clearBtn: {

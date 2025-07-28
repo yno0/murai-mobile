@@ -18,7 +18,16 @@ const login = async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET_KEY, { expiresIn: '1h' });
-        return res.status(200).json({ token, user: { email: user.email, role: user.role, name: user.name } });
+        return res.status(200).json({
+            token,
+            user: {
+                id: user._id,
+                _id: user._id,
+                email: user.email,
+                role: user.role,
+                name: user.name
+            }
+        });
     } catch (err) {
         console.error('login error: ', err);
         return res.status(500).json({ message: 'Internal server error' });
@@ -75,6 +84,8 @@ const register = async (req, res) => {
             message: 'Registration successful',
             token,
             user: {
+                id: user._id,
+                _id: user._id,
                 email: user.email,
                 role: user.role,
                 name: user.name

@@ -367,44 +367,46 @@ router.get("/groups/:id", authenticateToken, async (req, res) => {
     const groupId = req.params.id;
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ message: "Group not found" });
+
     // Get group code
     const groupCode = await GroupCode.findOne({ groupId: group._id });
-    // Get members
+
+    // Get admin info (from Group.userId)
+    const adminUser = await User.findById(group.userId);
+
+    // Get members (from GroupUserModel only - admin should NOT be here)
     const memberLinks = await GroupMember.find({ groupId: group._id });
     const userIds = memberLinks.map((link) => link.userId);
     const users = await User.find({ _id: { $in: userIds } });
-    // Build members array
+
+    // Build members array - ALL are members (no admin here)
     const members = users.map((user) => {
       const link = memberLinks.find(
         (l) => l.userId.toString() === user._id.toString()
       );
       return {
         id: user._id,
+        userId: user._id, // Add userId field for consistency
         name: user.name,
-        role:
-          group.userId.toString() === user._id.toString() ? "admin" : "member",
         joinedAt: link ? link.joinedAt : group.createAt,
       };
     });
-    // Add admin (creator) if not in members
-    if (!members.find((m) => m.id.toString() === group.userId.toString())) {
-      const adminUser = await User.findById(group.userId);
-      if (adminUser) {
-        members.unshift({
-          id: adminUser._id,
-          name: adminUser.name,
-          role: "admin",
-          joinedAt: group.createAt,
-        });
-      }
-    }
+
     res.json({
       id: group._id,
       name: group.name,
       shortCode: groupCode ? groupCode.code : "",
-      createdAt: group.createAt,
-      members,
-      adminId: group.userId, // Add this line
+      createAt: group.createAt, // Use original field name
+      createdAt: group.createAt, // Also provide alias
+      userId: group.userId, // The admin ID
+      adminInfo: adminUser ? {
+        id: adminUser._id,
+        name: adminUser.name,
+        username: adminUser.username,
+        email: adminUser.email
+      } : null,
+      members, // Only members from GroupUserModel
+      memberCount: members.length,
     });
   } catch (err) {
     console.error("Get group details error:", err);
@@ -462,16 +464,79 @@ router.delete(
     try {
       const groupId = req.params.id;
       const userId = req.params.userId;
+
+      console.log('Remove member request:');
+      console.log('- groupId:', groupId);
+      console.log('- userId to remove:', userId);
+      console.log('- admin user ID:', req.user.id);
+
+      const group = await Group.findById(groupId);
+      if (!group) {
+        console.log('Group not found');
+        return res.status(404).json({ message: "Group not found" });
+      }
+
+      console.log('- group.userId (admin):', group.userId.toString());
+      console.log('- is admin?', group.userId.toString() === req.user.id);
+
+      if (group.userId.toString() !== req.user.id) {
+        console.log('Permission denied - not admin');
+        return res
+          .status(403)
+          .json({ message: "Only the group admin can remove members" });
+      }
+
+      // Check if member exists before deletion
+      const existingMember = await GroupMember.findOne({ groupId, userId });
+      console.log('- existing member:', existingMember);
+
+      if (!existingMember) {
+        console.log('Member not found in group');
+        return res.status(404).json({ message: "Member not found in group" });
+      }
+
+      const deleteResult = await GroupMember.deleteOne({ groupId, userId });
+      console.log('- delete result:', deleteResult);
+
+      res.json({ message: "Member removed", deletedCount: deleteResult.deletedCount });
+    } catch (err) {
+      console.error("Remove member error:", err);
+      res.status(500).json({ message: "Server error", error: err.message });
+    }
+  }
+);
+
+// POST /api/users/groups/:id/regenerate-code - regenerate group code (admin only)
+router.post(
+  "/groups/:id/regenerate-code",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const groupId = req.params.id;
       const group = await Group.findById(groupId);
       if (!group) return res.status(404).json({ message: "Group not found" });
       if (group.userId.toString() !== req.user.id)
         return res
           .status(403)
-          .json({ message: "Only the group admin can remove members" });
-      await GroupMember.deleteOne({ groupId, userId });
-      res.json({ message: "Member removed" });
+          .json({ message: "Only the group admin can regenerate codes" });
+
+      // Generate new code
+      const newCode = Math.random().toString(36).substr(2, 6).toUpperCase();
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
+      // Update existing group code or create new one
+      await GroupCode.findOneAndUpdate(
+        { groupId },
+        { code: newCode, expiresAt, updateAt: new Date() },
+        { upsert: true }
+      );
+
+      res.json({
+        message: "Group code regenerated successfully",
+        shortCode: newCode
+      });
     } catch (err) {
-      console.error("Remove member error:", err);
+      console.error("Regenerate code error:", err);
       res.status(500).json({ message: "Server error", error: err.message });
     }
   }

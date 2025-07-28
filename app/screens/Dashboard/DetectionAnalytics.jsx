@@ -37,28 +37,42 @@ function DetectionAnalyticsScreen({ navigation }) {
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Chart configurations following the established pattern
-  const chartConfig = {
-    backgroundColor: 'transparent',
-    backgroundGradientFrom: '#f8fafc',
-    backgroundGradientTo: '#f8fafc',
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(2, 185, 127, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-    style: {
-      borderRadius: 16,
-    },
-    propsForDots: {
-      r: '4',
-      strokeWidth: '2',
-      stroke: '#ffffff',
-    },
-    propsForBackgroundLines: {
-      strokeWidth: 1,
-      stroke: '#f1f5f9',
-      strokeDasharray: '5,5',
-    },
+  // Dynamic chart configuration generator
+  const createChartConfig = (dataSize = 1, type = 'default') => {
+    // Iterative scaling based on data complexity
+    const complexity = Math.min(dataSize / 10, 1); // 0 to 1 scale
+    const baseOpacity = 0.7 + (complexity * 0.3); // More data = more opacity
+    const strokeWidth = 0.5 + (complexity * 1.5); // More data = thicker lines
+
+    return {
+      backgroundColor: 'transparent',
+      backgroundGradientFrom: '#f8fafc',
+      backgroundGradientTo: '#f8fafc',
+      decimalPlaces: 0,
+      color: (opacity = 1) => `rgba(2, 185, 127, ${baseOpacity * opacity})`,
+      labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+      style: {
+        borderRadius: 16,
+      },
+      propsForDots: {
+        r: Math.max(2, 4 - (complexity * 2)).toString(), // Smaller dots for complex data
+        strokeWidth: '2',
+        stroke: '#ffffff',
+      },
+      propsForBackgroundLines: {
+        strokeWidth: strokeWidth,
+        stroke: `rgba(241, 245, 249, ${0.5 + complexity * 0.5})`,
+        strokeDasharray: complexity > 0.5 ? '3,3' : '5,5', // Denser dashes for complex data
+      },
+      // Iterative font sizing based on data density
+      propsForLabels: {
+        fontSize: Math.max(8, 12 - (dataSize * 0.2)),
+      },
+    };
   };
+
+  // Default chart config for backward compatibility
+  const chartConfig = createChartConfig(5, 'default');
 
   const timeRanges = ['Today', 'Last 7 Days', 'Last Month', 'Last Year'];
 
@@ -684,7 +698,7 @@ function DetectionAnalyticsScreen({ navigation }) {
               data={detectionData.languageDistribution}
               width={width - 40}
               height={200}
-              chartConfig={chartConfig}
+              chartConfig={createChartConfig(detectionData.languageDistribution?.length || 1, 'pie')}
               accessor="population"
               backgroundColor="transparent"
               paddingLeft="0"
@@ -765,9 +779,9 @@ function DetectionAnalyticsScreen({ navigation }) {
               <BarChart
                 data={detectionData.trendPatterns}
                 width={Math.max(width - 40, detectionData.trendPatterns.labels.length * 60)}
-                height={220}
-                chartConfig={chartConfig}
-                verticalLabelRotation={30}
+                height={200 + (detectionData.trendPatterns.labels.length * 2)} // Iterative height
+                chartConfig={createChartConfig(detectionData.trendPatterns.labels.length, 'bar')}
+                verticalLabelRotation={Math.min(45, 15 + (detectionData.trendPatterns.labels.length * 3))} // Iterative rotation
                 style={styles.chart}
                 showValuesOnTopOfBars={true}
               />
@@ -810,7 +824,7 @@ function DetectionAnalyticsScreen({ navigation }) {
               data={detectionData.severityAnalysis}
               width={width - 40}
               height={200}
-              chartConfig={chartConfig}
+              chartConfig={createChartConfig(detectionData.severityAnalysis?.length || 1, 'severity')}
               accessor="population"
               backgroundColor="transparent"
               paddingLeft="0"
