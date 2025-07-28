@@ -216,9 +216,36 @@ export default function GroupDetailsScreen() {
     );
   };
 
+  // Activity logging helper
+  const logActivity = async (action, details = '') => {
+    try {
+      const activityMessages = {
+        'viewed_group_info': `Viewed group information for "${groupData?.name}"`,
+        'opened_rename_group': `Opened rename dialog for group "${groupData?.name}"`,
+        'regenerated_invite_code': `Regenerated invite code for group "${groupData?.name}"`,
+        'initiated_group_deletion': `Initiated deletion process for group "${groupData?.name}"`,
+        'removed_member': `Removed member from group "${groupData?.name}"`,
+        'member_joined': `New member joined group "${groupData?.name}"`,
+        'member_left': `Member left group "${groupData?.name}"`,
+        'code_regenerated': `Regenerated invite code for group "${groupData?.name}"`
+      };
+
+      await recordActivity(
+        action,
+        details || activityMessages[action] || `Admin action: ${action}`,
+        {
+          groupId: groupData?.id,
+          groupName: groupData?.name,
+          action: action
+        }
+      );
+    } catch (error) {
+      console.log('Failed to log activity:', error);
+    }
+  };
+
   const openEditModal = () => {
     setEditGroupName(groupData?.name || '');
-    setEditGroupDescription(groupData?.description || '');
     setEditError('');
     setEditModalVisible(true);
   };
@@ -257,6 +284,7 @@ export default function GroupDetailsScreen() {
       console.log('Remove member response:', response.data);
 
       // Record activity
+      await logActivity('removed_member', `Removed ${memberToRemove.name || 'Member'} from group "${groupData.name}"`);
       await recordActivity(
         'member_removed',
         `${memberToRemove.name || 'Member'} was removed from the group`,
@@ -300,6 +328,16 @@ export default function GroupDetailsScreen() {
                 shortCode: response.data.shortCode
               }));
 
+              // Record activity
+              await recordActivity(
+                'code_regenerated',
+                `Group invite code was regenerated`,
+                {
+                  oldCode: groupData.shortCode,
+                  newCode: response.data.shortCode
+                }
+              );
+
               Alert.alert('Success', 'New group code generated successfully');
             } catch (err) {
               console.error('Regenerate code error:', err);
@@ -320,31 +358,19 @@ export default function GroupDetailsScreen() {
     setEditError('');
     try {
       const oldName = groupData.name;
-      const oldDescription = groupData.description;
 
       await api.put(`/users/groups/${groupData.id}`, {
-        name: editGroupName.trim(),
-        description: editGroupDescription.trim()
+        name: editGroupName.trim()
       });
 
       // Record activity
-      const changes = [];
       if (oldName !== editGroupName.trim()) {
-        changes.push(`name from "${oldName}" to "${editGroupName.trim()}"`);
-      }
-      if (oldDescription !== editGroupDescription.trim()) {
-        changes.push(`description updated`);
-      }
-
-      if (changes.length > 0) {
         await recordActivity(
           'group_updated',
-          `Group ${changes.join(' and ')}`,
+          `Group name changed from "${oldName}" to "${editGroupName.trim()}"`,
           {
             oldName,
-            newName: editGroupName.trim(),
-            oldDescription,
-            newDescription: editGroupDescription.trim()
+            newName: editGroupName.trim()
           }
         );
       }
@@ -448,6 +474,8 @@ export default function GroupDetailsScreen() {
         return 'pencil';
       case 'group_deleted':
         return 'delete';
+      case 'code_regenerated':
+        return 'refresh';
       case 'detection':
         return 'alert-circle';
       case 'settings':
@@ -642,57 +670,66 @@ export default function GroupDetailsScreen() {
         onRequestClose={() => setEditModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.enhancedModalContent}>
+            {/* Modal Handle */}
+            <View style={styles.modalHandle} />
+
+            {/* Header */}
             <View style={styles.modalHeader}>
-              <MaterialCommunityIcons name="pencil" size={24} color="#02B97F" />
-              <Text style={styles.modalTitle}>Edit Group</Text>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Group Name</Text>
-              <TextInput
-                style={styles.input}
-                value={editGroupName}
-                onChangeText={setEditGroupName}
-                placeholder="Enter group name"
-                placeholderTextColor="#9CA3AF"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Description (Optional)</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={editGroupDescription}
-                onChangeText={setEditGroupDescription}
-                placeholder="Enter group description"
-                placeholderTextColor="#9CA3AF"
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-              />
-            </View>
-
-            {editError ? <Text style={styles.errorText}>{editError}</Text> : null}
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-              <TouchableOpacity
-                style={[styles.button, { backgroundColor: '#F3F4F6' }]}
-                onPress={() => setEditModalVisible(false)}
-                disabled={editLoading}
-              >
-                <Text style={{ color: '#374151' }}>Cancel</Text>
+              <View style={styles.modalTitleContainer}>
+                <MaterialCommunityIcons name="pencil-outline" size={24} color="#02B97F" />
+                <Text style={styles.modalTitle}>Rename Group</Text>
+              </View>
+              <TouchableOpacity style={styles.closeButton} onPress={() => setEditModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={20} color="#6b7280" />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, { backgroundColor: '#3B82F6' }]}
-                onPress={handleEditGroup}
-                disabled={editLoading}
-              >
-                {editLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={{ color: '#fff' }}>Save</Text>
-                )}
-              </TouchableOpacity>
+            </View>
+
+            {/* Content */}
+            <View style={styles.cleanEditContent}>
+              <View style={styles.cleanInputContainer}>
+                <Text style={styles.cleanInputLabel}>Group Name</Text>
+                <TextInput
+                  style={styles.cleanInput}
+                  value={editGroupName}
+                  onChangeText={setEditGroupName}
+                  placeholder="Enter group name"
+                  placeholderTextColor="#9CA3AF"
+                  autoFocus
+                />
+              </View>
+
+              {editError ? (
+                <View style={styles.cleanErrorContainer}>
+                  <MaterialCommunityIcons name="alert-circle" size={16} color="#dc2626" />
+                  <Text style={styles.cleanErrorText}>{editError}</Text>
+                </View>
+              ) : null}
+
+              {/* Action Buttons */}
+              <View style={styles.cleanButtonContainer}>
+                <TouchableOpacity
+                  style={styles.cleanCancelButton}
+                  onPress={() => setEditModalVisible(false)}
+                  disabled={editLoading}
+                >
+                  <Text style={styles.cleanCancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cleanSaveButton}
+                  onPress={handleEditGroup}
+                  disabled={editLoading}
+                >
+                  {editLoading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="check" size={18} color="#fff" />
+                      <Text style={styles.cleanSaveButtonText}>Save Changes</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
@@ -721,50 +758,58 @@ export default function GroupDetailsScreen() {
             </View>
 
             {/* Content */}
-            <View style={styles.modalContentContainer}>
-              {/* Group Details Card */}
-              <View style={styles.groupDetailsCard}>
-                <View style={styles.groupIconHeader}>
-                  <View style={styles.groupIconLarge}>
-                    <MaterialCommunityIcons name="account-group" size={32} color="#02B97F" />
-                  </View>
-                  <Text style={styles.groupNameLarge}>{groupData?.name}</Text>
-                  <Text style={styles.groupMemberCount}>
+            <View style={styles.cleanModalContent}>
+              {/* Group Header */}
+              <View style={styles.cleanGroupHeader}>
+                <View style={styles.cleanGroupIcon}>
+                  <MaterialCommunityIcons name="account-group" size={28} color="#02B97F" />
+                </View>
+                <View style={styles.cleanGroupInfo}>
+                  <Text style={styles.cleanGroupName}>{groupData?.name}</Text>
+                  <Text style={styles.cleanMemberCount}>
                     {groupData?.memberCount || (groupData?.members?.length || 0)} members
                   </Text>
                 </View>
+              </View>
 
-                {/* Group Info Rows */}
-                <View style={styles.infoSection}>
-                  <View style={styles.infoRowEnhanced}>
-                    <View style={styles.infoIconContainer}>
-                      <MaterialCommunityIcons name="key-variant" size={18} color="#6b7280" />
-                    </View>
-                    <Text style={styles.infoLabelEnhanced}>Group Code</Text>
-                    <View style={styles.codeContainer}>
-                      <Text style={styles.codeBoxEnhanced}>{groupData?.shortCode || '-'}</Text>
-                      {groupData?.shortCode && (
-                        <TouchableOpacity style={styles.copyBtnEnhanced} onPress={() => handleCopyCode(groupData.shortCode)}>
-                          <MaterialCommunityIcons name="content-copy" size={16} color="#02B97F" />
-                        </TouchableOpacity>
-                      )}
-                    </View>
+              {/* Group Details */}
+              <View style={styles.cleanDetailsSection}>
+                {/* Group Code Row */}
+                <View style={styles.cleanInfoRow}>
+                  <View style={styles.cleanInfoLeft}>
+                    <MaterialCommunityIcons name="key-variant" size={20} color="#02B97F" />
+                    <Text style={styles.cleanInfoLabel}>Group Code</Text>
                   </View>
-
-                  <View style={styles.infoRowEnhanced}>
-                    <View style={styles.infoIconContainer}>
-                      <MaterialCommunityIcons name="calendar" size={18} color="#6b7280" />
-                    </View>
-                    <Text style={styles.infoLabelEnhanced}>Created</Text>
-                    <Text style={styles.infoValueEnhanced}>{formatDateTime(groupData?.createdAt)}</Text>
+                  <View style={styles.cleanCodeContainer}>
+                    <Text style={styles.cleanCodeText}>{groupData?.shortCode || '-'}</Text>
+                    {groupData?.shortCode && (
+                      <TouchableOpacity
+                        style={styles.cleanCopyBtn}
+                        onPress={() => handleCopyCode(groupData.shortCode)}
+                      >
+                        <MaterialCommunityIcons name="content-copy" size={16} color="#02B97F" />
+                      </TouchableOpacity>
+                    )}
                   </View>
+                </View>
 
-                  <View style={styles.infoRowEnhanced}>
-                    <View style={styles.infoIconContainer}>
-                      <MaterialCommunityIcons name="crown" size={18} color="#6b7280" />
-                    </View>
-                    <Text style={styles.infoLabelEnhanced}>Your Role</Text>
-                    <Text style={[styles.infoValueEnhanced, { color: isAdmin ? '#02B97F' : '#6b7280' }]}>
+                {/* Created Date Row */}
+                <View style={styles.cleanInfoRow}>
+                  <View style={styles.cleanInfoLeft}>
+                    <MaterialCommunityIcons name="calendar" size={20} color="#02B97F" />
+                    <Text style={styles.cleanInfoLabel}>Created</Text>
+                  </View>
+                  <Text style={styles.cleanInfoValue}>{formatDateTime(groupData?.createdAt)}</Text>
+                </View>
+
+                {/* Role Row */}
+                <View style={styles.cleanInfoRow}>
+                  <View style={styles.cleanInfoLeft}>
+                    <MaterialCommunityIcons name="crown" size={20} color="#02B97F" />
+                    <Text style={styles.cleanInfoLabel}>Your Role</Text>
+                  </View>
+                  <View style={styles.cleanRoleBadge}>
+                    <Text style={[styles.cleanRoleText, { color: isAdmin ? '#02B97F' : '#6b7280' }]}>
                       {isAdmin ? 'Admin' : 'Member'}
                     </Text>
                   </View>
@@ -773,21 +818,21 @@ export default function GroupDetailsScreen() {
 
               {/* Copy Success Message */}
               {copied && (
-                <View style={styles.successMessage}>
+                <View style={styles.cleanSuccessMessage}>
                   <MaterialCommunityIcons name="check-circle" size={16} color="#10b981" />
-                  <Text style={styles.successText}>Code copied to clipboard!</Text>
+                  <Text style={styles.cleanSuccessText}>Code copied to clipboard!</Text>
                 </View>
               )}
 
               {/* Action Buttons */}
-              <View style={styles.modalActions}>
-                {!isAdmin && (
-                  <TouchableOpacity style={styles.leaveGroupButtonEnhanced} onPress={handleLeaveGroup}>
+              {!isAdmin && (
+                <View style={styles.cleanActionSection}>
+                  <TouchableOpacity style={styles.cleanLeaveButton} onPress={handleLeaveGroup}>
                     <MaterialCommunityIcons name="exit-to-app" size={20} color="#dc2626" />
-                    <Text style={styles.leaveGroupButtonTextEnhanced}>Leave Group</Text>
+                    <Text style={styles.cleanLeaveButtonText}>Leave Group</Text>
                   </TouchableOpacity>
-                )}
-              </View>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -861,75 +906,119 @@ export default function GroupDetailsScreen() {
         </View>
       </Modal>
 
-      {/* Admin Menu Modal */}
+      {/* Enhanced Menu Modal */}
       <Modal
         visible={adminMenuVisible}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setAdminMenuVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.adminMenuOverlay}
-          activeOpacity={1}
-          onPress={() => setAdminMenuVisible(false)}
-        >
-          <View style={styles.adminMenuContainer}>
-            <View style={styles.adminMenuHeader}>
-              <MaterialCommunityIcons name="shield-account" size={24} color="#02B97F" />
-              <Text style={styles.adminMenuTitle}>Admin Actions</Text>
+        <View style={styles.menuOverlay}>
+          <View style={styles.menuContainer}>
+            {/* Handle Bar */}
+            <View style={styles.menuHandle} />
+
+            {/* Header */}
+            <View style={styles.menuHeader}>
+              <View style={styles.menuTitleContainer}>
+                <MaterialCommunityIcons name="cog" size={24} color="#02B97F" />
+                <Text style={styles.menuTitle}>Group Settings</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.menuCloseBtn}
+                onPress={() => setAdminMenuVisible(false)}
+              >
+                <MaterialCommunityIcons name="close" size={20} color="#6b7280" />
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={styles.adminMenuItem}
-              onPress={() => {
-                setAdminMenuVisible(false);
-                openEditModal();
-              }}
-            >
-              <MaterialCommunityIcons name="pencil" size={20} color="#02B97F" />
-              <Text style={styles.adminMenuText}>Rename Group</Text>
-              <MaterialCommunityIcons name="chevron-right" size={16} color="#9ca3af" />
-            </TouchableOpacity>
+            {/* Enhanced Menu Items */}
+            <View style={styles.menuContent}>
+              {/* Group Info */}
+              <TouchableOpacity
+                style={styles.enhancedMenuItem}
+                onPress={() => {
+                  setAdminMenuVisible(false);
+                  setInfoModalVisible(true);
+                  logActivity('viewed_group_info');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.enhancedMenuItemIcon, { backgroundColor: '#E8F5F0' }]}>
+                  <MaterialCommunityIcons name="information-outline" size={22} color="#02B97F" />
+                </View>
+                <View style={styles.enhancedMenuItemContent}>
+                  <Text style={styles.enhancedMenuItemTitle}>Group Info</Text>
+                  <Text style={styles.enhancedMenuItemSubtitle}>View group details and statistics</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#9ca3af" />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.adminMenuItem}
-              onPress={() => {
-                setAdminMenuVisible(false);
-                setInfoModalVisible(true);
-              }}
-            >
-              <MaterialCommunityIcons name="information" size={20} color="#02B97F" />
-              <Text style={styles.adminMenuText}>Group Info</Text>
-              <MaterialCommunityIcons name="chevron-right" size={16} color="#9ca3af" />
-            </TouchableOpacity>
+              {/* Rename Group */}
+              <TouchableOpacity
+                style={styles.enhancedMenuItem}
+                onPress={() => {
+                  setAdminMenuVisible(false);
+                  openEditModal();
+                  logActivity('opened_rename_group');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.enhancedMenuItemIcon, { backgroundColor: '#EBF4FF' }]}>
+                  <MaterialCommunityIcons name="pencil-outline" size={22} color="#3b82f6" />
+                </View>
+                <View style={styles.enhancedMenuItemContent}>
+                  <Text style={styles.enhancedMenuItemTitle}>Rename Group</Text>
+                  <Text style={styles.enhancedMenuItemSubtitle}>Change the group name</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#9ca3af" />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.adminMenuItem}
-              onPress={() => {
-                setAdminMenuVisible(false);
-                handleRegenerateCode();
-              }}
-            >
-              <MaterialCommunityIcons name="refresh" size={20} color="#02B97F" />
-              <Text style={styles.adminMenuText}>Regenerate Code</Text>
-              <MaterialCommunityIcons name="chevron-right" size={16} color="#9ca3af" />
-            </TouchableOpacity>
+              {/* Regenerate Code */}
+              <TouchableOpacity
+                style={styles.enhancedMenuItem}
+                onPress={() => {
+                  setAdminMenuVisible(false);
+                  handleRegenerateCode();
+                  logActivity('regenerated_invite_code');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.enhancedMenuItemIcon, { backgroundColor: '#FEF3C7' }]}>
+                  <MaterialCommunityIcons name="refresh" size={22} color="#f59e0b" />
+                </View>
+                <View style={styles.enhancedMenuItemContent}>
+                  <Text style={styles.enhancedMenuItemTitle}>Regenerate Code</Text>
+                  <Text style={styles.enhancedMenuItemSubtitle}>Create a new invite code</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#9ca3af" />
+              </TouchableOpacity>
 
-            <View style={styles.adminMenuDivider} />
+              {/* Enhanced Divider */}
+              <View style={styles.enhancedMenuDivider} />
 
-            <TouchableOpacity
-              style={[styles.adminMenuItem, styles.dangerMenuItem]}
-              onPress={() => {
-                setAdminMenuVisible(false);
-                handleDeleteGroup();
-              }}
-            >
-              <MaterialCommunityIcons name="delete" size={20} color="#ef4444" />
-              <Text style={[styles.adminMenuText, styles.dangerText]}>Delete Group</Text>
-              <MaterialCommunityIcons name="chevron-right" size={16} color="#9ca3af" />
-            </TouchableOpacity>
+              {/* Delete Group */}
+              <TouchableOpacity
+                style={[styles.enhancedMenuItem, styles.enhancedDangerMenuItem]}
+                onPress={() => {
+                  setAdminMenuVisible(false);
+                  handleDeleteGroup();
+                  logActivity('initiated_group_deletion');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.enhancedMenuItemIcon, { backgroundColor: '#FEE2E2' }]}>
+                  <MaterialCommunityIcons name="delete-outline" size={22} color="#ef4444" />
+                </View>
+                <View style={styles.enhancedMenuItemContent}>
+                  <Text style={[styles.enhancedMenuItemTitle, styles.enhancedDangerText]}>Delete Group</Text>
+                  <Text style={[styles.enhancedMenuItemSubtitle, styles.enhancedDangerSubtext]}>Permanently remove this group</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Remove Member Modal */}
@@ -995,22 +1084,17 @@ export default function GroupDetailsScreen() {
         rightContent={
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.headerBtn} onPress={() => setInviteModalVisible(true)}>
-              <MaterialCommunityIcons name="account-plus" size={18} color="#02B97F" />
+              <MaterialCommunityIcons name="account-plus" size={20} color="#02B97F" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerBtn} onPress={() => setInfoModalVisible(true)}>
-              <MaterialCommunityIcons name="information-outline" size={18} color="#02B97F" />
+            <TouchableOpacity
+              style={[styles.headerBtn, styles.menuBtn]}
+              onPress={() => {
+                console.log('Menu button pressed');
+                setAdminMenuVisible(true);
+              }}
+            >
+              <MaterialCommunityIcons name="dots-vertical" size={20} color="#02B97F" />
             </TouchableOpacity>
-            {isAdmin && (
-              <TouchableOpacity
-                style={[styles.headerBtn, styles.adminMenuBtn]}
-                onPress={() => {
-                  console.log('Admin menu button pressed');
-                  setAdminMenuVisible(true);
-                }}
-              >
-                <MaterialCommunityIcons name="dots-vertical" size={18} color="#02B97F" />
-              </TouchableOpacity>
-            )}
           </View>
         }
         style={{ paddingHorizontal: 0 }}
@@ -1056,19 +1140,7 @@ export default function GroupDetailsScreen() {
         {renderTabContent()}
       </View>
 
-      {/* Action Buttons */}
-      {isAdmin && (
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.inviteButton} onPress={handleInviteMember}>
-            <MaterialCommunityIcons name="account-plus" size={20} color="#FFFFFF" />
-            <Text style={styles.inviteButtonText}>Invite Member</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteGroup}>
-            <MaterialCommunityIcons name="delete" size={20} color="#EF4444" />
-            <Text style={styles.deleteButtonText}>Delete Group</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+
       
 
     </View>
@@ -1103,74 +1175,402 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(2, 185, 127, 0.2)',
   },
-  adminMenuBtn: {
+  menuBtn: {
     backgroundColor: 'rgba(2, 185, 127, 0.15)',
   },
 
-  // Admin Menu Styles
-  adminMenuOverlay: {
+  // Enhanced Menu Styles
+  menuOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
+    justifyContent: 'flex-end',
   },
-  adminMenuContainer: {
+  menuContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    width: '100%',
-    maxWidth: 320,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 34, // Safe area padding
+    maxHeight: '80%',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 10,
+      height: -4,
     },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.15,
     shadowRadius: 20,
-    elevation: 10,
+    elevation: 15,
   },
-  adminMenuHeader: {
+  menuHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#d1d5db',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  menuHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 16,
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#f3f4f6',
   },
-  adminMenuTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  menuTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuTitle: {
+    fontSize: 20,
+    fontFamily: 'Poppins-SemiBold',
     color: '#1f2937',
     marginLeft: 12,
   },
-  adminMenuItem: {
+  menuCloseBtn: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+  },
+  menuContent: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+  },
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
     marginBottom: 8,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  menuItemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuItemContent: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  menuItemTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  menuItemSubtitle: {
+    fontSize: 13,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
   },
   dangerMenuItem: {
-    backgroundColor: 'rgba(239, 68, 68, 0.05)',
-  },
-  adminMenuText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#374151',
-    marginLeft: 12,
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
   },
   dangerText: {
     color: '#ef4444',
   },
-  adminMenuDivider: {
+  dangerSubtext: {
+    color: '#ef4444',
+    opacity: 0.7,
+  },
+  menuDivider: {
     height: 1,
     backgroundColor: '#e5e7eb',
-    marginVertical: 8,
-    marginHorizontal: 12,
+    marginVertical: 16,
+    marginHorizontal: 16,
+  },
+
+  // Enhanced Menu Item Styles
+  enhancedMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    shadowColor: '#64748b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  enhancedMenuItemIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  enhancedMenuItemContent: {
+    flex: 1,
+  },
+  enhancedMenuItemTitle: {
+    fontSize: 17,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  enhancedMenuItemSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#64748b',
+    lineHeight: 20,
+  },
+  enhancedMenuDivider: {
+    height: 1,
+    backgroundColor: '#e2e8f0',
+    marginVertical: 16,
+    marginHorizontal: 20,
+  },
+  enhancedDangerMenuItem: {
+    borderColor: 'rgba(239, 68, 68, 0.15)',
+    backgroundColor: 'rgba(254, 242, 242, 0.8)',
+  },
+  enhancedDangerText: {
+    color: '#dc2626',
+  },
+  enhancedDangerSubtext: {
+    color: '#ef4444',
+  },
+
+  // Clean Modal Styles for Group Info
+  cleanModalContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  cleanGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    marginBottom: 24,
+  },
+  cleanGroupIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E8F5F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  cleanGroupInfo: {
+    flex: 1,
+  },
+  cleanGroupName: {
+    fontSize: 20,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  cleanMemberCount: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#64748b',
+  },
+  cleanDetailsSection: {
+    gap: 20,
+  },
+  cleanInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  cleanInfoLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  cleanInfoLabel: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#374151',
+    marginLeft: 12,
+  },
+  cleanCodeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  cleanCodeText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#02B97F',
+    letterSpacing: 2,
+    marginRight: 8,
+  },
+  cleanCopyBtn: {
+    padding: 4,
+  },
+  cleanInfoValue: {
+    fontSize: 15,
+    fontFamily: 'Poppins-Regular',
+    color: '#64748b',
+  },
+  cleanRoleBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+  },
+  cleanRoleText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-SemiBold',
+  },
+  cleanSuccessMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  cleanSuccessText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#15803d',
+    marginLeft: 8,
+  },
+  cleanActionSection: {
+    marginTop: 24,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  cleanLeaveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fef2f2',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  cleanLeaveButtonText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#dc2626',
+    marginLeft: 8,
+  },
+
+  // Clean Edit Modal Styles
+  cleanEditContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  cleanInputContainer: {
+    marginBottom: 20,
+  },
+  cleanInputLabel: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  cleanInput: {
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#1f2937',
+    backgroundColor: '#ffffff',
+  },
+  cleanErrorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  cleanErrorText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#dc2626',
+    marginLeft: 6,
+  },
+  cleanButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  cleanCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cleanCancelButtonText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#64748b',
+  },
+  cleanSaveButton: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: '#02B97F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    shadowColor: '#02B97F',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cleanSaveButtonText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
   },
 
   // Remove Member Modal Styles
@@ -1554,80 +1954,7 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     textAlign: 'center',
   },
-  actionButtons: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    gap: 16,
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-    marginBottom: 0,
-  },
-  inviteButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#02B97F',
-    paddingVertical: 18,
-    borderRadius: 16,
-    gap: 8,
-    shadowColor: '#02B97F',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  inviteButtonText: {
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-  },
-  deleteButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fef2f2',
-    paddingVertical: 18,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#dc2626',
-  },
-  leaveButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fef2f2',
-    paddingVertical: 18,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  leaveButtonText: {
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#dc2626',
-  },
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1877,29 +2204,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     marginLeft: 8,
   },
-  leaveGroupButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fef2f2',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    marginTop: 20,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  leaveGroupButtonText: {
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#dc2626',
-  },
+
   // Enhanced Modal Styles
   enhancedModalContent: {
     backgroundColor: '#ffffff',

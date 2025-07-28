@@ -1,7 +1,9 @@
 import { Feather } from '@expo/vector-icons';
+import * as Print from 'expo-print';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Dimensions,
     Modal,
     ScrollView,
@@ -232,7 +234,7 @@ function DashboardScreen({ navigation }) {
   ];
 
   const sideMenuItems = [
-    { title: 'Dashboard Overview', icon: 'bar-chart-2', action: () => setIsMenuOpen(false) },
+    { title: 'Dashboard Overview', icon: 'view-dashboard', action: () => setIsMenuOpen(false) },
     { title: 'Detection Analytics', icon: 'shield-search', action: () => navigation.navigate('DetectionAnalytics') },
     { title: 'Where It Happened', icon: 'web', action: () => navigation.navigate('WebsiteAnalytics') },
     { title: 'People & Activity', icon: 'account-group', action: () => navigation.navigate('UserActivityAnalytics') },
@@ -255,6 +257,344 @@ function DashboardScreen({ navigation }) {
     }
   };
 
+  const handlePrintReport = async () => {
+    try {
+      // Show loading alert
+      Alert.alert('Generating Report', 'Fetching comprehensive analytics data...');
+
+      // Fetch additional analytics data for comprehensive report
+      const additionalData = await fetchComprehensiveAnalytics();
+
+      // Generate HTML report with all data
+      const htmlContent = generateReportHTML(additionalData);
+
+      // Print the report
+      await Print.printAsync({
+        html: htmlContent,
+        printerUrl: undefined, // Use default printer
+      });
+
+      Alert.alert('Success', 'Comprehensive analytics report has been sent to printer');
+    } catch (error) {
+      console.error('Print error:', error);
+      Alert.alert('Error', 'Failed to generate report. Please try again.');
+    }
+  };
+
+  const fetchComprehensiveAnalytics = async () => {
+    try {
+      const mappedTimeRange = selectedTimeRange === 'Today' ? 'today' :
+                             selectedTimeRange === 'Per Week' ? 'week' :
+                             selectedTimeRange === 'Per Months' ? 'month' : 'year';
+
+      console.log('Fetching comprehensive analytics for timeRange:', mappedTimeRange);
+
+      // Fetch comprehensive user-specific analytics with error handling for each endpoint
+      const requests = [
+        api.get(`/user-dashboard/detected-words?timeRange=${mappedTimeRange}&includeLanguage=true&includePatterns=true`).catch(err => {
+          console.warn('Threat distribution fetch failed:', err);
+          return { data: null };
+        }),
+        api.get(`/user-dashboard/websites?timeRange=${mappedTimeRange}`).catch(err => {
+          console.warn('Website analytics fetch failed:', err);
+          return { data: null };
+        }),
+        api.get(`/user-dashboard/user-activity?timeRange=${mappedTimeRange}`).catch(err => {
+          console.warn('User activity fetch failed:', err);
+          return { data: null };
+        }),
+        api.get('/home-stats').catch(err => {
+          console.warn('Home stats fetch failed:', err);
+          return { data: null };
+        })
+      ];
+
+      const [
+        threatDistributionRes,
+        websiteAnalyticsRes,
+        userActivityRes,
+        homeStatsRes
+      ] = await Promise.all(requests);
+
+      const analyticsData = {
+        threatDistribution: threatDistributionRes.data,
+        websiteAnalytics: websiteAnalyticsRes.data,
+        userActivity: userActivityRes.data,
+        homeStats: homeStatsRes.data,
+        timeRange: selectedTimeRange
+      };
+
+      console.log('Comprehensive analytics fetched:', analyticsData);
+      return analyticsData;
+    } catch (error) {
+      console.error('Error fetching comprehensive analytics:', error);
+      return null;
+    }
+  };
+
+  const generateReportHTML = (additionalData = null) => {
+    const currentDate = new Date().toLocaleDateString();
+    const currentTime = new Date().toLocaleTimeString();
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>MURAi Analytics Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; border-bottom: 2px solid #02B97F; padding-bottom: 20px; margin-bottom: 30px; }
+            .title { color: #02B97F; font-size: 24px; font-weight: bold; }
+            .subtitle { color: #6b7280; font-size: 16px; }
+            .section { margin-bottom: 30px; }
+            .section-title { color: #1f2937; font-size: 20px; font-weight: bold; margin-bottom: 15px; }
+            .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
+            .stat-card {
+              background: #ffffff;
+              padding: 20px;
+              border-radius: 12px;
+              border-left: 4px solid #02B97F;
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+              border: 1px solid #e5e7eb;
+            }
+            .stat-value { font-size: 28px; font-weight: bold; color: #1f2937; margin-bottom: 5px; }
+            .stat-label { font-size: 14px; color: #6b7280; margin-top: 5px; font-weight: 500; }
+            .chart-container { background: #ffffff; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 20px; }
+            .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">🛡️ MURAi Protection Report</div>
+            <div class="subtitle">Personal Security Analytics & Insights</div>
+            <div style="margin-top: 10px; color: #6b7280;">
+              Generated on ${currentDate} at ${currentTime} | Period: ${selectedTimeRange}
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">📊 Protection Overview</div>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-value">${dashboardData.overview?.harmfulContentDetected?.value || '0'}</div>
+                <div class="stat-label">Threats Blocked</div>
+                <div style="color: #02B97F; font-size: 12px; margin-top: 5px;">${dashboardData.overview?.harmfulContentDetected?.change || '+0%'}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value">${dashboardData.overview?.websitesMonitored?.value || '0'}</div>
+                <div class="stat-label">Sites Monitored</div>
+                <div style="color: #02B97F; font-size: 12px; margin-top: 5px;">${dashboardData.overview?.websitesMonitored?.change || '+0'}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value">${dashboardData.overview?.protectionEffectiveness?.value || '95%'}</div>
+                <div class="stat-label">AI Accuracy</div>
+                <div style="color: #02B97F; font-size: 12px; margin-top: 5px;">${dashboardData.overview?.protectionEffectiveness?.change || '+0%'}</div>
+              </div>
+              ${additionalData?.homeStats ? `
+              <div class="stat-card">
+                <div class="stat-value">${additionalData.homeStats.overallStats?.[0]?.totalThreatsBlocked || '0'}</div>
+                <div class="stat-label">Lifetime Total</div>
+                <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">All Time</div>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">📈 Activity Trends</div>
+            <div class="chart-container">
+              <div style="margin-bottom: 15px;">
+                <strong>Time Period:</strong> ${selectedTimeRange}
+              </div>
+              <div style="background: #f8fafc; padding: 20px; border-radius: 8px; text-align: center;">
+                <div style="color: #6b7280; margin-bottom: 10px;">Chart Data Summary</div>
+                <div style="font-size: 18px; color: #1f2937;">
+                  Total Detections: ${dashboardData.chartData?.datasets?.[0]?.data?.reduce((a, b) => a + b, 0) || 0}
+                </div>
+                <div style="font-size: 14px; color: #6b7280; margin-top: 5px;">
+                  Peak Activity: ${Math.max(...(dashboardData.chartData?.datasets?.[0]?.data || [0]))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">🔍 Key Insights</div>
+            <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; border-left: 4px solid #02B97F;">
+              <div style="font-weight: bold; color: #1f2937; margin-bottom: 10px;">Protection Status</div>
+              <div style="color: #6b7280; line-height: 1.6;">
+                • Your digital safety is being monitored 24/7<br>
+                • Real-time threat detection is active<br>
+                • Comprehensive website monitoring in place<br>
+                • User activity tracking enabled
+              </div>
+            </div>
+          </div>
+
+          ${additionalData ? `
+          <!-- Threat Distribution Analysis -->
+          <div class="section">
+            <div class="section-title">🎯 Threat Distribution Analysis</div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+              <div style="background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444;">
+                <div style="font-weight: bold; color: #dc2626;">High Severity</div>
+                <div style="font-size: 24px; color: #dc2626;">${additionalData.threatDistribution?.severityDistribution?.high || 0}</div>
+              </div>
+              <div style="background: #fffbeb; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                <div style="font-weight: bold; color: #d97706;">Medium Severity</div>
+                <div style="font-size: 24px; color: #d97706;">${additionalData.threatDistribution?.severityDistribution?.medium || 0}</div>
+              </div>
+              <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; border-left: 4px solid #02B97F;">
+                <div style="font-weight: bold; color: #059669;">Low Severity</div>
+                <div style="font-size: 24px; color: #059669;">${additionalData.threatDistribution?.severityDistribution?.low || 0}</div>
+              </div>
+            </div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+              <div style="font-weight: bold; margin-bottom: 10px;">Summary</div>
+              <div>Total Unique Threats: <strong>${additionalData.threatDistribution?.totalUniqueThreats || 0}</strong></div>
+              <div>Total Detections: <strong>${additionalData.threatDistribution?.totalDetections || 0}</strong></div>
+            </div>
+          </div>
+
+          <!-- Website Analytics -->
+          <div class="section">
+            <div class="section-title">🌐 Website Analytics</div>
+            ${additionalData.websiteAnalytics?.topWebsites ? `
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+              <div style="background: #f8fafc; padding: 15px; border-bottom: 1px solid #e5e7eb;">
+                <div style="font-weight: bold;">Top Monitored Websites</div>
+              </div>
+              ${additionalData.websiteAnalytics.topWebsites.slice(0, 5).map(site => `
+                <div style="padding: 12px 15px; border-bottom: 1px solid #f3f4f6;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <div style="font-weight: bold; color: #1f2937;">${site.domain}</div>
+                      <div style="font-size: 12px; color: #6b7280;">Risk Level: ${site.riskLevel.toUpperCase()}</div>
+                    </div>
+                    <div style="text-align: right;">
+                      <div style="font-weight: bold; color: #ef4444;">${site.detectionCount} threats</div>
+                      <div style="font-size: 12px; color: #6b7280;">${site.accuracy}% accuracy</div>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            ` : ''}
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px;">
+              <div style="background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 20px; font-weight: bold; color: #1f2937;">${additionalData.websiteAnalytics?.totalWebsites || 0}</div>
+                <div style="color: #6b7280; font-size: 14px;">Total Sites</div>
+              </div>
+              <div style="background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 20px; font-weight: bold; color: #ef4444;">${additionalData.websiteAnalytics?.monitoringStats?.highRiskSites || 0}</div>
+                <div style="color: #6b7280; font-size: 14px;">High Risk</div>
+              </div>
+              <div style="background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 20px; font-weight: bold; color: #02B97F;">${additionalData.websiteAnalytics?.monitoringStats?.aiAccuracy || 0}%</div>
+                <div style="color: #6b7280; font-size: 14px;">AI Accuracy</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- User Activity Analytics -->
+          <div class="section">
+            <div class="section-title">👤 User Activity Analytics</div>
+            ${additionalData.userActivity?.activityBreakdown ? `
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+              <div style="font-weight: bold; margin-bottom: 10px;">Activity Breakdown</div>
+              ${additionalData.userActivity.activityBreakdown.map(activity => `
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6;">
+                  <span style="color: #1f2937;">${activity._id}</span>
+                  <span style="font-weight: bold; color: #02B97F;">${activity.count}</span>
+                </div>
+              `).join('')}
+            </div>
+            ` : ''}
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+              <div style="font-weight: bold; margin-bottom: 10px;">Activity Summary</div>
+              <div>Total Activities: <strong>${additionalData.userActivity?.totalActivities || 0}</strong></div>
+              <div>Recent Activity Count: <strong>${additionalData.userActivity?.recentActivity?.length || 0}</strong></div>
+            </div>
+          </div>
+          ` : `
+          <div class="section">
+            <div class="section-title">📊 Enhanced Analytics</div>
+            <div style="background: #fffbeb; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+              <div style="font-weight: bold; color: #92400e; margin-bottom: 10px;">Note</div>
+              <div style="color: #92400e;">
+                Enhanced analytics data is being processed. Basic protection metrics are shown above.
+                For detailed threat analysis, website monitoring, and activity insights, please ensure you have recent activity data.
+              </div>
+            </div>
+          </div>
+          `}
+
+          <!-- Report Summary -->
+          <div class="section">
+            <div class="section-title">📋 Report Summary</div>
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px;">
+              <div style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Protection Status: ACTIVE</div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div>
+                  <div style="opacity: 0.9;">Current Period</div>
+                  <div style="font-weight: bold;">${selectedTimeRange}</div>
+                </div>
+                <div>
+                  <div style="opacity: 0.9;">Monitoring Status</div>
+                  <div style="font-weight: bold;">24/7 Active</div>
+                </div>
+                <div>
+                  <div style="opacity: 0.9;">Protection Level</div>
+                  <div style="font-weight: bold;">Maximum</div>
+                </div>
+                <div>
+                  <div style="opacity: 0.9;">Report Generated</div>
+                  <div style="font-weight: bold;">${currentTime}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recommendations -->
+          ${additionalData ? `
+          <div class="section">
+            <div class="section-title">💡 Recommendations</div>
+            <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; border-left: 4px solid #02B97F;">
+              <div style="font-weight: bold; color: #1f2937; margin-bottom: 15px;">Security Recommendations</div>
+              <ul style="color: #374151; line-height: 1.8; margin: 0; padding-left: 20px;">
+                ${additionalData.websiteAnalytics?.monitoringStats?.highRiskSites > 0 ?
+                  `<li>⚠️ You have ${additionalData.websiteAnalytics.monitoringStats.highRiskSites} high-risk sites. Consider reviewing your browsing habits.</li>` :
+                  `<li>✅ No high-risk sites detected. Great job maintaining safe browsing habits!</li>`
+                }
+                ${additionalData.threatDistribution?.severityDistribution?.high > 0 ?
+                  `<li>🔴 ${additionalData.threatDistribution.severityDistribution.high} high-severity threats detected. Stay vigilant.</li>` :
+                  `<li>✅ No high-severity threats detected in this period.</li>`
+                }
+                <li>🛡️ Continue using MURAi for comprehensive protection</li>
+                <li>📊 Review this report regularly to track your digital safety</li>
+                <li>🔄 Keep your protection settings updated</li>
+              </ul>
+            </div>
+          </div>
+          ` : ''}
+
+          <div class="footer">
+            <div style="margin-bottom: 10px;">
+              <strong>🛡️ MURAi Protection System</strong>
+            </div>
+            <div style="font-size: 14px; margin-bottom: 5px;">
+              Comprehensive Digital Safety Analytics & Real-time Monitoring
+            </div>
+            <div style="font-size: 12px; color: #9ca3af;">
+              This report contains user-specific data for the selected time period.
+              For questions or support, contact the MURAi team.
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
 
 
   return (
@@ -264,7 +604,13 @@ function DashboardScreen({ navigation }) {
         subtitle="Real-time protection insights"
         rightActions={[
           {
-            icon: 'menu',
+            icon: 'printer',
+            iconType: 'material',
+            color: '#02B97F',
+            onPress: handlePrintReport
+          },
+          {
+            icon: 'list',
             iconType: 'feather',
             onPress: toggleMenu
           }
@@ -278,7 +624,12 @@ function DashboardScreen({ navigation }) {
           <MaterialCommunityIcons name="clock-outline" size={20} color="#6b7280" />
           <Text style={styles.timeRangeSelectorTitle}>Time Period</Text>
         </View>
-        <View style={styles.timeRangeButtonsContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.timeRangeScrollContainer}
+          contentContainerStyle={styles.timeRangeScrollContent}
+        >
           {timeRanges.map((range) => (
             <TouchableOpacity
               key={range}
@@ -312,7 +663,7 @@ function DashboardScreen({ navigation }) {
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       </View>
 
 
@@ -481,8 +832,10 @@ function DashboardScreen({ navigation }) {
         transparent={true}
         animationType="slide"
         onRequestClose={toggleMenu}
+        statusBarTranslucent={true}
       >
-        <TouchableOpacity style={styles.overlay} onPress={toggleMenu}>
+        <View style={styles.overlay}>
+          <TouchableOpacity style={styles.overlayTouchable} onPress={toggleMenu} />
           <View style={styles.bottomSheetContainer}>
             <View style={styles.bottomSheet}>
               {/* Handle Bar */}
@@ -522,10 +875,15 @@ function DashboardScreen({ navigation }) {
                     </TouchableOpacity>
                   ))}
                 </View>
+                
+                {/* Debug: Show menu items count */}
+                <View style={styles.debugSection}>
+                  <Text style={styles.debugText}>Menu Items: {sideMenuItems.length}</Text>
+                </View>
               </ScrollView>
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </ScrollView>
   );
@@ -589,13 +947,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     color: '#374151',
   },
+  timeRangeScrollContainer: {
+    marginHorizontal: -4,
+  },
+  timeRangeScrollContent: {
+    paddingHorizontal: 4,
+    gap: 8,
+  },
   timeRangeButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 8,
   },
   timeRangeButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -606,6 +970,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
     gap: 6,
+    minWidth: 120,
   },
   timeRangeButtonActive: {
     backgroundColor: '#02B97F',
@@ -854,6 +1219,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 4,
     elevation: 2,
+    minHeight: 60,
   },
   menuIcon: {
     width: 48,
@@ -921,6 +1287,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
+  overlayTouchable: {
+    flex: 1,
+  },
   bottomSheetContainer: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -931,11 +1300,14 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    paddingBottom: 40,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 10,
+    maxHeight: '90%',
+    minHeight: 400,
   },
   handleBar: {
     width: 40,
@@ -953,6 +1325,7 @@ const styles = StyleSheet.create({
   },
   menuScroll: {
     flex: 1,
+    paddingBottom: 20,
   },
   menuSection: {
     marginBottom: 20,
@@ -979,11 +1352,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Medium',
     color: '#111827',
     marginLeft: 16,
+    marginBottom: 4,
   },
   menuItemSubtitle: {
     fontSize: 12,
     fontFamily: 'Poppins-Regular',
     color: '#9ca3af',
+    marginLeft: 16,
   },
   closeButton: {
     width: 40,
@@ -1044,6 +1419,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Medium',
     color: 'rgba(81, 7, 192, 0.7)',
     marginBottom: 12,
+  },
+  debugSection: {
+    padding: 16,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  debugText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    textAlign: 'center',
   },
 });
 

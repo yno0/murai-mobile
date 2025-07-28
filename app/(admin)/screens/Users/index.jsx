@@ -16,7 +16,7 @@ const UsersList = require('./UsersList').default;
 const MainHeader = require('../../../components/common/MainHeader').default;
 
 // API configuration
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'https://murai-server.onrender.com/api';
 
 export default function AdminUsersScreen() {
   const [users, setUsers] = useState([]);

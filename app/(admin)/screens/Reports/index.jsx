@@ -16,11 +16,12 @@ const ReportsList = require('./ReportsList').default;
 const MainHeader = require('../../../components/common/MainHeader').default;
 
 // API configuration
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'https://murai-server.onrender.com/api';
 
 export default function AdminReportsScreen() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [overviewStats, setOverviewStats] = useState(null);
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedReport, setSelectedReport] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -154,6 +155,22 @@ export default function AdminReportsScreen() {
 
       console.log('📊 Transformed reports:', transformedReports.length, 'reports');
       setReports(transformedReports);
+
+      // Also load overview stats with the same filters
+      try {
+        const statsParams = new URLSearchParams({
+          search: searchQuery,
+          status: selectedFilter === 'all' ? '' : selectedFilter,
+        });
+
+        const statsData = await makeAuthenticatedRequest(`/admin/reports/overview?${statsParams}`);
+        console.log('📊 Overview stats loaded:', statsData);
+        setOverviewStats(statsData);
+      } catch (statsError) {
+        console.error('❌ Load overview stats error:', statsError);
+        // Don't show alert for stats error, just log it
+        setOverviewStats(null);
+      }
     } catch (error) {
       console.error('❌ Load reports error:', error);
       Alert.alert('Error', error.message || 'Failed to load reports');
@@ -315,6 +332,7 @@ export default function AdminReportsScreen() {
       reports={reports}
       loading={loading}
       onRefresh={loadReports}
+      overviewStats={overviewStats}
     />
   );
 

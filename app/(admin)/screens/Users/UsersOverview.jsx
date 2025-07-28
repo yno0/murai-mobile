@@ -259,39 +259,43 @@ export default function UsersOverview({ users, loading, onRefresh }) {
                   width={screenWidth * 1.2}
                   height={220}
                   chartConfig={{
-                    backgroundColor: 'transparent',
-                    backgroundGradientFrom: 'transparent',
-                    backgroundGradientTo: 'transparent',
+                    backgroundColor: '#ffffff',
+                    backgroundGradientFrom: '#ffffff',
+                    backgroundGradientTo: '#ffffff',
                     decimalPlaces: 0,
                     color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
                     labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
                     style: {
-                      borderRadius: 0,
+                      borderRadius: 16,
                     },
                     propsForDots: {
-                      r: '3',
-                      strokeWidth: '1',
-                      stroke: '#01B97F',
+                      r: '4',
+                      strokeWidth: '2',
+                      stroke: '#ffffff',
                       fill: '#01B97F',
                     },
                     propsForBackgroundLines: {
-                      strokeDasharray: '3,3',
-                      stroke: '#e5e7eb',
-                      strokeWidth: 0.5,
+                      strokeDasharray: '5,5',
+                      stroke: '#f3f4f6',
+                      strokeWidth: 1,
                     },
                     propsForLabels: {
-                      fontSize: 10,
+                      fontSize: 11,
+                      fontFamily: 'Poppins-Medium',
                     },
+                    fillShadowGradient: '#01B97F',
+                    fillShadowGradientOpacity: 0.1,
                   }}
                   bezier
                   withDots={true}
-                  withInnerLines={false}
+                  withInnerLines={true}
                   withOuterLines={false}
                   withVerticalLines={false}
                   withHorizontalLines={true}
                   style={{
                     paddingRight: 20,
                     paddingLeft: 10,
+                    marginVertical: 10,
                   }}
                 />
               </ScrollView>

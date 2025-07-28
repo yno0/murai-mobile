@@ -1,9 +1,14 @@
 import { Stack } from "expo-router";
 import React from "react";
 import { View } from "react-native";
+import 'react-native-svg';
 import SplashScreen from "./components/SplashScreen";
 import { AuthProvider } from "./context/AuthContext";
 import { checkFontAvailability, loadPoppinsFonts } from "./utils/fontLoader";
+import registerSVGComponents from "./utils/svgSetup";
+
+// Initialize SVG components
+registerSVGComponents();
 
 const BG = "#0f0f0f";
 

@@ -13,7 +13,7 @@ import {
 import { useAuth } from '../../../context/AuthContext';
 
 // API configuration
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'https://murai-server.onrender.com/api';
 
 const MainHeader = require('../../../components/common/MainHeader').default;
 

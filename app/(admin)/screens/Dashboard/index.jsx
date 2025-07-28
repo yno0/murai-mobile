@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Dimensions,
@@ -9,13 +9,13 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import MainHeader from "../../../components/common/MainHeader";
 
-const API_BASE_URL = "http://localhost:3000/api";
+const API_BASE_URL = "https://murai-server.onrender.com/api";
 
 const dashboardService = {
   getOverview: async (timeRange) => {
@@ -79,6 +79,50 @@ const dashboardService = {
       throw error;
     }
   },
+  getFlaggedWords: async (timeRange) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/dashboard/flagged-words?timeRange=${encodeURIComponent(
+          timeRange
+        )}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  getWebsites: async (timeRange) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/dashboard/websites?timeRange=${encodeURIComponent(
+          timeRange
+        )}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  },
 };
 
 const { width } = Dimensions.get("window");
@@ -88,14 +132,22 @@ export default function AdminDashboardScreen({ navigation }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState(null);
+  const [customDateModalVisible, setCustomDateModalVisible] = useState(false);
+  const [fromDate, setFromDate] = useState(new Date());
+  const [toDate, setToDate] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedFromDate, setSelectedFromDate] = useState(null);
+  const [selectedToDate, setSelectedToDate] = useState(null);
+  const [isSelectingFrom, setIsSelectingFrom] = useState(true);
+  const [showYearPicker, setShowYearPicker] = useState(false);
   const [dashboardData, setDashboardData] = useState({
     overview: null,
     chartData: null,
     insights: null,
     topFlaggedContent: [],
     topMonitoredWebsites: [],
-    keyUserActivity: [],
   });
 
   const defaultChartData = {
@@ -142,32 +194,37 @@ export default function AdminDashboardScreen({ navigation }) {
 
   const timeRanges = ["Today", "Last 7 days", "Last 30 days", "All Time"];
 
-  const fetchDashboardData = async (timeRange) => {
+  const fetchDashboardData = useCallback(async (timeRange) => {
     try {
       setIsLoading(true);
       setError(null); // Clear any previous errors
-      const [overview, chartData, insights] = await Promise.all([
-        dashboardService.getOverview(timeRange),
-        dashboardService.getActivityChart(timeRange),
+
+      // Map time range for API consistency
+      const mappedTimeRange = timeRange.toLowerCase();
+
+      const [overview, chartData, insights, flaggedWordsData, websitesData] = await Promise.all([
+        dashboardService.getOverview(mappedTimeRange),
+        dashboardService.getActivityChart(mappedTimeRange),
         dashboardService.getInsights(),
+        dashboardService.getFlaggedWords(mappedTimeRange),
+        dashboardService.getWebsites(mappedTimeRange),
       ]);
 
-      // Placeholder for new analytics data - these would typically come from new API calls
-      const topFlaggedContent = [
-        { id: 1, term: "badword", count: 120 },
-        { id: 2, term: "anotherbad", count: 90 },
-        { id: 3, term: "offensive", count: 75 },
-      ];
-      const topMonitoredWebsites = [
-        { id: 1, url: "socialmedia.com", issues: 50 },
-        { id: 2, url: "forum.net", issues: 35 },
-        { id: 3, url: "chat.app", issues: 20 },
-      ];
-      const keyUserActivity = [
-        { id: 1, user: "Alice", actions: 250 },
-        { id: 2, user: "Bob", actions: 180 },
-        { id: 3, user: "Charlie", actions: 150 },
-      ];
+      // Format flagged words data for display
+      const topFlaggedContent = flaggedWordsData.topWords?.slice(0, 10).map((word, index) => ({
+        id: index + 1,
+        term: word.word,
+        count: word.count,
+        severity: word.severity || 'medium'
+      })) || [];
+
+      // Format websites data for display
+      const topMonitoredWebsites = websitesData.topWebsites?.slice(0, 10).map((site, index) => ({
+        id: index + 1,
+        url: site.domain || site.url,
+        issues: site.detectionCount,
+        riskLevel: site.riskLevel || 'medium'
+      })) || [];
 
       setDashboardData({
         overview,
@@ -175,7 +232,6 @@ export default function AdminDashboardScreen({ navigation }) {
         insights,
         topFlaggedContent,
         topMonitoredWebsites,
-        keyUserActivity,
       });
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
@@ -202,12 +258,14 @@ export default function AdminDashboardScreen({ navigation }) {
             },
           ],
         },
+        topFlaggedContent: [],
+        topMonitoredWebsites: [],
       });
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, []); // Empty dependency array since this function doesn't depend on any props or state
 
   const onRefresh = () => {
     setIsRefreshing(true);
@@ -216,7 +274,24 @@ export default function AdminDashboardScreen({ navigation }) {
 
   useEffect(() => {
     fetchDashboardData(selectedTimeRange);
-  }, [selectedTimeRange]);
+  }, [selectedTimeRange, fetchDashboardData]);
+
+  // Real-time updates for flagged content and websites
+  useEffect(() => {
+    const updateInterval = setInterval(async () => {
+      // Only update if not currently loading and not in custom date mode
+      if (!isLoading && selectedTimeRange !== 'Custom') {
+        setIsUpdating(true);
+        try {
+          await fetchDashboardData(selectedTimeRange);
+        } finally {
+          setIsUpdating(false);
+        }
+      }
+    }, 30000); // Update every 30 seconds
+
+    return () => clearInterval(updateInterval);
+  }, [selectedTimeRange, isLoading, fetchDashboardData]);
 
   // Detection and Reports counts mock data for each time range
   const detectionReportsData = {
@@ -397,6 +472,132 @@ export default function AdminDashboardScreen({ navigation }) {
     setSelectedTimeRange(range);
   };
 
+  const openCustomDateModal = () => {
+    // Initialize with current date
+    const today = new Date();
+    setCurrentMonth(today);
+    setSelectedFromDate(null);
+    setSelectedToDate(null);
+    setIsSelectingFrom(true);
+    setCustomDateModalVisible(true);
+  };
+
+  const closeCustomDateModal = () => {
+    setCustomDateModalVisible(false);
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const validateDateInput = (day, month, year) => {
+    const dayNum = parseInt(day);
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+    
+    if (isNaN(dayNum) || isNaN(monthNum) || isNaN(yearNum)) return false;
+    if (monthNum < 1 || monthNum > 12) return false;
+    if (dayNum < 1 || dayNum > 31) return false;
+    if (yearNum < 1900 || yearNum > 2100) return false;
+    
+    // Check for valid day in month
+    const date = new Date(yearNum, monthNum - 1, dayNum);
+    return date.getDate() === dayNum && date.getMonth() === monthNum - 1;
+  };
+
+  const getDaysInMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const generateCalendarDays = (date) => {
+    const daysInMonth = getDaysInMonth(date);
+    const firstDay = getFirstDayOfMonth(date);
+    const days = [];
+    
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
+    }
+    
+    // Add days of the month
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(date.getFullYear(), date.getMonth(), i));
+    }
+    
+    return days;
+  };
+
+  const isSameDay = (date1, date2) => {
+    return date1 && date2 && 
+           date1.getDate() === date2.getDate() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getFullYear() === date2.getFullYear();
+  };
+
+  const isDateInRange = (date, fromDate, toDate) => {
+    if (!date || !fromDate || !toDate) return false;
+    return date >= fromDate && date <= toDate;
+  };
+
+  const formatMonthYear = (date) => {
+    return date.toLocaleDateString('en-US', { 
+      month: 'long', 
+      year: 'numeric' 
+    });
+  };
+
+  const handleDateSelect = (date) => {
+    if (isSelectingFrom) {
+      setSelectedFromDate(date);
+      setIsSelectingFrom(false);
+    } else {
+      if (date >= selectedFromDate) {
+        setSelectedToDate(date);
+      } else {
+        setSelectedFromDate(date);
+        setSelectedToDate(null);
+      }
+    }
+  };
+
+  const handleMonthChange = (direction) => {
+    const newMonth = new Date(currentMonth);
+    if (direction === 'next') {
+      newMonth.setMonth(newMonth.getMonth() + 1);
+    } else {
+      newMonth.setMonth(newMonth.getMonth() - 1);
+    }
+    setCurrentMonth(newMonth);
+  };
+
+  const handleYearChange = (direction) => {
+    const newMonth = new Date(currentMonth);
+    if (direction === 'next') {
+      newMonth.setFullYear(newMonth.getFullYear() + 1);
+    } else {
+      newMonth.setFullYear(newMonth.getFullYear() - 1);
+    }
+    setCurrentMonth(newMonth);
+  };
+
+  const applyDateRange = () => {
+    if (selectedFromDate && selectedToDate) {
+      setFromDate(selectedFromDate);
+      setToDate(selectedToDate);
+      setSelectedTimeRange("Custom");
+      closeCustomDateModal();
+      fetchDashboardData("Custom");
+    }
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -423,25 +624,49 @@ export default function AdminDashboardScreen({ navigation }) {
         style={{ paddingHorizontal: 0 }}
       />
       <View style={styles.timeRangeContainer}>
-        {timeRanges.map((range) => (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.timeRangeScrollContent}
+        >
+          {timeRanges.map((range) => (
+            <TouchableOpacity
+              key={range}
+              style={[
+                styles.timeRangeButton,
+                selectedTimeRange === range && styles.timeRangeButtonActive,
+              ]}
+              onPress={() => handleTimeRangeChange(range)}
+            >
+              <Text
+                style={[
+                  styles.timeRangeText,
+                  selectedTimeRange === range && styles.timeRangeTextActive,
+                ]}
+              >
+                {range}
+              </Text>
+            </TouchableOpacity>
+          ))}
           <TouchableOpacity
-            key={range}
             style={[
               styles.timeRangeButton,
-              selectedTimeRange === range && styles.timeRangeButtonActive,
+              styles.customDateButton,
+              selectedTimeRange === "Custom" && styles.timeRangeButtonActive,
             ]}
-            onPress={() => handleTimeRangeChange(range)}
+            onPress={openCustomDateModal}
           >
+            <Feather name="calendar" size={16} color={selectedTimeRange === "Custom" ? "#ffffff" : "#374151"} />
             <Text
               style={[
                 styles.timeRangeText,
-                selectedTimeRange === range && styles.timeRangeTextActive,
+                selectedTimeRange === "Custom" && styles.timeRangeTextActive,
               ]}
             >
-              {range}
+              Custom
             </Text>
           </TouchableOpacity>
-        ))}
+        </ScrollView>
       </View>
       {error ? (
         <View style={styles.errorContainer}>
@@ -553,7 +778,15 @@ export default function AdminDashboardScreen({ navigation }) {
 
       {/* New Analytics Sections */}
       <View style={styles.analyticsSectionContainer}>
-        <Text style={styles.analyticsSectionTitle}>Top Flagged Content</Text>
+        <View style={styles.sectionTitleContainer}>
+          <Text style={styles.analyticsSectionTitle}>Top Flagged Content</Text>
+          {isUpdating && (
+            <View style={styles.updateIndicator}>
+              <ActivityIndicator size="small" color="#3b82f6" />
+              <Text style={styles.updateText}>Updating...</Text>
+            </View>
+          )}
+        </View>
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color="#3b82f6" />
@@ -563,9 +796,22 @@ export default function AdminDashboardScreen({ navigation }) {
           </View>
         ) : (
           <View style={styles.analyticsList}>
-            {dashboardData.topFlaggedContent.map((item, index) => (
+            {dashboardData.topFlaggedContent.map((item) => (
               <View key={item.id} style={styles.analyticsListItem}>
-                <Text style={styles.analyticsListItemText}>{item.term}</Text>
+                <View style={styles.analyticsItemLeft}>
+                  <Text style={styles.analyticsListItemText}>{item.term}</Text>
+                  <View style={[styles.severityBadge, {
+                    backgroundColor: item.severity === 'high' ? '#fee2e2' :
+                                   item.severity === 'medium' ? '#fef3c7' : '#f0fdf4',
+                  }]}>
+                    <Text style={[styles.severityText, {
+                      color: item.severity === 'high' ? '#dc2626' :
+                             item.severity === 'medium' ? '#d97706' : '#16a34a',
+                    }]}>
+                      {item.severity}
+                    </Text>
+                  </View>
+                </View>
                 <Text style={styles.analyticsListItemValue}>{item.count}</Text>
               </View>
             ))}
@@ -574,7 +820,15 @@ export default function AdminDashboardScreen({ navigation }) {
       </View>
 
       <View style={styles.analyticsSectionContainer}>
-        <Text style={styles.analyticsSectionTitle}>Top Monitored Websites</Text>
+        <View style={styles.sectionTitleContainer}>
+          <Text style={styles.analyticsSectionTitle}>Top Monitored Websites</Text>
+          {isUpdating && (
+            <View style={styles.updateIndicator}>
+              <ActivityIndicator size="small" color="#3b82f6" />
+              <Text style={styles.updateText}>Updating...</Text>
+            </View>
+          )}
+        </View>
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color="#3b82f6" />
@@ -584,9 +838,22 @@ export default function AdminDashboardScreen({ navigation }) {
           </View>
         ) : (
           <View style={styles.analyticsList}>
-            {dashboardData.topMonitoredWebsites.map((item, index) => (
+            {dashboardData.topMonitoredWebsites.map((item) => (
               <View key={item.id} style={styles.analyticsListItem}>
-                <Text style={styles.analyticsListItemText}>{item.url}</Text>
+                <View style={styles.analyticsItemLeft}>
+                  <Text style={styles.analyticsListItemText}>{item.url}</Text>
+                  <View style={[styles.riskBadge, {
+                    backgroundColor: item.riskLevel === 'high' ? '#fee2e2' :
+                                   item.riskLevel === 'medium' ? '#fef3c7' : '#f0fdf4',
+                  }]}>
+                    <Text style={[styles.riskText, {
+                      color: item.riskLevel === 'high' ? '#dc2626' :
+                             item.riskLevel === 'medium' ? '#d97706' : '#16a34a',
+                    }]}>
+                      {item.riskLevel} risk
+                    </Text>
+                  </View>
+                </View>
                 <Text style={styles.analyticsListItemValue}>{item.issues}</Text>
               </View>
             ))}
@@ -594,26 +861,7 @@ export default function AdminDashboardScreen({ navigation }) {
         )}
       </View>
 
-      <View style={styles.analyticsSectionContainer}>
-        <Text style={styles.analyticsSectionTitle}>Key User Activity</Text>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#3b82f6" />
-            <Text style={styles.loadingText}>Loading key user activity...</Text>
-          </View>
-        ) : (
-          <View style={styles.analyticsList}>
-            {dashboardData.keyUserActivity.map((item, index) => (
-              <View key={item.id} style={styles.analyticsListItem}>
-                <Text style={styles.analyticsListItemText}>{item.user}</Text>
-                <Text style={styles.analyticsListItemValue}>
-                  {item.actions}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
+
       <Modal
         visible={isMenuOpen}
         transparent={true}
@@ -685,6 +933,156 @@ export default function AdminDashboardScreen({ navigation }) {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Custom Date Range Modal */}
+      <Modal
+        visible={customDateModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeCustomDateModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.customDateModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Date Range</Text>
+              <TouchableOpacity onPress={closeCustomDateModal}>
+                <Feather name="x" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.dateInputContainer}>
+              <View style={styles.calendarHeader}>
+                <TouchableOpacity onPress={() => handleMonthChange('prev')}>
+                  <Feather name="chevron-left" size={24} color="#6B7280" />
+                </TouchableOpacity>
+                <View style={styles.calendarTitleContainer}>
+                  <Text style={styles.calendarTitle}>{formatMonthYear(currentMonth)}</Text>
+                  <TouchableOpacity 
+                    style={styles.yearSelector}
+                    onPress={() => setShowYearPicker(true)}
+                  >
+                    <Feather name="calendar" size={16} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity onPress={() => handleMonthChange('next')}>
+                  <Feather name="chevron-right" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.calendarStatus}>
+                <Text style={styles.calendarStatusText}>
+                  {isSelectingFrom ? 'Select start date' : 'Select end date'}
+                </Text>
+                {selectedFromDate && (
+                  <Text style={styles.selectedDateText}>
+                    From: {formatDate(selectedFromDate)}
+                  </Text>
+                )}
+                {selectedToDate && (
+                  <Text style={styles.selectedDateText}>
+                    To: {formatDate(selectedToDate)}
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.calendarGrid}>
+                <View style={styles.weekDays}>
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <Text key={day} style={styles.weekDayText}>{day}</Text>
+                  ))}
+                </View>
+                <View style={styles.daysGrid}>
+                  {generateCalendarDays(currentMonth).map((date, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.dayCell,
+                        date && isSameDay(date, selectedFromDate) && styles.selectedFromCell,
+                        date && isSameDay(date, selectedToDate) && styles.selectedToCell,
+                        date && isDateInRange(date, selectedFromDate, selectedToDate) && styles.inRangeCell,
+                        !date && styles.emptyCell,
+                      ]}
+                      onPress={() => date && handleDateSelect(date)}
+                      disabled={!date}
+                    >
+                      <Text style={[
+                        styles.dayText,
+                        date && isSameDay(date, selectedFromDate) && styles.selectedDayText,
+                        date && isSameDay(date, selectedToDate) && styles.selectedDayText,
+                        date && isDateInRange(date, selectedFromDate, selectedToDate) && styles.inRangeDayText,
+                      ]}>
+                        {date ? date.getDate() : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={closeCustomDateModal}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.applyButton}
+                onPress={applyDateRange}
+              >
+                <Text style={styles.applyButtonText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Year Picker Modal */}
+      <Modal
+        visible={showYearPicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowYearPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.yearPickerModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Year</Text>
+              <TouchableOpacity onPress={() => setShowYearPicker(false)}>
+                <Feather name="x" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.yearPickerScroll}>
+              {Array.from({ length: 11 }, (_, i) => {
+                const year = new Date().getFullYear() - i;
+                return (
+                  <TouchableOpacity
+                    key={year}
+                    style={[
+                      styles.yearOption,
+                      year === currentMonth.getFullYear() && styles.selectedYearOption
+                    ]}
+                    onPress={() => {
+                      const newMonth = new Date(currentMonth);
+                      newMonth.setFullYear(year);
+                      setCurrentMonth(newMonth);
+                      setShowYearPicker(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.yearOptionText,
+                      year === currentMonth.getFullYear() && styles.selectedYearOptionText
+                    ]}>
+                      {year}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -696,14 +1094,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   timeRangeContainer: {
-    flexDirection: "row",
     marginBottom: 20,
+  },
+  timeRangeScrollContent: {
+    paddingHorizontal: 10,
     gap: 8,
   },
   timeRangeButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    marginRight: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   timeRangeButtonActive: {
     backgroundColor: "#01B97F",
@@ -716,6 +1120,11 @@ const styles = StyleSheet.create({
   timeRangeTextActive: {
     fontFamily: "Poppins-SemiBold",
     color: "#ffffff",
+  },
+  customDateButton: {
+    backgroundColor: "#f3f4f6",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
   },
   overallStatsContainer: {
     flexDirection: "row",
@@ -998,5 +1407,278 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-Medium",
     color: "#111827",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  customDateModal: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 20,
+    width: "90%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
+  },
+  dateInputContainer: {
+    marginBottom: 20,
+  },
+  calendarHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  calendarTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
+    textAlign: "center",
+  },
+  calendarTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  yearSelector: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 16,
+    backgroundColor: "#f3f4f6",
+  },
+  calendarStatus: {
+    marginBottom: 15,
+    paddingHorizontal: 10,
+  },
+  calendarStatusText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#6b7280",
+    marginBottom: 5,
+  },
+  selectedDateText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#374151",
+  },
+  calendarGrid: {
+    borderWidth: 1,
+    borderColor: "#f3f4f6",
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  weekDays: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 10,
+    backgroundColor: "#f9fafb",
+  },
+  weekDayText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#6b7280",
+  },
+  daysGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  dayCell: {
+    width: width / 7, // 7 columns for days of the week
+    aspectRatio: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  dayText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#374151",
+  },
+  selectedFromCell: {
+    backgroundColor: "#e8f5f0",
+    borderRadius: 8,
+  },
+  selectedToCell: {
+    backgroundColor: "#e8f5f0",
+    borderRadius: 8,
+  },
+  inRangeCell: {
+    backgroundColor: "#e8f5f0",
+    borderRadius: 8,
+  },
+  emptyCell: {
+    backgroundColor: "transparent",
+  },
+  selectedDayText: {
+    color: "#ffffff",
+  },
+  inRangeDayText: {
+    color: "#ffffff",
+  },
+  dateInput: {
+    marginBottom: 15,
+  },
+  dateLabel: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#6b7280",
+    marginBottom: 8,
+  },
+  dateInputRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  dateInputField: {
+    flex: 1,
+  },
+  dateInputLabel: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#6b7280",
+    marginBottom: 4,
+  },
+  dateTextInput: {
+    fontSize: 16,
+    fontFamily: "Poppins-Regular",
+    color: "#374151",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 20,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: "#f3f4f6",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-Medium",
+    color: "#374151",
+  },
+  applyButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: "#01B97F",
+    alignItems: "center",
+    marginLeft: 10,
+  },
+  applyButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-Medium",
+    color: "#ffffff",
+  },
+  yearPickerModal: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 20,
+    width: "80%",
+    maxWidth: 300,
+    maxHeight: "70%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  yearPickerScroll: {
+    maxHeight: 300,
+  },
+  yearOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginVertical: 2,
+  },
+  selectedYearOption: {
+    backgroundColor: "#01B97F",
+  },
+  yearOptionText: {
+    fontSize: 16,
+    fontFamily: "Poppins-Medium",
+    color: "#374151",
+    textAlign: "center",
+  },
+  selectedYearOptionText: {
+    color: "#ffffff",
+    fontFamily: "Poppins-SemiBold",
+  },
+  analyticsItemLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  severityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  severityText: {
+    fontSize: 10,
+    fontFamily: 'Poppins-Medium',
+    textTransform: 'uppercase',
+  },
+  riskBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  riskText: {
+    fontSize: 10,
+    fontFamily: 'Poppins-Medium',
+    textTransform: 'uppercase',
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  updateIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  updateText: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#3b82f6',
+    marginLeft: 4,
   },
 });

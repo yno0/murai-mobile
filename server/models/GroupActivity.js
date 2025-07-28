@@ -12,7 +12,7 @@ const groupActivitySchema = new mongoose.Schema({
     required: true,
     enum: [
       'group_created',
-      'group_updated', 
+      'group_updated',
       'group_deleted',
       'member_joined',
       'member_left',
@@ -20,6 +20,7 @@ const groupActivitySchema = new mongoose.Schema({
       'member_promoted',
       'member_demoted',
       'settings_updated',
+      'code_regenerated',
       'detection',
       'report_generated',
       'content_flagged',

@@ -1,6 +1,5 @@
 import { Feather } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { View } from "react-native";
 import DashboardStack from "./DashboardStack";
 import ExtensionStack from "./ExtensionStack";
 import GroupStack from "./GroupStack";
@@ -14,7 +13,7 @@ export default function RootNavigator() {
     <Tab.Navigator
       initialRouteName="Home"
       screenOptions={({ route }) => ({
-        tabBarShowLabel: true,
+        tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 0,
@@ -42,7 +41,7 @@ export default function RootNavigator() {
               iconName = "bar-chart-2";
               break;
             case "Extension":
-              iconName = "package";
+              iconName = "settings";
               break;
             case "Group":
               iconName = "users";
@@ -57,27 +56,7 @@ export default function RootNavigator() {
           const iconColor = focused ? '#02B97F' : '#9CA3AF';
           const iconSize = focused ? 26 : 24;
 
-          return (
-            <View style={{
-              backgroundColor: focused ? '#e8f5f0' : 'transparent',
-              borderRadius: 16,
-              paddingHorizontal: 18,
-              paddingVertical: 10,
-              minWidth: 55,
-              alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: focused ? '#02B97F' : 'transparent',
-              shadowOffset: {
-                width: 0,
-                height: 2,
-              },
-              shadowOpacity: focused ? 0.15 : 0,
-              shadowRadius: 4,
-              elevation: focused ? 3 : 0,
-            }}>
-              <Feather name={iconName} size={iconSize} color={iconColor} />
-            </View>
-          );
+          return <Feather name={iconName} size={iconSize} color={iconColor} />;
         },
         tabBarActiveTintColor: '#02B97F',
         tabBarInactiveTintColor: '#9CA3AF',

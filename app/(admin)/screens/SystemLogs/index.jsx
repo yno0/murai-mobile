@@ -1,19 +1,19 @@
 import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import MainHeader from "../../../components/common/MainHeader";
 import { useAuth } from "../../../context/AuthContext";
 
-const API_BASE_URL = "http://localhost:3000/api";
+const API_BASE_URL = "https://murai-server.onrender.com/api";
 
 export default function AdminSystemLogsScreen({ navigation }) {
   const { makeAuthenticatedRequest } = useAuth();

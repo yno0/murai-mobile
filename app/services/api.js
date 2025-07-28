@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/api'; // Change to your server address if needed
+const API_BASE_URL = 'https://murai-server.onrender.com/api'; // Deployed server
 
 const api = axios.create({
   baseURL: API_BASE_URL,

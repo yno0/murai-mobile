@@ -25,22 +25,22 @@ function AdminTabNavigator() {
     <Tab.Navigator
       initialRouteName="AdminHome"
       screenOptions={({ route }) => ({
-        tabBarShowLabel: true,
+        tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 0,
-          height: 85,
-          paddingBottom: 20,
-          paddingTop: 12,
+          height: 80,
+          paddingBottom: 15,
+          paddingTop: 10,
           paddingHorizontal: 10,
           shadowColor: '#000',
           shadowOffset: {
             width: 0,
-            height: -4,
+            height: -2,
           },
           shadowOpacity: 0.1,
-          shadowRadius: 12,
-          elevation: 15,
+          shadowRadius: 8,
+          elevation: 10,
         },
         tabBarIcon: ({ focused }) => {
           let iconName;
@@ -73,39 +73,26 @@ function AdminTabNavigator() {
               iconName = "circle";
           }
 
-          const iconColor = focused ? '#01B97F' : '#9CA3AF';
-          const iconSize = focused ? 26 : 24;
+          const iconColor = focused ? '#01B97F' : '#6B7280';
+          const iconSize = focused ? 24 : 20;
 
           return (
             <View style={{
-              backgroundColor: focused ? '#e8f5f0' : 'transparent',
-              borderRadius: 16,
-              paddingHorizontal: 18,
-              paddingVertical: 10,
-              minWidth: 55,
-              alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: focused ? '#01B97F' : 'transparent',
+              shadowColor: '#000',
               shadowOffset: {
                 width: 0,
-                height: 2,
+                height: 4,
               },
-              shadowOpacity: focused ? 0.15 : 0,
-              shadowRadius: 4,
-              elevation: focused ? 3 : 0,
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 6,
             }}>
               <Feather name={iconName} size={iconSize} color={iconColor} />
             </View>
           );
         },
         tabBarActiveTintColor: '#01B97F',
-        tabBarInactiveTintColor: '#9CA3AF',
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontFamily: 'Poppins-SemiBold',
-          marginTop: 6,
-          letterSpacing: 0.3,
-        },
+        tabBarInactiveTintColor: '#6B7280',
         tabBarItemStyle: {
           paddingVertical: 4,
         },

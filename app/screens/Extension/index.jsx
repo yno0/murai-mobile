@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import {
-    Animated,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    View
+  Animated,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MainHeader from '../../components/common/MainHeader';
@@ -22,6 +22,7 @@ export default function ExtensionScreen() {
   const [buttonScale] = useState(new Animated.Value(1));
   const [statusCardsAnim] = useState(new Animated.Value(0));
   const [statusCardsScale] = useState(new Animated.Value(0.8));
+  const [shakeAnim] = useState(new Animated.Value(0));
 
   // Mock sync data - replace with real data from your service
   const [lastSyncTime, setLastSyncTime] = useState(null); // null means not synced
@@ -32,43 +33,41 @@ export default function ExtensionScreen() {
     if (extensionEnabled) {
       // Start tracking active time when enabled
       setActiveTime(0);
-      setLastSyncTime(new Date()); // Set sync time when enabled
+      // Keep sync time as null for now - will handle real sync later
+      // setLastSyncTime(new Date()); // Set sync time when enabled
 
       // Button pop effect
-      buttonScale.setValue(0.8);
-      Animated.spring(buttonScale, {
+      buttonScale.setValue(0.9);
+      Animated.timing(buttonScale, {
         toValue: 1,
-        friction: 4,
-        tension: 120,
+        duration: 300,
         useNativeDriver: true,
       }).start();
 
       // Pulse pop and settle into gentle pulse
-      pulseAnim.setValue(0.7);
+      pulseAnim.setValue(0.95);
       Animated.sequence([
-        Animated.spring(pulseAnim, {
-          toValue: 1.2,
-          friction: 3,
-          tension: 120,
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 400,
           useNativeDriver: true,
         }),
-        Animated.spring(pulseAnim, {
+        Animated.timing(pulseAnim, {
           toValue: 1,
-          friction: 4,
-          tension: 80,
+          duration: 400,
           useNativeDriver: true,
         })
       ]).start(() => {
         Animated.loop(
           Animated.sequence([
             Animated.timing(pulseAnim, {
-              toValue: 1.15,
-              duration: 1800,
+              toValue: 1.08,
+              duration: 2000,
               useNativeDriver: true,
             }),
             Animated.timing(pulseAnim, {
               toValue: 1,
-              duration: 1800,
+              duration: 2000,
               useNativeDriver: true,
             }),
           ])
@@ -80,12 +79,12 @@ export default function ExtensionScreen() {
       Animated.sequence([
         Animated.timing(glowAnim, {
           toValue: 1,
-          duration: 400,
+          duration: 600,
           useNativeDriver: true,
         }),
         Animated.timing(glowAnim, {
-          toValue: 0.5,
-          duration: 400,
+          toValue: 0.6,
+          duration: 600,
           useNativeDriver: true,
         })
       ]).start(() => {
@@ -93,37 +92,30 @@ export default function ExtensionScreen() {
           Animated.sequence([
             Animated.timing(glowAnim, {
               toValue: 1,
-              duration: 1500,
+              duration: 2500,
               useNativeDriver: true,
             }),
             Animated.timing(glowAnim, {
-              toValue: 0.5,
-              duration: 1500,
+              toValue: 0.6,
+              duration: 2500,
               useNativeDriver: true,
             }),
           ])
         ).start();
       });
 
-      // Quick spin, then slow loop
+      // Smooth rotation
       rotateAnim.setValue(0);
-      Animated.sequence([
-        Animated.timing(rotateAnim, {
-          toValue: 0.5,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 7400,
-          useNativeDriver: true,
-        })
-      ]).start(() => {
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 10000,
+        useNativeDriver: true,
+      }).start(() => {
         rotateAnim.setValue(0);
         Animated.loop(
           Animated.timing(rotateAnim, {
             toValue: 1,
-            duration: 8000,
+            duration: 10000,
             useNativeDriver: true,
           })
         ).start();
@@ -151,6 +143,39 @@ export default function ExtensionScreen() {
       setLastSyncTime(null);
       setActiveTime(0);
 
+      // Smooth button scale animation for disabled state
+      buttonScale.setValue(1);
+      Animated.timing(buttonScale, {
+        toValue: 0.95,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        Animated.timing(buttonScale, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      });
+
+      // Add a subtle shake effect when deactivating
+      Animated.sequence([
+        Animated.timing(shakeAnim, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: -1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: 0,
+          duration: 100,
+          useNativeDriver: true,
+        })
+      ]).start();
+
       // Smoothly fade out and reset animations
       Animated.parallel([
         Animated.timing(pulseAnim, {
@@ -165,11 +190,6 @@ export default function ExtensionScreen() {
         }),
         Animated.timing(rotateAnim, {
           toValue: 0,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(buttonScale, {
-          toValue: 1,
           duration: 400,
           useNativeDriver: true,
         }),
@@ -208,6 +228,9 @@ export default function ExtensionScreen() {
 
   // Helper function to format time
   const formatTime = (minutes) => {
+    if (!minutes || minutes < 0) {
+      return '0m';
+    }
     if (minutes < 60) {
       return `${minutes}m`;
     }
@@ -220,18 +243,22 @@ export default function ExtensionScreen() {
   const formatLastSync = (syncTime) => {
     if (!syncTime) return 'Not synced';
 
-    const now = new Date();
-    const diffMs = now - syncTime;
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    try {
+      const now = new Date();
+      const diffMs = now - syncTime;
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
 
-    if (diffMinutes < 1) return 'Just now';
-    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+      if (diffMinutes < 1) return 'Just now';
+      if (diffMinutes < 60) return `${diffMinutes}m ago`;
 
-    const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
+      const diffHours = Math.floor(diffMinutes / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
 
-    const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}d ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      return `${diffDays}d ago`;
+    } catch (error) {
+      return 'Not synced';
+    }
   };
 
   // Interpolate rotation for the outer ring
@@ -261,11 +288,11 @@ export default function ExtensionScreen() {
         <View style={styles.statusHeader}>
           <View style={[
             styles.statusIndicator,
-            { backgroundColor: extensionEnabled ? '#02B97F' : '#6B7280' }
+            { backgroundColor: extensionEnabled ? '#02B97F' : '#9CA3AF' }
           ]} />
           <Text style={[
             styles.statusTitle,
-            { color: extensionEnabled ? '#02B97F' : '#6B7280' }
+            { color: extensionEnabled ? '#02B97F' : '#9CA3AF' }
           ]}>
             {extensionEnabled ? 'PROTECTION ACTIVE' : 'PROTECTION INACTIVE'}
           </Text>
@@ -317,27 +344,46 @@ export default function ExtensionScreen() {
         ]} />
 
         {/* Main button with enhanced styling */}
-        <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+        <Animated.View style={{ 
+          transform: [
+            { scale: buttonScale },
+            {
+              translateX: shakeAnim.interpolate({
+                inputRange: [-1, 0, 1],
+                outputRange: [-3, 0, 3]
+              })
+            }
+          ] 
+        }}>
           <Pressable
             style={[
               styles.powerButton,
-              extensionEnabled && styles.powerButtonActive
+              extensionEnabled && styles.powerButtonActive,
+              {
+                backgroundColor: extensionEnabled ? '#111827' : '#1F2937',
+                borderColor: extensionEnabled ? 'rgba(2, 185, 127, 0.7)' : 'rgba(107, 114, 128, 0.3)',
+                shadowColor: extensionEnabled ? 'rgba(2, 185, 127, 0.4)' : '#000',
+              }
             ]}
             onPress={toggleExtension}
             android_ripple={{
-              color: extensionEnabled ? 'rgba(1, 185, 127, 0.3)' : 'rgba(107, 114, 128, 0.3)',
+              color: extensionEnabled ? 'rgba(2, 185, 127, 0.2)' : 'rgba(107, 114, 128, 0.2)',
               borderless: true,
-              radius: 60
+              radius: 55
             }}
           >
             <View style={[
               styles.powerButtonInner,
-              { backgroundColor: extensionEnabled ? 'rgba(1, 185, 127, 0.1)' : 'rgba(107, 114, 128, 0.05)' }
+              {
+                backgroundColor: extensionEnabled ? 'rgba(2, 185, 127, 0.15)' : 'rgba(31, 41, 55, 0.1)',
+                borderWidth: extensionEnabled ? 1 : 0,
+                borderColor: extensionEnabled ? 'rgba(2, 185, 127, 0.3)' : 'transparent'
+              }
             ]}>
               <MaterialCommunityIcons
                 name="power"
                 size={42}
-                color={extensionEnabled ? "#02B97F" : "#6B7280"}
+                color={extensionEnabled ? "#02B97F" : "#9CA3AF"}
               />
             </View>
           </Pressable>
@@ -346,7 +392,7 @@ export default function ExtensionScreen() {
       <Animated.Text style={[
         styles.powerButtonText,
         {
-          color: extensionEnabled ? "#1f2937" : "#6b7280",
+          color: extensionEnabled ? "#1f2937" : "#9CA3AF",
           opacity: buttonScale
         }
       ]}>
@@ -405,7 +451,7 @@ export default function ExtensionScreen() {
                 fontSize: lastSyncTime ? 16 : 14
               }
             ]}>
-              {formatLastSync(lastSyncTime)}
+              {String(formatLastSync(lastSyncTime))}
             </Text>
           </Animated.View>
 
@@ -439,7 +485,7 @@ export default function ExtensionScreen() {
               styles.statusInfoValue,
               { color: '#1f2937' }
             ]}>
-              {formatTime(activeTime)}
+              {String(formatTime(activeTime))}
             </Text>
           </Animated.View>
         </Animated.View>
@@ -460,11 +506,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF', // White background
-    paddingHorizontal: 20,
+    paddingHorizontal: 8,
+    paddingTop: 0,
   },
   // Enhanced Status Card Styles
   statusCard: {
     backgroundColor: '#FFFFFF',
+    marginTop: 24,
     marginBottom: 32,
     alignItems: 'center',
   },
@@ -477,13 +525,13 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#6B7280',
+    backgroundColor: '#9CA3AF',
     marginRight: 12,
   },
   statusTitle: {
     fontSize: 16,
     fontFamily: 'Poppins-SemiBold',
-    color: '#6B7280',
+    color: '#9CA3AF',
     letterSpacing: 0.5,
     textAlign: 'center',
   },
@@ -502,14 +550,14 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
     borderWidth: 1,
     borderColor: 'rgba(107, 114, 128, 0.2)',
-    shadowColor: '#000',
+    shadowColor: 'transparent',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 0,
     },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   statusInfoHeader: {
     flexDirection: 'row',
@@ -538,39 +586,39 @@ const styles = StyleSheet.create({
   },
   powerButtonGlow: {
     position: 'absolute',
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: 'rgba(2, 185, 127, 0.1)',
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: 'rgba(2, 185, 127, 0.15)',
   },
   powerButtonOuterRing: {
     position: 'absolute',
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    borderWidth: 2,
-    borderColor: 'rgba(2, 185, 127, 0.3)',
-    borderStyle: 'dashed',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    borderWidth: 1.5,
+    borderColor: 'rgba(2, 185, 127, 0.4)',
+    borderStyle: 'solid',
   },
   powerButtonRing: {
     position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(2, 185, 127, 0.08)',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(2, 185, 127, 0.1)',
   },
   powerButtonInnerRing: {
     position: 'absolute',
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: 'rgba(2, 185, 127, 0.15)',
   },
   powerButton: {
     width: 110,
     height: 110,
     borderRadius: 55,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1F2937',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -578,22 +626,27 @@ const styles = StyleSheet.create({
       width: 0,
       height: 8,
     },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 12,
-    borderWidth: 3,
-    borderColor: 'rgba(107, 114, 128, 0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(107, 114, 128, 0.3)',
   },
   powerButtonActive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(2, 185, 127, 0.4)',
-    shadowColor: 'rgba(2, 185, 127, 0.3)',
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 16,
+    borderWidth: 3,
   },
   powerButtonInner: {
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: 'rgba(107, 114, 128, 0.05)',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
   },

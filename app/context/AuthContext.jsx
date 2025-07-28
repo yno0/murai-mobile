@@ -28,7 +28,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const API_BASE_URL = 'http://localhost:3000/api'; // Adjust if needed
+  const API_BASE_URL = 'https://murai-server.onrender.com/api'; // Deployed server
 
   const login = async (email, password) => {
     try {

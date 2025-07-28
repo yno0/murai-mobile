@@ -5,9 +5,9 @@ const Group = require('../models/Group');
 const auth = require('../middleware/auth');
 
 // Get activities for a specific group
-router.get('/groups/:groupId/activities', auth, async (req, res) => {
+router.get('/groups/:id/activities', auth, async (req, res) => {
   try {
-    const { groupId } = req.params;
+    const { id: groupId } = req.params;
     const { limit = 50, skip = 0, type } = req.query;
     
     // Check if user has access to this group
@@ -48,9 +48,9 @@ router.get('/groups/:groupId/activities', auth, async (req, res) => {
 });
 
 // Record a new activity for a group
-router.post('/groups/:groupId/activities', auth, async (req, res) => {
+router.post('/groups/:id/activities', auth, async (req, res) => {
   try {
-    const { groupId } = req.params;
+    const { id: groupId } = req.params;
     const { type, message, metadata = {} } = req.body;
     
     // Validate required fields
@@ -101,9 +101,9 @@ router.post('/groups/:groupId/activities', auth, async (req, res) => {
 });
 
 // Get activity statistics for a group
-router.get('/groups/:groupId/activities/stats', auth, async (req, res) => {
+router.get('/groups/:id/activities/stats', auth, async (req, res) => {
   try {
-    const { groupId } = req.params;
+    const { id: groupId } = req.params;
     const { days = 30 } = req.query;
     
     // Check if user has access to this group
@@ -186,9 +186,9 @@ router.get('/groups/:groupId/activities/stats', auth, async (req, res) => {
 });
 
 // Delete activities (admin only)
-router.delete('/groups/:groupId/activities/:activityId', auth, async (req, res) => {
+router.delete('/groups/:id/activities/:activityId', auth, async (req, res) => {
   try {
-    const { groupId, activityId } = req.params;
+    const { id: groupId, activityId } = req.params;
     
     // Check if user is admin of the group
     const group = await Group.findById(groupId);

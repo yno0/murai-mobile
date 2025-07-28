@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'https://murai-server.onrender.com/api';
 
 // Helper function to get auth token (you might need to adjust this based on your auth implementation)
 const getAuthToken = () => {

@@ -2,13 +2,12 @@ import React from 'react';
 import {
     Animated,
     Dimensions,
-    FlatList,
     Modal,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -39,12 +38,13 @@ function HomeScreen({ navigation }) {
   });
 
   const timeRange = 'today';
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = Array.isArray(notifications) ? notifications.filter(n => !n.isRead).length : 0;
 
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(50)).current;
   const scaleAnim = React.useRef(new Animated.Value(0.8)).current;
+  const loadingAnim = React.useRef(new Animated.Value(0)).current;
 
   // Quick action animations
   const quickAction1Anim = React.useRef(new Animated.Value(0)).current;
@@ -54,51 +54,65 @@ function HomeScreen({ navigation }) {
 
   // Initialize animations
   const startAnimations = React.useCallback(() => {
-    // Main content animations
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 700,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // Only start animations when data is loaded
+    if (loading) return;
 
-    // Staggered quick action animations
+    // Reset animations first
+    fadeAnim.setValue(0);
+    slideAnim.setValue(50);
+    scaleAnim.setValue(0.8);
+    quickAction1Anim.setValue(0);
+    quickAction2Anim.setValue(0);
+    quickAction3Anim.setValue(0);
+    quickAction4Anim.setValue(0);
+
+    // Start main content animations with a small delay
     setTimeout(() => {
-      Animated.stagger(150, [
-        Animated.timing(quickAction1Anim, {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
           toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
           duration: 500,
           useNativeDriver: true,
         }),
-        Animated.timing(quickAction2Anim, {
+        Animated.timing(scaleAnim, {
           toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(quickAction3Anim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(quickAction4Anim, {
-          toValue: 1,
-          duration: 500,
+          duration: 550,
           useNativeDriver: true,
         }),
       ]).start();
-    }, 400);
-  }, [fadeAnim, slideAnim, scaleAnim, quickAction1Anim, quickAction2Anim, quickAction3Anim, quickAction4Anim]);
+
+      // Staggered quick action animations
+      setTimeout(() => {
+        Animated.stagger(150, [
+          Animated.timing(quickAction1Anim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(quickAction2Anim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(quickAction3Anim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(quickAction4Anim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }, 300);
+    }, 200);
+  }, [fadeAnim, slideAnim, scaleAnim, quickAction1Anim, quickAction2Anim, quickAction3Anim, quickAction4Anim, loading]);
 
   // Get user's first name for greeting
   const getUserFirstName = () => {
@@ -107,7 +121,11 @@ function HomeScreen({ navigation }) {
   };
 
   const formatNotificationTime = (dateString) => {
+    if (!dateString) return 'Just now';
+    
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Just now';
+    
     const now = new Date();
     const diffInMinutes = Math.floor((now - date) / (1000 * 60));
 
@@ -127,9 +145,13 @@ function HomeScreen({ navigation }) {
     setNotifLoading(true);
     try {
       const res = await api.get('/notifications');
-      setNotifications(res.data);
+      // The API returns { notifications: [...], pagination: {...}, unreadCount: ... }
+      // So we need to access res.data.notifications
+      const notificationsData = res.data?.notifications || res.data;
+      setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
     } catch (_err) {
-      // Optionally handle error
+      // Set empty array on error
+      setNotifications([]);
     } finally {
       setNotifLoading(false);
     }
@@ -144,7 +166,7 @@ function HomeScreen({ navigation }) {
     try {
       await api.put(`/notifications/${id}/read`);
       // Update the notifications state to mark as read
-      setNotifications((prev) => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+      setNotifications((prev) => Array.isArray(prev) ? prev.map(n => n._id === id ? { ...n, isRead: true } : n) : []);
     } catch (_err) {}
   };
 
@@ -169,7 +191,7 @@ function HomeScreen({ navigation }) {
 
     setMarkingAllAsRead(true);
     try {
-      const unreadNotifications = notifications.filter(n => !n.isRead);
+      const unreadNotifications = Array.isArray(notifications) ? notifications.filter(n => !n.isRead) : [];
 
       // Mark all unread notifications as read on the server
       await Promise.all(
@@ -179,7 +201,7 @@ function HomeScreen({ navigation }) {
       );
 
       // Update local state to mark all as read
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setNotifications(prev => Array.isArray(prev) ? prev.map(n => ({ ...n, isRead: true })) : []);
     } catch (_err) {
       console.error('Failed to mark all notifications as read');
     } finally {
@@ -222,8 +244,21 @@ function HomeScreen({ navigation }) {
 
   React.useEffect(() => {
     fetchData();
-    startAnimations();
-  }, [fetchData, startAnimations]);
+  }, [fetchData]);
+
+  React.useEffect(() => {
+    if (loading) {
+      // Show loading state immediately
+      Animated.timing(loadingAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // Data is loaded, start main animations
+      startAnimations();
+    }
+  }, [loading, startAnimations, loadingAnim]);
 
   // Prepare chart data for LineChart
   const preparedChartData = chartData ? {
@@ -303,7 +338,16 @@ function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </Animated.View>
 
-
+      {/* Loading State */}
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <View style={styles.loadingCard}>
+            <MaterialCommunityIcons name="shield-check" size={48} color="#02B97F" />
+            <Text style={styles.loadingTitle}>Loading Protection Data</Text>
+            <Text style={styles.loadingSubtitle}>Fetching your security overview...</Text>
+          </View>
+        </View>
+      )}
 
       {/* Hero Protection Status Card */}
       {!loading && stats && (
@@ -311,7 +355,7 @@ function HomeScreen({ navigation }) {
           style={[
             styles.heroCard,
             {
-              opacity: fadeAnim,
+              opacity: loadingAnim,
               transform: [{ scale: scaleAnim }]
             }
           ]}
@@ -326,17 +370,23 @@ function HomeScreen({ navigation }) {
                 <Text style={styles.heroSubtitle}>Your digital safety is being monitored 24/7</Text>
               </View>
               <View style={styles.heroBadge}>
-                <Text style={styles.heroBadgeText}>{homeStats.overall.averageAccuracy}%</Text>
+                <Text style={styles.heroBadgeText}>
+                  {loading ? '...' : `${Math.round(homeStats.overall?.averageAccuracy || 0)}%`}
+                </Text>
               </View>
             </View>
             <View style={styles.heroStats}>
               <View style={styles.heroStatItem}>
-                <Text style={styles.heroStatNumber}>{homeStats.overall.threatsBlocked}</Text>
+                <Text style={styles.heroStatNumber}>
+                  {loading ? '...' : (homeStats.overall?.threatsBlocked || 0)}
+                </Text>
                 <Text style={styles.heroStatLabel}>Threats Blocked</Text>
               </View>
               <View style={styles.heroStatDivider} />
               <View style={styles.heroStatItem}>
-                <Text style={styles.heroStatNumber}>{homeStats.overall.sitesMonitored}</Text>
+                <Text style={styles.heroStatNumber}>
+                  {loading ? '...' : (homeStats.overall?.sitesMonitored || 0)}
+                </Text>
                 <Text style={styles.heroStatLabel}>Sites Monitored</Text>
               </View>
             </View>
@@ -386,15 +436,13 @@ function HomeScreen({ navigation }) {
             </View>
             {notifLoading ? (
               <Text style={{ textAlign: 'center', color: '#6b7280' }}>Loading...</Text>
-            ) : notifications.length === 0 ? (
+            ) : !Array.isArray(notifications) || notifications.length === 0 ? (
               <Text style={{ textAlign: 'center', color: '#6b7280' }}>No notifications</Text>
             ) : (
-              <FlatList
-                data={notifications}
-                keyExtractor={item => item._id}
-                style={{ maxHeight: 350 }}
-                renderItem={({ item }) => (
+              <ScrollView style={{ maxHeight: 350 }} showsVerticalScrollIndicator={false}>
+                {(Array.isArray(notifications) ? notifications : []).slice(0, 10).map((item) => (
                   <TouchableOpacity
+                    key={item._id}
                     style={[styles.notifItem, !item.isRead && styles.notifItemUnread]}
                     onPress={() => openNotificationDetail(item)}
                   >
@@ -416,8 +464,8 @@ function HomeScreen({ navigation }) {
                       />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.notifTitle}>{item.title}</Text>
-                      <Text style={styles.notifMessage}>{item.message}</Text>
+                      <Text style={styles.notifTitle}>{item.title || 'Notification'}</Text>
+                      <Text style={styles.notifMessage}>{item.message || 'No message'}</Text>
                       <Text style={styles.notifTime}>{formatNotificationTime(item.createdAt)}</Text>
                     </View>
                     <View style={{ alignItems: 'center', justifyContent: 'center', paddingLeft: 8 }}>
@@ -428,8 +476,8 @@ function HomeScreen({ navigation }) {
                       />
                     </View>
                   </TouchableOpacity>
-                )}
-              />
+                ))}
+              </ScrollView>
             )}
           </View>
         </View>
@@ -444,24 +492,29 @@ function HomeScreen({ navigation }) {
       />
 
       {/* Stats Card */}
-      <Animated.View
-        style={[
-          styles.statsCardContainer,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }]
-          }
-        ]}
-      >
+      {!loading && (
+        <Animated.View
+          style={[
+            styles.statsCardContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
         <View style={styles.statsCard}>
           <View style={styles.statsHeader}>
             <View style={styles.statsLeft}>
-              <Text style={styles.statsNumber}>{loading ? '...' : homeStats.today.inappropriateWordsFlagged}</Text>
-              <Text style={styles.statsLabel}>{`inappropriate words\nwere flagged today`}</Text>
+              <Text style={styles.statsNumber}>
+                {loading ? '...' : (homeStats.today?.inappropriateWordsFlagged || 0)}
+              </Text>
+              <Text style={styles.statsLabel}>
+                {loading ? 'Loading data...' : 'inappropriate words\nwere flagged today'}
+              </Text>
             </View>
             <View style={styles.statsRight}>
               <Text style={[styles.percentage, { color: '#01B97F' }]}>
-                {loading ? '' : `+${homeStats.today.inappropriateWordsFlagged} ↗`}
+                {loading ? '...' : `+${homeStats.today?.inappropriateWordsFlagged || 0} ↗`}
               </Text>
             </View>
           </View>
@@ -487,17 +540,19 @@ function HomeScreen({ navigation }) {
           <Text style={styles.viewDetailedText}>View Detailed →</Text>
         </TouchableOpacity>
       </Animated.View>
+      )}
 
       {/* Quick Actions Section */}
-      <Animated.View
-        style={[
-          styles.quickActionsSection,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }]
-          }
-        ]}
-      >
+      {!loading && (
+        <Animated.View
+          style={[
+            styles.quickActionsSection,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <Text style={styles.sectionSubtitle}>Manage your digital safety</Text>
@@ -592,21 +647,25 @@ function HomeScreen({ navigation }) {
           </AnimatedTouchableOpacity>
         </View>
       </Animated.View>
+      )}
 
       {/* Recent Activity */}
-      <Animated.View
-        style={[
-          styles.recentActivity,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }]
-          }
-        ]}
-      >
+      {!loading && (
+        <Animated.View
+          style={[
+            styles.recentActivity,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
         <View style={styles.recentActivityHeader}>
           <View>
             <Text style={styles.recentActivityTitle}>Recent Activity</Text>
-            <Text style={styles.recentActivityCount}>{loading ? '' : (recentActivity.length + ' items')}</Text>
+            <Text style={styles.recentActivityCount}>
+              {loading ? 'Loading...' : `${recentActivity.length} items`}
+            </Text>
           </View>
           <TouchableOpacity style={styles.viewAllButton}>
             <Text style={styles.viewAllText}>View All</Text>
@@ -622,14 +681,10 @@ function HomeScreen({ navigation }) {
           ) : recentActivity.length === 0 ? (
             <Text style={styles.emptyStateText}>No recent activity</Text>
           ) : (
-            <FlatList
-              data={recentActivity}
-              keyExtractor={(item, idx) => item.id ? String(item.id) : String(idx)}
-              style={styles.activityList}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <View style={styles.activityItem}>
-                  <View style={[styles.activityIcon, { backgroundColor: '#f3f4f6' }]}> {/* You can color by type if you want */}
+            <View style={styles.activityList}>
+              {recentActivity.slice(0, 5).map((item, idx) => (
+                <View key={item.id ? String(item.id) : String(idx)} style={styles.activityItem}>
+                  <View style={[styles.activityIcon, { backgroundColor: '#f3f4f6' }]}>
                     <MaterialCommunityIcons
                       name={
                         item.type === 'flagged' ? 'alert-circle-outline' :
@@ -658,17 +713,22 @@ function HomeScreen({ navigation }) {
                   </View>
                   <View style={styles.activityContent}>
                     <View style={styles.activityTopLine}>
-                      <Text style={styles.activityText}>{item.details || item.type}</Text>
-                      <Text style={styles.activityTime}>{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                      <Text style={styles.activityText}>{item.details || item.type || 'Activity'}</Text>
+                      <Text style={styles.activityTime}>
+                        {item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                      </Text>
                     </View>
-                    <Text style={styles.activityDetails}>{item.user ? `By ${item.user}` : ''}</Text>
+                    <Text style={styles.activityDetails}>
+                      {item.user ? `By ${item.user}` : 'System'}
+                    </Text>
                   </View>
                 </View>
-              )}
-            />
+              ))}
+            </View>
           )}
         </View>
       </Animated.View>
+      )}
     </ScrollView>
   );
 }
@@ -676,7 +736,7 @@ function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#ffffff',
     paddingHorizontal: 20,
     paddingTop: 50,
   },
@@ -1171,6 +1231,42 @@ const styles = StyleSheet.create({
   },
   quickActionSubtitle: {
     fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  // Loading State Styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(2, 185, 127, 0.1)',
+  },
+  loadingTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1f2937',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  loadingSubtitle: {
+    fontSize: 14,
     fontFamily: 'Poppins-Regular',
     color: '#6b7280',
     textAlign: 'center',

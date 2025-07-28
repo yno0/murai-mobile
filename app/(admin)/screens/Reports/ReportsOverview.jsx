@@ -1,23 +1,23 @@
 import { Feather } from "@expo/vector-icons";
 import { useState } from "react";
 import {
-  Dimensions,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { BarChart } from "react-native-chart-kit";
 
 const { width } = Dimensions.get("window");
 
 export default function ReportsOverview({
-  reports,
-  loading,
+  reports = [],
+  loading = false,
   onRefresh,
-  overviewStats,
+  overviewStats = null,
 }) {
   const [currentDetectionPage, setCurrentDetectionPage] = useState(1);
   const DETECTION_ITEMS_PER_PAGE = 5;
@@ -91,33 +91,34 @@ export default function ReportsOverview({
   ];
   const getStats = () => {
     // Use overviewStats if available (from API), otherwise calculate from reports array
-    if (overviewStats !== null) {
+    if (overviewStats && typeof overviewStats === 'object' && overviewStats.total !== undefined) {
       console.log("🎯 Using overview stats from API:", overviewStats);
       return {
-        total: overviewStats.total,
-        pending: overviewStats.pending,
-        resolved: overviewStats.resolved,
-        rejected: overviewStats.rejected,
-        falsePositives: overviewStats.falsePositives,
-        falseNegatives: overviewStats.falseNegatives,
-        resolutionRate: overviewStats.resolutionRate,
+        total: overviewStats.total || 0,
+        pending: overviewStats.pending || 0,
+        resolved: overviewStats.resolved || 0,
+        rejected: overviewStats.rejected || 0,
+        falsePositives: overviewStats.falsePositives || 0,
+        falseNegatives: overviewStats.falseNegatives || 0,
+        resolutionRate: overviewStats.resolutionRate || 0,
       };
     }
 
     // Fallback to calculating from reports array (for backward compatibility)
+    const safeReports = Array.isArray(reports) ? reports : [];
     console.log(
       "⚠️ Falling back to local calculation from reports array:",
-      reports.length,
+      safeReports.length,
       "reports"
     );
-    const total = reports.length;
-    const pending = reports.filter((r) => r.status === "pending").length;
-    const resolved = reports.filter((r) => r.status === "resolved").length;
-    const rejected = reports.filter((r) => r.status === "rejected").length;
-    const falsePositives = reports.filter(
+    const total = safeReports.length;
+    const pending = safeReports.filter((r) => r.status === "pending").length;
+    const resolved = safeReports.filter((r) => r.status === "resolved").length;
+    const rejected = safeReports.filter((r) => r.status === "rejected").length;
+    const falsePositives = safeReports.filter(
       (r) => r.reportType === "false_positive"
     ).length;
-    const falseNegatives = reports.filter(
+    const falseNegatives = safeReports.filter(
       (r) => r.reportType === "false_negative"
     ).length;
     const resolutionRate =
@@ -138,20 +139,22 @@ export default function ReportsOverview({
 
   const getCategoryStats = () => {
     // Use overviewStats if available (from API), otherwise calculate from reports array
-    if (overviewStats !== null && overviewStats.categoryStats) {
+    if (overviewStats && typeof overviewStats === 'object' && overviewStats.categoryStats && Array.isArray(overviewStats.categoryStats)) {
       return overviewStats.categoryStats;
     }
 
     // Fallback to calculating from reports array (for backward compatibility)
+    const safeReports = Array.isArray(reports) ? reports : [];
     const categories = {};
-    reports.forEach((report) => {
-      categories[report.category] = (categories[report.category] || 0) + 1;
+    safeReports.forEach((report) => {
+      const category = report.category || 'uncategorized';
+      categories[category] = (categories[category] || 0) + 1;
     });
     return Object.entries(categories).map(([category, count]) => ({
       category,
       count,
       percentage:
-        reports.length > 0 ? ((count / reports.length) * 100).toFixed(1) : 0,
+        safeReports.length > 0 ? ((count / safeReports.length) * 100).toFixed(1) : 0,
     }));
   };
 
@@ -243,38 +246,45 @@ export default function ReportsOverview({
           <Text style={styles.sectionTitle}>Category Breakdown</Text>
         </View>
         <View style={styles.card}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <BarChart
-              data={{
-                labels: categoryStats.map((item) => item.category),
-                datasets: [
-                  {
-                    data: categoryStats.map((item) => item.count),
+          {categoryStats.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <BarChart
+                data={{
+                  labels: categoryStats.map((item) => item.category || 'Unknown'),
+                  datasets: [
+                    {
+                      data: categoryStats.map((item) => item.count || 0),
+                    },
+                  ],
+                }}
+                width={Math.max(categoryStats.length * 80, width - 60)}
+                height={220}
+                fromZero
+                showBarTops
+                showValuesOnTopOfBars
+                chartConfig={{
+                  backgroundGradientFrom: "#fff",
+                  backgroundGradientTo: "#fff",
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(29, 29, 31, ${opacity})`,
+                  style: { borderRadius: 16 },
+                  propsForBackgroundLines: {
+                    stroke: "#f3f4f6",
                   },
-                ],
-              }}
-              width={Math.max(categoryStats.length * 80, width - 60)}
-              height={220}
-              fromZero
-              showBarTops
-              showValuesOnTopOfBars
-              chartConfig={{
-                backgroundGradientFrom: "#fff",
-                backgroundGradientTo: "#fff",
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(29, 29, 31, ${opacity})`,
-                style: { borderRadius: 16 },
-                propsForBackgroundLines: {
-                  stroke: "#f3f4f6",
-                },
-                propsForLabels: {
-                  fontFamily: "Poppins-Medium",
-                },
-              }}
-              style={{ borderRadius: 16 }}
-            />
-          </ScrollView>
+                  propsForLabels: {
+                    fontFamily: "Poppins-Medium",
+                  },
+                }}
+                style={{ borderRadius: 16 }}
+              />
+            </ScrollView>
+          ) : (
+            <View style={styles.emptyChartContainer}>
+              <Feather name="bar-chart-2" size={48} color="#d1d5db" />
+              <Text style={styles.emptyChartText}>No category data available</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -912,5 +922,16 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 20,
+  },
+  emptyChartContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyChartText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#9ca3af',
+    marginTop: 12,
   },
 });
