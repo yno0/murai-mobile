@@ -1,21 +1,13 @@
-const express = require('express');
-const router = express.Router();
-const GroupActivity = require('../models/GroupActivity');
-const auth = require('../middleware/auth');
+import express from 'express';
+import GroupActivity from '../../models/GroupActivity.js';
+import Group from '../../models/groupModel.js';
+import GroupMember from '../../models/groupUserModel.js';
+import { authenticateToken } from '../../middleware/authMiddleware.js';
 
-// Dynamic import for Group model (ES6 module)
-let Group;
-(async () => {
-  try {
-    const groupModule = await import('../../murai-server/models/groupModel.js');
-    Group = groupModule.default;
-  } catch (error) {
-    console.error('Failed to import Group model:', error);
-  }
-})();
+const router = express.Router();
 
 // Get activities for a specific group
-router.get('/groups/:id/activities', auth, async (req, res) => {
+router.get('/groups/:id/activities', authenticateToken, async (req, res) => {
   try {
     const { id: groupId } = req.params;
     const { limit = 50, skip = 0, type } = req.query;
@@ -26,12 +18,13 @@ router.get('/groups/:id/activities', auth, async (req, res) => {
       return res.status(404).json({ message: 'Group not found' });
     }
     
-    // Check if user is a member of the group
-    const isMember = group.members.some(member => 
-      member.userId.toString() === req.user.id.toString()
-    );
+    // Check if user is a member of the group or admin
+    const isMember = await GroupMember.findOne({ 
+      groupId: groupId, 
+      userId: req.user.id 
+    });
     
-    if (!isMember && group.adminId.toString() !== req.user.id.toString()) {
+    if (!isMember && group.userId.toString() !== req.user.id.toString()) {
       return res.status(403).json({ message: 'Access denied' });
     }
     
@@ -58,7 +51,7 @@ router.get('/groups/:id/activities', auth, async (req, res) => {
 });
 
 // Record a new activity for a group
-router.post('/groups/:id/activities', auth, async (req, res) => {
+router.post('/groups/:id/activities', authenticateToken, async (req, res) => {
   try {
     const { id: groupId } = req.params;
     const { type, message, metadata = {} } = req.body;
@@ -76,12 +69,13 @@ router.post('/groups/:id/activities', auth, async (req, res) => {
       return res.status(404).json({ message: 'Group not found' });
     }
     
-    // Check if user is a member of the group
-    const isMember = group.members.some(member => 
-      member.userId.toString() === req.user.id.toString()
-    );
+    // Check if user is a member of the group or admin
+    const isMember = await GroupMember.findOne({ 
+      groupId: groupId, 
+      userId: req.user.id 
+    });
     
-    if (!isMember && group.adminId.toString() !== req.user.id.toString()) {
+    if (!isMember && group.userId.toString() !== req.user.id.toString()) {
       return res.status(403).json({ message: 'Access denied' });
     }
     
@@ -111,7 +105,7 @@ router.post('/groups/:id/activities', auth, async (req, res) => {
 });
 
 // Get activity statistics for a group
-router.get('/groups/:id/activities/stats', auth, async (req, res) => {
+router.get('/groups/:id/activities/stats', authenticateToken, async (req, res) => {
   try {
     const { id: groupId } = req.params;
     const { days = 30 } = req.query;
@@ -122,12 +116,13 @@ router.get('/groups/:id/activities/stats', auth, async (req, res) => {
       return res.status(404).json({ message: 'Group not found' });
     }
     
-    // Check if user is a member of the group
-    const isMember = group.members.some(member => 
-      member.userId.toString() === req.user.id.toString()
-    );
+    // Check if user is a member of the group or admin
+    const isMember = await GroupMember.findOne({ 
+      groupId: groupId, 
+      userId: req.user.id 
+    });
     
-    if (!isMember && group.adminId.toString() !== req.user.id.toString()) {
+    if (!isMember && group.userId.toString() !== req.user.id.toString()) {
       return res.status(403).json({ message: 'Access denied' });
     }
     
@@ -187,51 +182,12 @@ router.get('/groups/:id/activities/stats', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error fetching activity stats:', error);
+    console.error('Error fetching group activity stats:', error);
     res.status(500).json({ 
-      message: 'Failed to fetch activity statistics',
+      message: 'Failed to fetch group activity statistics',
       error: error.message 
     });
   }
 });
 
-// Delete activities (admin only)
-router.delete('/groups/:id/activities/:activityId', auth, async (req, res) => {
-  try {
-    const { id: groupId, activityId } = req.params;
-    
-    // Check if user is admin of the group
-    const group = await Group.findById(groupId);
-    if (!group) {
-      return res.status(404).json({ message: 'Group not found' });
-    }
-    
-    if (group.adminId.toString() !== req.user.id.toString()) {
-      return res.status(403).json({ message: 'Admin access required' });
-    }
-    
-    // Delete the activity
-    const activity = await GroupActivity.findOneAndDelete({
-      _id: activityId,
-      groupId: groupId
-    });
-    
-    if (!activity) {
-      return res.status(404).json({ message: 'Activity not found' });
-    }
-    
-    res.json({
-      success: true,
-      message: 'Activity deleted successfully'
-    });
-    
-  } catch (error) {
-    console.error('Error deleting activity:', error);
-    res.status(500).json({ 
-      message: 'Failed to delete activity',
-      error: error.message 
-    });
-  }
-});
-
-module.exports = router;
+export default router;
