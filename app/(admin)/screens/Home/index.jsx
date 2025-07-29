@@ -26,7 +26,6 @@ function AdminHomeScreen({ navigation }) {
   const [notifModalVisible, setNotifModalVisible] = React.useState(false);
   const [notifLoading, setNotifLoading] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
-  const [selectedTimeRange, setSelectedTimeRange] = React.useState('today');
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -71,8 +70,8 @@ function AdminHomeScreen({ navigation }) {
       // Fetch dashboard data using admin endpoints with current timestamp to avoid cache
       const timestamp = new Date().getTime();
       const [statsRes, chartRes, reportsRes, usersRes] = await Promise.all([
-        api.get(`/dashboard/overview?timeRange=${selectedTimeRange}&_t=${timestamp}`),
-        api.get(`/dashboard/activity-chart?timeRange=${selectedTimeRange}&_t=${timestamp}`),
+        api.get(`/dashboard/overview?timeRange=today&_t=${timestamp}`),
+        api.get(`/dashboard/activity-chart?timeRange=today&_t=${timestamp}`),
         api.get(`/admin/reports?limit=5&sortBy=createdAt&sortOrder=desc&_t=${timestamp}`),
         api.get(`/admin/users?limit=1&_t=${timestamp}`), // Just to get total count
       ]);
@@ -102,7 +101,7 @@ function AdminHomeScreen({ navigation }) {
         setLoading(false);
       }
     }
-  }, [selectedTimeRange]);
+  }, []);
 
   const handleRefresh = React.useCallback(() => {
     fetchData(true);
@@ -379,12 +378,7 @@ function AdminHomeScreen({ navigation }) {
       {/* System Activity Chart */}
       <View style={styles.chartContainer}>
         <View style={styles.chartHeader}>
-          <Text style={styles.chartTitle}>
-            {selectedTimeRange === 'today' ? "Today's System Activity" :
-             selectedTimeRange === 'last 7 days' ? "Last 7 Days Activity" :
-             selectedTimeRange === 'last 30 days' ? "Last 30 Days Activity" :
-             "All Time Activity"}
-          </Text>
+          <Text style={styles.chartTitle}>System Activity</Text>
           <TouchableOpacity
             style={styles.viewAllButton}
             onPress={() => navigation.navigate('AdminDashboard')}
@@ -394,35 +388,7 @@ function AdminHomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Time Range Selection */}
-        <View style={styles.timeRangeContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.timeRangeScrollContainer}
-          >
-            {['today', 'last 7 days', 'last 30 days', 'all time'].map((range) => (
-              <TouchableOpacity
-                key={range}
-                style={[
-                  styles.timeRangeButton,
-                  selectedTimeRange === range && styles.timeRangeButtonActive
-                ]}
-                onPress={() => setSelectedTimeRange(range)}
-              >
-                <Text style={[
-                  styles.timeRangeButtonText,
-                  selectedTimeRange === range && styles.timeRangeButtonTextActive
-                ]}>
-                  {range === 'today' ? 'Today' :
-                   range === 'last 7 days' ? 'Week' :
-                   range === 'last 30 days' ? 'Month' :
-                   'All Time'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+
         {loading || refreshing ? (
           <View style={styles.chartLoadingContainer}>
             <ActivityIndicator size="large" color="#01B97F" />
@@ -891,34 +857,7 @@ const styles = StyleSheet.create({
     color: '#6C6C6C',
     marginLeft: 8,
   },
-  timeRangeContainer: {
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  timeRangeScrollContainer: {
-    paddingHorizontal: 4,
-  },
-  timeRangeButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginHorizontal: 4,
-    borderRadius: 20,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  timeRangeButtonActive: {
-    backgroundColor: '#01B97F',
-    borderColor: '#01B97F',
-  },
-  timeRangeButtonText: {
-    fontSize: 12,
-    fontFamily: 'Poppins-Medium',
-    color: '#6c757d',
-  },
-  timeRangeButtonTextActive: {
-    color: '#ffffff',
-  },
+
 });
 
 export default AdminHomeScreen;

@@ -7,12 +7,6 @@ import User from '../../models/userModel.js';
 
 const router = express.Router();
 
-// Test endpoint
-router.get('/test', (req, res) => {
-  console.log('🧪 Test endpoint hit!');
-  res.json({ message: 'Dashboard routes working!', timestamp: new Date().toISOString() });
-});
-
 // Middleware to authenticate JWT
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -111,7 +105,6 @@ router.get('/overview', /* authenticateToken, */ async (req, res) => {
 router.get('/activity-chart', /* authenticateToken, */ async (req, res) => {
   try {
     const { timeRange = 'last 7 days' } = req.query;
-    console.log('🔥 Activity chart requested with timeRange:', timeRange, 'at', new Date().toISOString());
 
     const chartData = [];
     const labels = [];
@@ -887,6 +880,147 @@ router.get('/patterns', /* authenticateToken, */ async (req, res) => {
     });
   } catch (err) {
     console.error('Patterns analytics error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/dashboard/language-analytics - Language analytics data
+router.get('/language-analytics', /* authenticateToken, */ async (req, res) => {
+  try {
+    const { timeRange = 'today' } = req.query;
+    let dateFilter = {};
+
+    const now = new Date();
+    switch (timeRange.toLowerCase()) {
+      case 'today':
+        dateFilter = {
+          createdAt: {
+            $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          }
+        };
+        break;
+      case 'last 7 days':
+        dateFilter = {
+          createdAt: {
+            $gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          }
+        };
+        break;
+      case 'last 30 days':
+        dateFilter = {
+          createdAt: {
+            $gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          }
+        };
+        break;
+      case 'all time':
+      default:
+        dateFilter = {};
+        break;
+    }
+
+    // Get language distribution from detected words
+    const languageDistribution = await DetectedWord.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: '$language',
+          count: { $sum: 1 },
+          avgSentiment: { $avg: '$sentimentScore' },
+          avgAccuracy: { $avg: '$accuracy' },
+          severityBreakdown: {
+            $push: '$severity'
+          }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Get total detections for percentage calculation
+    const totalDetections = await DetectedWord.countDocuments(dateFilter);
+
+    // Process language data
+    const processedLanguages = languageDistribution.map(lang => {
+      const severityCounts = lang.severityBreakdown.reduce((acc, severity) => {
+        acc[severity] = (acc[severity] || 0) + 1;
+        return acc;
+      }, {});
+
+      return {
+        language: lang._id || 'Unknown',
+        count: lang.count,
+        percentage: totalDetections > 0 ? ((lang.count / totalDetections) * 100).toFixed(1) : 0,
+        avgSentiment: lang.avgSentiment || 0,
+        avgAccuracy: lang.avgAccuracy || 0,
+        severityBreakdown: severityCounts
+      };
+    });
+
+    // Get trend data for the last 7 days
+    const trendStartDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const trendData = await DetectedWord.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: trendStartDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            language: '$language'
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.date': 1 } }
+    ]);
+
+    // Process trend data
+    const trendMap = {};
+    trendData.forEach(item => {
+      const date = item._id.date;
+      const language = item._id.language || 'Unknown';
+      if (!trendMap[date]) trendMap[date] = {};
+      trendMap[date][language] = item.count;
+    });
+
+    // Get top patterns by language
+    const topPatterns = await DetectedWord.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: {
+            language: '$language',
+            patternType: '$patternType'
+          },
+          count: { $sum: 1 },
+          examples: { $push: '$word' }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]);
+
+    res.json({
+      totalDetections,
+      languageDistribution: processedLanguages,
+      trendData: trendMap,
+      topPatterns: topPatterns.map(pattern => ({
+        language: pattern._id.language || 'Unknown',
+        patternType: pattern._id.patternType || 'Unknown',
+        count: pattern.count,
+        examples: pattern.examples.slice(0, 3) // Top 3 examples
+      })),
+      summary: {
+        totalLanguages: processedLanguages.length,
+        mostCommonLanguage: processedLanguages[0]?.language || 'None',
+        avgAccuracy: processedLanguages.length > 0 ?
+          processedLanguages.reduce((sum, lang) => sum + lang.avgAccuracy, 0) / processedLanguages.length : 0
+      }
+    });
+  } catch (err) {
+    console.error('Language analytics error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

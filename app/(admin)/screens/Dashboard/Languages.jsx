@@ -19,7 +19,7 @@ const languagesService = {
   getLanguages: async (timeRange) => {
     try {
       console.log(`Fetching languages data for timeRange: ${timeRange}`);
-      const response = await fetch(`${API_BASE_URL}/dashboard/flagged-words?timeRange=${encodeURIComponent(timeRange)}`, {
+      const response = await fetch(`${API_BASE_URL}/dashboard/language-analytics?timeRange=${encodeURIComponent(timeRange)}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -37,12 +37,7 @@ const languagesService = {
       const data = await response.json();
       console.log('Raw API response:', data);
 
-      // Process data to extract language information
-      return {
-        detections: data.recentDetections || [],
-        totalCount: data.totalCount || 0,
-        summary: data.summary || {}
-      };
+      return data;
     } catch (error) {
       console.error('Languages service error:', error);
       throw error;
@@ -76,9 +71,15 @@ export default function AdminLanguagesScreen({ navigation }) {
       setError("Failed to load languages data. Please try again later.");
       setLanguagesData({
         languages: {
-          detections: [],
-          totalCount: 0,
-          summary: {}
+          totalDetections: 0,
+          languageDistribution: [],
+          trendData: {},
+          topPatterns: [],
+          summary: {
+            totalLanguages: 0,
+            mostCommonLanguage: 'None',
+            avgAccuracy: 0
+          }
         },
       });
     } finally {
@@ -96,35 +97,13 @@ export default function AdminLanguagesScreen({ navigation }) {
     fetchLanguagesData(selectedTimeRange);
   }, [selectedTimeRange]);
 
-  // Process language data from detections
+  // Process language data from API response
   const processLanguageData = () => {
-    if (!languagesData.languages?.detections) return { languageData: [], languageBreakdown: [], trendData: [] };
+    if (!languagesData.languages || !languagesData.languages.languageDistribution) {
+      return { languageData: [], languageBreakdown: [], trendData: [], trendLabels: [], totalDetections: 0 };
+    }
 
-    // Simple language detection based on common words/patterns
-    const languageMap = {};
-    const trendMap = {};
-
-    languagesData.languages.detections.forEach(detection => {
-      const text = detection.context || detection.word || '';
-      let detectedLanguage = 'Other';
-
-      // Basic language detection (you can enhance this with a proper language detection library)
-      if (/[a-zA-Z]/.test(text) && !/[ñáéíóúü]/i.test(text)) {
-        detectedLanguage = 'English';
-      } else if (/[ñáéíóúü]|ang|ng|sa|mga|ako|ikaw|siya/i.test(text)) {
-        detectedLanguage = 'Filipino/Tagalog';
-      } else if (/ug|og|sa|ang|mga|ako|ikaw|siya/i.test(text)) {
-        detectedLanguage = 'Cebuano';
-      }
-
-      languageMap[detectedLanguage] = (languageMap[detectedLanguage] || 0) + 1;
-
-      // Create trend data (simplified)
-      const date = new Date(detection.timestamp).toLocaleDateString();
-      trendMap[date] = (trendMap[date] || 0) + 1;
-    });
-
-    const totalDetections = Object.values(languageMap).reduce((sum, count) => sum + count, 0);
+    const { languageDistribution, totalDetections, trendData, topPatterns } = languagesData.languages;
 
     // Create balanced colors for pie chart
     const balancedColors = [
@@ -133,13 +112,13 @@ export default function AdminLanguagesScreen({ navigation }) {
       '#A78BFA', // Medium purple
       '#FBBF24', // Medium amber
       '#F87171', // Medium red
+      '#6B7280', // Medium gray
     ];
 
-    const languageData = Object.entries(languageMap).map(([language, count], index) => {
-      const percentage = totalDetections > 0 ? ((count / totalDetections) * 100).toFixed(1) : 0;
+    const languageData = languageDistribution.map((lang, index) => {
       return {
-        name: `${language} (${percentage}%)`,
-        population: count,
+        name: `${lang.language} (${lang.percentage}%)`,
+        population: lang.count,
         color: balancedColors[index % balancedColors.length],
         legendFontColor: '#374151',
         legendFontSize: 11,
@@ -147,24 +126,37 @@ export default function AdminLanguagesScreen({ navigation }) {
       };
     });
 
-    const languageBreakdown = Object.entries(languageMap).map(([language, count]) => {
-      const percentage = totalDetections > 0 ? ((count / totalDetections) * 100).toFixed(0) : 0;
-      return {
-        language,
-        count,
-        percentage: `${percentage}%`
-      };
+    const languageBreakdown = languageDistribution.map(lang => ({
+      language: lang.language,
+      count: lang.count,
+      percentage: `${lang.percentage}%`,
+      avgSentiment: lang.avgSentiment,
+      avgAccuracy: lang.avgAccuracy,
+      severityBreakdown: lang.severityBreakdown
+    }));
+
+    // Process trend data for chart (last 7 days)
+    const trendEntries = Object.entries(trendData || {}).slice(-7);
+    const chartTrendData = [];
+    const trendLabels = [];
+
+    trendEntries.forEach(([date, languages]) => {
+      const totalForDay = Object.values(languages).reduce((sum, count) => sum + count, 0);
+      chartTrendData.push(totalForDay);
+      trendLabels.push(new Date(date).toLocaleDateString('en-US', { weekday: 'short' }));
     });
 
-    // Create trend data for chart
-    const trendEntries = Object.entries(trendMap).slice(-7); // Last 7 days
-    const trendData = trendEntries.map(([date, count]) => count);
-    const trendLabels = trendEntries.map(([date]) => new Date(date).toLocaleDateString('en-US', { weekday: 'short' }));
-
-    return { languageData, languageBreakdown, trendData, trendLabels, totalDetections };
+    return {
+      languageData,
+      languageBreakdown,
+      trendData: chartTrendData,
+      trendLabels,
+      totalDetections,
+      topPatterns: topPatterns || []
+    };
   };
 
-  const { languageData, languageBreakdown, trendData, trendLabels, totalDetections } = processLanguageData();
+  const { languageData, languageBreakdown, trendData, trendLabels, totalDetections, topPatterns } = processLanguageData();
 
   const lineChartConfig = {
     backgroundColor: 'transparent',
