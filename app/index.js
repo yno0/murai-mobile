@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
@@ -12,6 +11,7 @@ export default function Index() {
 
   const checkFirstTime = async () => {
     try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
       const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
       setIsFirstTime(!hasSeenOnboarding);
     } catch (error) {

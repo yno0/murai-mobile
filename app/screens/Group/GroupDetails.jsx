@@ -93,6 +93,13 @@ export default function GroupDetailsScreen() {
     }
   }, [groupId]);
 
+  // Reset tab to members if non-admin tries to access activity
+  useEffect(() => {
+    if (!isAdmin && activeTab === 'activity') {
+      setActiveTab('members');
+    }
+  }, [isAdmin, activeTab]);
+
   const fetchGroupDetails = async (id) => {
     setLoading(true);
     setError('');
@@ -629,6 +636,16 @@ export default function GroupDetailsScreen() {
           </ScrollView>
         );
       case 'activity':
+        // Only admins can view activity
+        if (!isAdmin) {
+          return (
+            <View style={styles.accessDeniedContainer}>
+              <MaterialCommunityIcons name="lock" size={48} color="#9ca3af" />
+              <Text style={styles.accessDeniedText}>Access Restricted</Text>
+              <Text style={styles.accessDeniedSubtext}>Only group admins can view activity logs</Text>
+            </View>
+          );
+        }
         return (
           <View style={styles.activityTabContainer}>
             {activitiesLoading ? (
@@ -994,8 +1011,8 @@ export default function GroupDetailsScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <View style={[styles.enhancedMenuItemIcon, { backgroundColor: '#EBF4FF' }]}>
-                  <MaterialCommunityIcons name="pencil-outline" size={22} color="#3b82f6" />
+                <View style={[styles.enhancedMenuItemIcon, { backgroundColor: '#E8F5F0' }]}>
+                  <MaterialCommunityIcons name="pencil-outline" size={22} color="#02B97F" />
                 </View>
                 <View style={styles.enhancedMenuItemContent}>
                   <Text style={styles.enhancedMenuItemTitle}>Rename Group</Text>
@@ -1019,8 +1036,8 @@ export default function GroupDetailsScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <View style={[styles.enhancedMenuItemIcon, { backgroundColor: '#FEF3C7' }]}>
-                  <MaterialCommunityIcons name="refresh" size={22} color="#f59e0b" />
+                <View style={[styles.enhancedMenuItemIcon, { backgroundColor: '#E8F5F0' }]}>
+                  <MaterialCommunityIcons name="refresh" size={22} color="#02B97F" />
                 </View>
                 <View style={styles.enhancedMenuItemContent}>
                   <Text style={styles.enhancedMenuItemTitle}>Regenerate Code</Text>
@@ -1111,11 +1128,10 @@ export default function GroupDetailsScreen() {
         </View>
       </Modal>
 
-      {/* Enhanced Header with Icon */}
+      {/* Enhanced Header without Icon */}
       <Header
         title={
           <View style={styles.headerTitleContainer}>
-            <MaterialCommunityIcons name="account-group" size={24} color="#02B97F" />
             <Text style={styles.headerTitle}>{groupData?.name || 'Group Details'}</Text>
           </View>
         }
@@ -1143,10 +1159,14 @@ export default function GroupDetailsScreen() {
 
 
 
-      {/* Enhanced Tab Navigation with Icons */}
+      {/* Enhanced Tab Navigation with Green Theme */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'members' && styles.activeTab]}
+          style={[
+            styles.tab,
+            activeTab === 'members' && styles.activeTab,
+            !isAdmin && styles.singleTab // Full width for members when no activity tab
+          ]}
           onPress={() => setActiveTab('members')}
         >
           <MaterialCommunityIcons
@@ -1159,20 +1179,24 @@ export default function GroupDetailsScreen() {
             Members ({groupData?.memberCount || (groupData?.members?.length || 0)})
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'activity' && styles.activeTab]}
-          onPress={() => setActiveTab('activity')}
-        >
-          <MaterialCommunityIcons
-            name="history"
-            size={18}
-            color={activeTab === 'activity' ? '#02B97F' : '#6b7280'}
-            style={styles.tabIcon}
-          />
-          <Text style={[styles.tabText, activeTab === 'activity' && styles.activeTabText]}>
-            Activity
-          </Text>
-        </TouchableOpacity>
+
+        {/* Only show Activity tab for admins */}
+        {isAdmin && (
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'activity' && styles.activeTab]}
+            onPress={() => setActiveTab('activity')}
+          >
+            <MaterialCommunityIcons
+              name="history"
+              size={18}
+              color={activeTab === 'activity' ? '#02B97F' : '#6b7280'}
+              style={styles.tabIcon}
+            />
+            <Text style={[styles.tabText, activeTab === 'activity' && styles.activeTabText]}>
+              Activity
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Content */}
@@ -1191,6 +1215,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
+    marginLeft: 16,
+    marginRight: 16,
+    marginTop: 8,
   },
   // Enhanced Header Styles
   headerTitleContainer: {
@@ -1201,7 +1228,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
-    marginLeft: 8,
   },
   headerActions: {
     flexDirection: 'row',
@@ -1650,12 +1676,12 @@ const styles = StyleSheet.create({
   // Enhanced Tab Styles
   tabContainer: {
     flexDirection: 'row',
-    marginHorizontal: 20,
+    marginHorizontal: 4,
     marginTop: 20,
     backgroundColor: '#f8fafc',
     borderRadius: 12,
     padding: 4,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#e5e7eb',
   },
   tab: {
@@ -1667,15 +1693,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
   },
+  singleTab: {
+    flex: 1, // Takes full width when it's the only tab
+  },
   activeTab: {
     backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: 'rgba(2, 185, 127, 0.2)',
-    shadowColor: 'rgba(2, 185, 127, 0.3)',
+    borderWidth: 2,
+    borderColor: '#02B97F',
+    shadowColor: 'rgba(2, 185, 127, 0.4)',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
   tabIcon: {
     marginRight: 6,
@@ -1691,7 +1720,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 4,
     backgroundColor: '#ffffff',
     paddingTop: 8,
   },
@@ -1989,6 +2018,25 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   emptyActivitySubtext: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  accessDeniedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  accessDeniedText: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  accessDeniedSubtext: {
     fontSize: 14,
     fontFamily: 'Poppins-Regular',
     color: '#9ca3af',

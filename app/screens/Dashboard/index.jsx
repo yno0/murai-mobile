@@ -1,16 +1,17 @@
 import { Feather } from '@expo/vector-icons';
 import * as Print from 'expo-print';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Animated,
     Dimensions,
     Modal,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -23,7 +24,6 @@ function DashboardScreen({ navigation }) {
   // const { user } = useAuth(); // Get user from auth context
   const [selectedTimeRange, setSelectedTimeRange] = useState('Last 7 Days');
 
-
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -32,6 +32,18 @@ function DashboardScreen({ navigation }) {
     chartData: null,
     userActivity: null,
   });
+
+  // Animation state variables
+  const [isDataReady, setIsDataReady] = useState(false);
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(50)).current;
+  const scaleAnim = React.useRef(new Animated.Value(0.9)).current;
+  const loadingAnim = React.useRef(new Animated.Value(0)).current;
+
+  // Individual component animations for staggered effect
+  const statsAnim = React.useRef(new Animated.Value(0)).current;
+  const chartAnim = React.useRef(new Animated.Value(0)).current;
+  const menuAnim = React.useRef(new Animated.Value(0)).current;
 
 
 
@@ -134,16 +146,102 @@ function DashboardScreen({ navigation }) {
       });
     } finally {
       setIsLoading(false);
+      // Set data ready after a brief delay to ensure proper rendering
+      setTimeout(() => {
+        setIsDataReady(true);
+      }, 50);
     }
   };
 
+  // Animation functions
+  const startEntranceAnimation = React.useCallback(() => {
+    // Reset all animations to initial state
+    fadeAnim.setValue(0);
+    slideAnim.setValue(50);
+    scaleAnim.setValue(0.9);
+    statsAnim.setValue(0);
+    chartAnim.setValue(0);
+    menuAnim.setValue(0);
 
+    // Add a small delay to ensure content is rendered before animating
+    setTimeout(() => {
+      // Start main container animations first
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Start staggered component animations
+      setTimeout(() => {
+        Animated.stagger(150, [
+          Animated.timing(statsAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(chartAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(menuAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }, 200);
+    }, 100); // Small delay to ensure proper rendering
+  }, [fadeAnim, slideAnim, scaleAnim, statsAnim, chartAnim, menuAnim]);
+
+  const startLoadingAnimation = React.useCallback(() => {
+    loadingAnim.setValue(0);
+    Animated.timing(loadingAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, [loadingAnim]);
+
+  const resetAnimations = React.useCallback(() => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(50);
+    scaleAnim.setValue(0.9);
+    statsAnim.setValue(0);
+    chartAnim.setValue(0);
+    menuAnim.setValue(0);
+    loadingAnim.setValue(0);
+  }, [fadeAnim, slideAnim, scaleAnim, statsAnim, chartAnim, menuAnim, loadingAnim]);
 
   // Effect to load data on component mount and time range change
   useEffect(() => {
+    resetAnimations();
+    setIsDataReady(false);
     fetchDashboardData(selectedTimeRange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTimeRange]);
+
+  // Effect to handle animations based on loading state
+  useEffect(() => {
+    if (isLoading) {
+      startLoadingAnimation();
+    } else if (isDataReady && !error) {
+      startEntranceAnimation();
+    }
+  }, [isLoading, isDataReady, error, startLoadingAnimation, startEntranceAnimation]);
 
   // Prepare detection chart data based on detected words data
   const detectionChartData = dashboardData.chartData ? {
@@ -668,13 +766,22 @@ function DashboardScreen({ navigation }) {
 
 
 
-      {/* Overall Stats */}
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#02B97F" />
-          <Text style={styles.loadingText}>Loading dashboard data...</Text>
-        </View>
-      ) : error ? (
+      {/* Enhanced Loading State */}
+      {isLoading && (
+        <Animated.View style={[styles.enhancedLoadingContainer, { opacity: loadingAnim }]}>
+          <View style={styles.loadingCard}>
+            <MaterialCommunityIcons name="shield-check" size={48} color="#02B97F" />
+            <Text style={styles.loadingTitle}>Loading Dashboard</Text>
+            <Text style={styles.loadingSubtitle}>Fetching your security analytics...</Text>
+            <View style={styles.loadingIndicatorContainer}>
+              <ActivityIndicator size="large" color="#02B97F" />
+            </View>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Error State */}
+      {error && !isLoading && (
         <View style={styles.errorContainer}>
           <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#ef4444" />
           <Text style={styles.errorText}>{error}</Text>
@@ -685,8 +792,32 @@ function DashboardScreen({ navigation }) {
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
-      ) : (
-        <View style={styles.overallStatsContainer}>
+      )}
+
+      {/* Animated Overall Stats */}
+      {!isLoading && !error && (
+        <Animated.View
+          style={[
+            styles.overallStatsContainer,
+            {
+              opacity: statsAnim,
+              transform: [
+                {
+                  translateY: statsAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [30, 0],
+                  })
+                },
+                {
+                  scale: statsAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.95, 1],
+                  })
+                }
+              ]
+            }
+          ]}
+        >
           {overallStats.map((stat, index) => (
             <View key={index} style={styles.statCard}>
               <View style={styles.statIconContainer}>
@@ -714,11 +845,33 @@ function DashboardScreen({ navigation }) {
               </View>
             </View>
           ))}
-        </View>
+        </Animated.View>
       )}
 
-      {/* Detection Trends Chart with Horizontal Scroll */}
-      <View style={styles.chartContainer}>
+      {/* Animated Detection Trends Chart with Horizontal Scroll */}
+      {!isLoading && !error && (
+        <Animated.View
+          style={[
+            styles.chartContainer,
+            {
+              opacity: chartAnim,
+              transform: [
+                {
+                  translateY: chartAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [40, 0],
+                  })
+                },
+                {
+                  scale: chartAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.95, 1],
+                  })
+                }
+              ]
+            }
+          ]}
+        >
         <View style={styles.chartHeader}>
           <View style={styles.chartTitleContainer}>
             <MaterialCommunityIcons name="shield-search" size={24} color="#02B97F" />
@@ -801,28 +954,52 @@ function DashboardScreen({ navigation }) {
             </View>
           </View>
         </View>
-      </View>
+        </Animated.View>
+      )}
 
-      {/* Analytics Menu */}
-      <View style={styles.menuContainer}>
-        <Text style={styles.menuTitle}>Analytics Sections</Text>
-        {menuOptions.map((option, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.menuItem}
-            onPress={() => navigation.navigate(option.screen)}
-          >
-            <View style={[styles.menuIcon, { backgroundColor: option.color }]}>
-              <Text style={styles.menuEmoji}>{option.icon}</Text>
-            </View>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuItemTitle}>{option.title}</Text>
-              <Text style={styles.menuItemSubtitle}>{option.subtitle}</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#9ca3af" />
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* Animated Analytics Menu */}
+      {!isLoading && !error && (
+        <Animated.View
+          style={[
+            styles.menuContainer,
+            {
+              opacity: menuAnim,
+              transform: [
+                {
+                  translateY: menuAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [50, 0],
+                  })
+                },
+                {
+                  scale: menuAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.95, 1],
+                  })
+                }
+              ]
+            }
+          ]}
+        >
+          <Text style={styles.menuTitle}>Analytics Sections</Text>
+          {menuOptions.map((option, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.menuItem}
+              onPress={() => navigation.navigate(option.screen)}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: option.color }]}>
+                <Text style={styles.menuEmoji}>{option.icon}</Text>
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuItemTitle}>{option.title}</Text>
+                <Text style={styles.menuItemSubtitle}>{option.subtitle}</Text>
+              </View>
+              <Feather name="chevron-right" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+          ))}
+        </Animated.View>
+      )}
 
 
 
@@ -1431,6 +1608,47 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Medium',
     color: '#6b7280',
     textAlign: 'center',
+  },
+
+  // Enhanced Loading Styles
+  enhancedLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  loadingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    minWidth: 280,
+  },
+  loadingTitle: {
+    fontSize: 20,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1f2937',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  loadingSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  loadingIndicatorContainer: {
+    marginTop: 8,
   },
 });
 

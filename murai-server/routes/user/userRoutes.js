@@ -205,6 +205,39 @@ router.put("/preferences", authenticateToken, async (req, res) => {
   }
 });
 
+// POST /api/users/extension-sync - Track extension sync activity
+router.post("/extension-sync", authenticateToken, async (req, res) => {
+  try {
+    const { syncType = 'manual', extensionVersion, userAgent } = req.body;
+
+    // Log extension sync activity
+    await logUserActivity(
+      req.user.id,
+      "sync",
+      `Extension synced settings (${syncType})`,
+      "extension_sync",
+      {
+        extensionVersion,
+        userAgent,
+        syncType,
+        timestamp: new Date()
+      }
+    );
+
+    // Get current preferences to return
+    const pref = await Preference.findOne({ userId: req.user.id });
+
+    res.json({
+      message: "Extension sync logged successfully",
+      syncTime: new Date().toISOString(),
+      preferences: pref
+    });
+  } catch (err) {
+    console.error("Extension sync error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
 // GET /api/users/active-time
 router.get("/active-time", authenticateToken, async (req, res) => {
   try {

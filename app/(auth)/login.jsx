@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Link, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Image, ScrollView, StatusBar, StyleSheet, Text, View } from "react-native";
+import { Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppButton from "../components/common/AppButton";
 import AppInput from "../components/common/AppInput";
 import { COLORS } from "../constants/theme";
@@ -140,11 +140,17 @@ export default function Login() {
 
       {/* Header Section */}
       <View style={styles.header}>
-        <Image 
-          source={require("../../assets/images/logo.png")} 
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <TouchableOpacity 
+          style={styles.logoContainer}
+          onPress={() => router.push('/(onboarding)')}
+          activeOpacity={0.7}
+        >
+          <Image 
+            source={require("../../assets/images/logo.png")} 
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
         <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>Sign in to continue to MURAi</Text>
       </View>
@@ -237,31 +243,20 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingTop: 80,
+    paddingTop: 45,
     paddingBottom: 40,
     paddingHorizontal: 24,
   },
   logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    justifyContent: 'center',
+    marginBottom: 32,
+    padding: 12,
   },
   logo: {
     width: 120,
     height: 120,
-    marginBottom: 24,
+    marginBottom: 32,
   },
   title: {
     fontSize: 32,
