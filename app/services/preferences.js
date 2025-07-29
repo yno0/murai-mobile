@@ -11,6 +11,14 @@ const DEFAULT_PREFERENCES = {
   isHighlighted: true,
   color: '#374151',
   extensionEnabled: true,
+  // Accessibility settings
+  accessibility: {
+    largeText: false,
+    reduceMotion: false,
+    largeTouchTargets: false,
+    fontScale: 1.0,
+    highContrast: false,
+  },
 };
 
 // Local storage keys
@@ -150,5 +158,33 @@ export const hasLocalPreferences = async () => {
   } catch (error) {
     console.log('Failed to check local preferences:', error.message);
     return false;
+  }
+};
+
+// Accessibility-specific functions
+export const getAccessibilityPreferences = async () => {
+  try {
+    const prefs = await getPreferences();
+    return prefs.accessibility || DEFAULT_PREFERENCES.accessibility;
+  } catch (error) {
+    console.log('Failed to get accessibility preferences:', error.message);
+    return DEFAULT_PREFERENCES.accessibility;
+  }
+};
+
+export const updateAccessibilityPreferences = async (accessibilitySettings) => {
+  try {
+    const currentPrefs = await getPreferences();
+    const updatedPrefs = {
+      ...currentPrefs,
+      accessibility: {
+        ...currentPrefs.accessibility,
+        ...accessibilitySettings,
+      },
+    };
+    return await updatePreferences(updatedPrefs);
+  } catch (error) {
+    console.log('Failed to update accessibility preferences:', error.message);
+    throw error;
   }
 };

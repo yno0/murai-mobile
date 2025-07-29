@@ -990,4 +990,150 @@ router.get("/detected-words", authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/users/export-data - Export all user data
+router.get("/export-data", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get user basic info
+    const user = await User.findById(userId).select("-password -otp").lean();
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Get additional user info
+    const userInfo = await UserInfo.findOne({ userId }).lean();
+
+    // Get user preferences
+    const preferences = await Preference.findOne({ userId }).lean();
+
+    // Get user activity logs
+    const activities = await UserActivity.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(1000) // Limit to last 1000 activities
+      .lean();
+
+    // Get detected words
+    const detectedWords = await DetectedWord.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(1000) // Limit to last 1000 detections
+      .lean();
+
+    // Get user groups
+    const groupMemberships = await GroupMember.find({ userId })
+      .populate('groupId', 'name description')
+      .lean();
+
+    // Get user reports
+    const reports = await Report.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(100) // Limit to last 100 reports
+      .lean();
+
+    // Compile all data
+    const exportData = {
+      exportInfo: {
+        exportDate: new Date().toISOString(),
+        userId: userId,
+        dataTypes: ['profile', 'preferences', 'activities', 'detections', 'groups', 'reports']
+      },
+      profile: {
+        ...user,
+        additionalInfo: userInfo
+      },
+      preferences: preferences || {},
+      activities: activities || [],
+      detectedWords: detectedWords || [],
+      groupMemberships: groupMemberships || [],
+      reports: reports || [],
+      summary: {
+        totalActivities: activities?.length || 0,
+        totalDetections: detectedWords?.length || 0,
+        totalGroups: groupMemberships?.length || 0,
+        totalReports: reports?.length || 0,
+        accountCreated: user.createdAt,
+        lastActivity: activities?.[0]?.createdAt || user.updatedAt
+      }
+    };
+
+    // Log the export activity
+    await logUserActivity(
+      userId,
+      "export",
+      "User exported their data",
+      "data_management",
+      {
+        exportSize: JSON.stringify(exportData).length,
+        dataTypes: exportData.exportInfo.dataTypes
+      }
+    );
+
+    res.json(exportData);
+  } catch (err) {
+    console.error("Export data error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+// DELETE /api/users/delete-all-data - Delete all user data (GDPR compliance)
+router.delete("/delete-all-data", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get user info before deletion for logging
+    const user = await User.findById(userId).select("name email").lean();
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Log the deletion request before deleting
+    await logUserActivity(
+      userId,
+      "delete",
+      "User requested complete data deletion",
+      "data_management",
+      {
+        deletionTimestamp: new Date().toISOString(),
+        userEmail: user.email
+      }
+    );
+
+    // Delete all user-related data in order
+    await Promise.all([
+      // Delete user activities
+      UserActivity.deleteMany({ userId }),
+
+      // Delete detected words
+      DetectedWord.deleteMany({ userId }),
+
+      // Delete user preferences
+      Preference.deleteMany({ userId }),
+
+      // Delete user info
+      UserInfo.deleteMany({ userId }),
+
+      // Delete user reports
+      Report.deleteMany({ userId }),
+
+      // Remove user from groups (but don't delete groups they created)
+      GroupMember.deleteMany({ userId }),
+
+      // Delete user notifications
+      Notification.deleteMany({ userId })
+    ]);
+
+    // Finally, delete the user account
+    await User.findByIdAndDelete(userId);
+
+    res.json({
+      message: "All user data has been permanently deleted",
+      deletedAt: new Date().toISOString(),
+      userId: userId
+    });
+  } catch (err) {
+    console.error("Delete all data error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
 export default router;

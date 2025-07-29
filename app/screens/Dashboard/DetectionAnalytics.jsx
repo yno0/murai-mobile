@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -398,21 +398,18 @@ function DetectionAnalyticsScreen({ navigation }) {
     {
       value: detectionData.totalDetections?.toString() || '0',
       label: 'Total Detections',
-      change: '+12%',
       color: 'rgba(2, 185, 127, 1)',
       icon: 'shield-alert'
     },
     {
       value: detectionData.flaggedWords.uniqueThreats?.toString() || '0',
       label: 'Unique Threats',
-      change: '+8%',
       color: 'rgba(239, 68, 68, 1)',
       icon: 'alert-triangle'
     },
     {
       value: Math.round(detectionData.flaggedWords.avgAccuracy || 0) + '%',
       label: 'Accuracy Rate',
-      change: '+2%',
       color: 'rgba(16, 185, 129, 1)',
       icon: 'target'
     },
@@ -422,7 +419,7 @@ function DetectionAnalyticsScreen({ navigation }) {
     { title: 'Dashboard Overview', icon: 'view-dashboard', action: () => navigation.navigate('DashboardMain') },
     { title: 'Detection Analytics', icon: 'shield-search', action: () => setIsMenuOpen(false) },
     { title: 'Where It Happened', icon: 'web', action: () => navigation.navigate('WebsiteAnalytics') },
-    { title: 'People & Activity', icon: 'account-group', action: () => navigation.navigate('UserActivityAnalytics') },
+
   ];
 
   const toggleMenu = () => {
@@ -459,10 +456,15 @@ function DetectionAnalyticsScreen({ navigation }) {
         ]}
       >
         <View style={styles.timeRangeSelectorHeader}>
-          <MaterialCommunityIcons name="clock-outline" size={20} color="#6b7280" />
-          <Text style={styles.timeRangeSelectorTitle}>Time Period</Text>
+          <MaterialCommunityIcons name="clock-outline" size={20} color="#02B97F" />
+          <Text style={styles.timeRangeSelectorTitle}>Select Time Period</Text>
         </View>
-        <View style={styles.timeRangeButtonsContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.timeRangeScrollContainer}
+          contentContainerStyle={styles.timeRangeScrollContent}
+        >
           {timeRanges.map((range) => (
             <TouchableOpacity
               key={range}
@@ -471,30 +473,39 @@ function DetectionAnalyticsScreen({ navigation }) {
                 selectedTimeRange === range && styles.timeRangeButtonActive,
               ]}
               onPress={() => handleTimeRangeChange(range)}
+              activeOpacity={0.7}
             >
               {isLoading && selectedTimeRange === range ? (
-                <ActivityIndicator size="small" color="#ffffff" />
+                <View style={styles.timeRangeLoadingContainer}>
+                  <ActivityIndicator size="small" color="#ffffff" />
+                </View>
               ) : (
-                <MaterialCommunityIcons
-                  name={
-                    range === 'Today' ? 'calendar-today' :
-                    range === 'Last 7 Days' ? 'calendar-week' :
-                    range === 'Last Month' ? 'calendar-month' :
-                    'calendar-range'
-                  }
-                  size={16}
-                  color={selectedTimeRange === range ? '#ffffff' : '#6b7280'}
-                />
+                <View style={[
+                  styles.timeRangeIconContainer,
+                  selectedTimeRange === range && { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+                ]}>
+                  <MaterialCommunityIcons
+                    name={
+                      range === 'Today' ? 'calendar-today' :
+                      range === 'Last 7 Days' ? 'calendar-week' :
+                      range === 'Last Month' ? 'calendar-month' :
+                      'calendar-range'
+                    }
+                    size={18}
+                    color={selectedTimeRange === range ? '#ffffff' : '#6b7280'}
+                  />
+                </View>
               )}
               <Text style={[
                 styles.timeRangeText,
                 selectedTimeRange === range && styles.timeRangeTextActive,
-              ]}>
+              ]}
+              numberOfLines={1}>
                 {range}
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       </Animated.View>
 
       {/* Overall Stats */}
@@ -546,18 +557,6 @@ function DetectionAnalyticsScreen({ navigation }) {
               <View style={styles.statContent}>
                 <Text style={styles.statValue}>{stat.value}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
-                <View style={styles.statChangeContainer}>
-                  <MaterialCommunityIcons
-                    name={stat.change.includes('+') ? 'trending-up' : 'trending-down'}
-                    size={14}
-                    color={stat.change.includes('+') ? '#10b981' : '#ef4444'}
-                  />
-                  <Text style={[styles.statChange, {
-                    color: stat.change.includes('+') ? '#10b981' : '#ef4444'
-                  }]}>
-                    {stat.change}
-                  </Text>
-                </View>
               </View>
             </Animated.View>
           ))}
@@ -919,26 +918,25 @@ function DetectionAnalyticsScreen({ navigation }) {
               {/* Handle Bar */}
               <View style={styles.handleBar} />
 
-              {/* Header */}
+              {/* Close Button */}
               <View style={styles.menuHeader}>
-                <Text style={styles.menuTitle}>MURAi Dashboard</Text>
+                <View style={styles.menuHeaderContent} />
                 <TouchableOpacity style={styles.closeButton} onPress={toggleMenu}>
-                  <MaterialCommunityIcons name="close" size={24} color="#374151" />
+                  <MaterialCommunityIcons name="close" size={20} color="#6b7280" />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
-                {/* Analytics Section */}
+                {/* Analytics Menu Items */}
                 <View style={styles.menuSection}>
-                  <Text style={styles.sectionTitle}>Analytics</Text>
                   {sideMenuItems.map((item, index) => (
                     <TouchableOpacity
                       key={index}
                       style={styles.menuItem}
                       onPress={() => handleMenuAction(item.action)}
                     >
-                      <View style={styles.menuItemIcon}>
-                        <MaterialCommunityIcons name={item.icon} size={24} color="#374151" />
+                      <View style={[styles.menuItemIcon, { backgroundColor: '#E8F5F0' }]}>
+                        <MaterialCommunityIcons name={item.icon} size={22} color="#02B97F" />
                       </View>
                       <View style={styles.menuItemContent}>
                         <Text style={styles.menuItemText}>{item.title}</Text>
@@ -949,14 +947,9 @@ function DetectionAnalyticsScreen({ navigation }) {
                            'User activity & interactions'}
                         </Text>
                       </View>
-                      <MaterialCommunityIcons name="chevron-right" size={20} color="#9ca3af" />
+                      <MaterialCommunityIcons name="chevron-right" size={18} color="#02B97F" />
                     </TouchableOpacity>
                   ))}
-                </View>
-                
-                {/* Debug: Show menu items count */}
-                <View style={styles.debugSection}>
-                  <Text style={styles.debugText}>Menu Items: {sideMenuItems.length}</Text>
                 </View>
               </ScrollView>
             </View>
@@ -996,29 +989,60 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   timeRangeButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 16,
     backgroundColor: '#ffffff',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#e5e7eb',
-    gap: 6,
+    gap: 8,
+    minWidth: 130,
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   timeRangeButtonActive: {
     backgroundColor: '#02B97F',
     borderColor: '#02B97F',
+    shadowColor: '#02B97F',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   timeRangeText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'Poppins-SemiBold',
     color: '#6b7280',
   },
   timeRangeTextActive: {
     color: '#ffffff',
+  },
+  timeRangeIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timeRangeLoadingContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -1070,14 +1094,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
     minHeight: 120,
   },
   statIconContainer: {
@@ -1122,14 +1138,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1350,11 +1358,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     padding: 20,
     paddingBottom: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
     maxHeight: '90%',
     minHeight: 400,
   },
@@ -1372,6 +1375,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  menuHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   menuTitle: {
     fontSize: 18,
     fontFamily: 'Poppins-SemiBold',
@@ -1384,12 +1392,7 @@ const styles = StyleSheet.create({
   menuSection: {
     marginBottom: 20,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#374151',
-    marginBottom: 12,
-  },
+
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1397,20 +1400,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   menuItemIcon: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 12,
-    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -1430,12 +1424,12 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
   },
   closeButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    borderRadius: 18,
+    backgroundColor: '#f8fafc',
   },
   debugSection: {
     padding: 16,
@@ -1485,6 +1479,13 @@ const styles = StyleSheet.create({
   },
   barChartScrollContent: {
     paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  timeRangeScrollContainer: {
+    flexDirection: 'row',
+    marginTop: 12,
+  },
+  timeRangeScrollContent: {
     alignItems: 'center',
   },
 });

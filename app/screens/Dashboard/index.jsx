@@ -16,12 +16,14 @@ import {
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MainHeader from '../../components/common/MainHeader';
+import { useAccessibility } from '../../context/AccessibilityContext';
 import api from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
 function DashboardScreen({ navigation }) {
   // const { user } = useAuth(); // Get user from auth context
+  const { getAccessibleTextStyle, getAccessibleTouchableStyle } = useAccessibility();
   const [selectedTimeRange, setSelectedTimeRange] = useState('Last 7 Days');
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -126,9 +128,9 @@ function DashboardScreen({ navigation }) {
       // Set default data on error
       setDashboardData({
         overview: {
-          harmfulContentDetected: { value: '0', change: '+0%' },
-          websitesMonitored: { value: '0', change: '+0' },
-          protectionEffectiveness: { value: '95.0%', change: '+0%' },
+          harmfulContentDetected: { value: '0' },
+          websitesMonitored: { value: '0' },
+          protectionEffectiveness: { value: '95.0%' },
         },
         chartData: {
           labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
@@ -274,21 +276,18 @@ function DashboardScreen({ navigation }) {
     {
       value: dashboardData.overview.harmfulContentDetected?.value || '0',
       label: 'Harmful Content Detected',
-      change: dashboardData.overview.harmfulContentDetected?.change || '+0%',
       color: 'rgba(1, 82, 55, 1)',
       icon: 'shield-alert'
     },
     {
       value: dashboardData.overview.websitesMonitored?.value || '0',
       label: 'Websites Monitored',
-      change: dashboardData.overview.websitesMonitored?.change || '+0',
       color: 'rgba(1, 82, 55, 1)',
       icon: 'web'
     },
     {
       value: dashboardData.overview.protectionEffectiveness?.value || '95%',
       label: 'Protection Effectiveness',
-      change: dashboardData.overview.protectionEffectiveness?.change || '+0%',
       color: 'rgba(1, 82, 55, 1)',
       icon: 'shield-check'
     },
@@ -298,7 +297,7 @@ function DashboardScreen({ navigation }) {
 
   const menuOptions = [
     {
-      icon: '🔍',
+      icon: 'magnify',
       title: 'Detection Analytics',
       subtitle: 'Comprehensive detection insights & patterns',
       color: '#f0fdf4',
@@ -306,7 +305,7 @@ function DashboardScreen({ navigation }) {
       screen: 'DetectionAnalytics',
     },
     {
-      icon: '🧼',
+      icon: 'shield-search',
       title: 'What MURAi Caught',
       subtitle: 'Flagged words, trending terms & changes',
       color: '#fef2f2',
@@ -314,20 +313,12 @@ function DashboardScreen({ navigation }) {
       screen: 'DetectionAnalytics',
     },
     {
-      icon: '🌍',
+      icon: 'web',
       title: 'Where It Happened',
       subtitle: 'Top websites & monitoring stats',
       color: '#eff6ff',
       iconColor: '#3b82f6',
       screen: 'WebsiteAnalytics',
-    },
-    {
-      icon: '👨‍👩‍👧‍👦',
-      title: 'People & Activity',
-      subtitle: 'User activity & alert interactions',
-      color: '#fef3c7',
-      iconColor: '#f59e0b',
-      screen: 'UserActivityAnalytics',
     },
   ];
 
@@ -335,7 +326,7 @@ function DashboardScreen({ navigation }) {
     { title: 'Dashboard Overview', icon: 'view-dashboard', action: () => setIsMenuOpen(false) },
     { title: 'Detection Analytics', icon: 'shield-search', action: () => navigation.navigate('DetectionAnalytics') },
     { title: 'Where It Happened', icon: 'web', action: () => navigation.navigate('WebsiteAnalytics') },
-    { title: 'People & Activity', icon: 'account-group', action: () => navigation.navigate('UserActivityAnalytics') },
+
   ];
 
   const toggleMenu = () => {
@@ -719,8 +710,8 @@ function DashboardScreen({ navigation }) {
       {/* Enhanced Time Range Selector */}
       <View style={styles.timeRangeContainer}>
         <View style={styles.timeRangeSelectorHeader}>
-          <MaterialCommunityIcons name="clock-outline" size={20} color="#6b7280" />
-          <Text style={styles.timeRangeSelectorTitle}>Time Period</Text>
+          <MaterialCommunityIcons name="clock-outline" size={20} color="#02B97F" />
+          <Text style={styles.timeRangeSelectorTitle}>Select Time Period</Text>
         </View>
         <ScrollView
           horizontal
@@ -736,10 +727,17 @@ function DashboardScreen({ navigation }) {
                 selectedTimeRange === range && styles.timeRangeButtonActive,
               ]}
               onPress={() => handleTimeRangeChange(range)}
+              activeOpacity={0.7}
             >
               {isLoading && selectedTimeRange === range ? (
+                <View style={styles.timeRangeLoadingContainer}>
                 <ActivityIndicator size="small" color="#ffffff" />
+                </View>
               ) : (
+                                 <View style={[
+                   styles.timeRangeIconContainer,
+                   selectedTimeRange === range && { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+                 ]}>
                 <MaterialCommunityIcons
                   name={
                     range === 'Today' ? 'calendar-today' :
@@ -747,21 +745,25 @@ function DashboardScreen({ navigation }) {
                     range === 'Last Month' ? 'calendar-month' :
                     'calendar-range'
                   }
-                  size={16}
+                     size={18}
                   color={selectedTimeRange === range ? '#ffffff' : '#6b7280'}
                 />
+                 </View>
               )}
               <Text
                 style={[
                   styles.timeRangeText,
                   selectedTimeRange === range && styles.timeRangeTextActive,
                 ]}
+                numberOfLines={1}
               >
                 {range}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
+        
+
       </View>
 
 
@@ -794,11 +796,10 @@ function DashboardScreen({ navigation }) {
         </View>
       )}
 
-      {/* Animated Overall Stats */}
+      {/* Animated Overall Stats - Horizontal Scrollable */}
       {!isLoading && !error && (
         <Animated.View
           style={[
-            styles.overallStatsContainer,
             {
               opacity: statsAnim,
               transform: [
@@ -818,33 +819,31 @@ function DashboardScreen({ navigation }) {
             }
           ]}
         >
-          {overallStats.map((stat, index) => (
-            <View key={index} style={styles.statCard}>
-              <View style={styles.statIconContainer}>
-                <MaterialCommunityIcons
-                  name={stat.icon}
-                  size={24}
-                  color="#02B97F"
-                />
-              </View>
-              <View style={styles.statContent}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-                <View style={styles.statChangeContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.overallStatsContainer}
+          >
+            {overallStats.map((stat, index) => (
+              <View
+                key={index}
+                style={styles.statCard}
+                accessibilityLabel={`${stat.label}: ${stat.value}`}
+              >
+                <View style={styles.statIconContainer}>
                   <MaterialCommunityIcons
-                    name={stat.change.includes('+') ? 'trending-up' : 'trending-down'}
-                    size={14}
-                    color={stat.change.includes('+') ? '#10b981' : '#ef4444'}
+                    name={stat.icon}
+                    size={20}
+                    color="#02B97F"
                   />
-                  <Text style={[styles.statChange, {
-                    color: stat.change.includes('+') ? '#10b981' : '#ef4444'
-                  }]}>
-                    {stat.change}
-                  </Text>
+                </View>
+                <View style={styles.statContent}>
+                  <Text style={getAccessibleTextStyle(styles.statValue)}>{stat.value}</Text>
+                  <Text style={getAccessibleTextStyle(styles.statLabel)}>{stat.label}</Text>
                 </View>
               </View>
-            </View>
-          ))}
+            ))}
+          </ScrollView>
         </Animated.View>
       )}
 
@@ -989,7 +988,7 @@ function DashboardScreen({ navigation }) {
               onPress={() => navigation.navigate(option.screen)}
             >
               <View style={[styles.menuIcon, { backgroundColor: option.color }]}>
-                <Text style={styles.menuEmoji}>{option.icon}</Text>
+                <MaterialCommunityIcons name={option.icon} size={24} color={option.iconColor} />
               </View>
               <View style={styles.menuContent}>
                 <Text style={styles.menuItemTitle}>{option.title}</Text>
@@ -1018,44 +1017,46 @@ function DashboardScreen({ navigation }) {
               {/* Handle Bar */}
               <View style={styles.handleBar} />
 
-              {/* Header */}
+              {/* Close Button */}
               <View style={styles.menuHeader}>
-                <Text style={styles.menuTitle}>MURAi Dashboard</Text>
-                <TouchableOpacity style={styles.closeButton} onPress={toggleMenu}>
-                  <MaterialCommunityIcons name="close" size={24} color="#374151" />
+                <View style={styles.menuHeaderContent} />
+                <TouchableOpacity
+                  style={getAccessibleTouchableStyle(styles.closeButton)}
+                  onPress={toggleMenu}
+                  accessibilityLabel="Close menu"
+                >
+                  <MaterialCommunityIcons name="close" size={20} color="#6b7280" />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
-                {/* Analytics Section */}
+                {/* Analytics Menu Items */}
                 <View style={styles.menuSection}>
-                  <Text style={styles.sectionTitle}>Analytics</Text>
                   {sideMenuItems.map((item, index) => (
                     <TouchableOpacity
                       key={index}
-                      style={styles.menuItem}
+                      style={getAccessibleTouchableStyle(styles.menuItem)}
                       onPress={() => handleMenuAction(item.action)}
+                      accessibilityLabel={`${item.title}. ${index === 0 ? 'Main dashboard overview' :
+                           index === 1 ? 'Flagged words & trending terms' :
+                           index === 2 ? 'Website monitoring & stats' :
+                           'User activity & interactions'}`}
                     >
-                      <View style={styles.menuItemIcon}>
-                        <MaterialCommunityIcons name={item.icon} size={24} color="#374151" />
+                      <View style={[styles.menuItemIcon, { backgroundColor: '#E8F5F0' }]}>
+                        <MaterialCommunityIcons name={item.icon} size={22} color="#02B97F" />
                       </View>
                       <View style={styles.menuItemContent}>
-                        <Text style={styles.menuItemText}>{item.title}</Text>
-                        <Text style={styles.menuItemSubtitle}>
+                        <Text style={getAccessibleTextStyle(styles.menuItemText)}>{item.title}</Text>
+                        <Text style={getAccessibleTextStyle(styles.menuItemSubtitle)}>
                           {index === 0 ? 'Main dashboard overview' :
                            index === 1 ? 'Flagged words & trending terms' :
                            index === 2 ? 'Website monitoring & stats' :
                            'User activity & interactions'}
                         </Text>
                       </View>
-                      <MaterialCommunityIcons name="chevron-right" size={20} color="#9ca3af" />
+                      <MaterialCommunityIcons name="chevron-right" size={18} color="#02B97F" />
                     </TouchableOpacity>
                   ))}
-                </View>
-                
-                {/* Debug: Show menu items count */}
-                <View style={styles.debugSection}>
-                  <Text style={styles.debugText}>Menu Items: {sideMenuItems.length}</Text>
                 </View>
               </ScrollView>
             </View>
@@ -1124,6 +1125,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     color: '#374151',
   },
+
   timeRangeScrollContainer: {
     marginHorizontal: -4,
   },
@@ -1140,27 +1142,55 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 16,
     backgroundColor: '#ffffff',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#e5e7eb',
-    gap: 6,
-    minWidth: 120,
+    gap: 8,
+    minWidth: 130,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   timeRangeButtonActive: {
     backgroundColor: '#02B97F',
     borderColor: '#02B97F',
+    shadowColor: '#02B97F',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   timeRangeText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'Poppins-SemiBold',
     color: '#6b7280',
   },
   timeRangeTextActive: {
     color: '#ffffff',
   },
+
+  timeRangeIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E8F5F0',
+    marginRight: 8,
+  },
+
+
   yearSelectorContainer: {
     marginBottom: 24,
     backgroundColor: '#f8fafc',
@@ -1210,35 +1240,27 @@ const styles = StyleSheet.create({
   },
   overallStatsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingHorizontal: 16,
     marginBottom: 24,
-    gap: 8,
+    gap: 12,
   },
   statCard: {
-    flex: 1,
+    width: 140,
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    minHeight: 120,
+    minHeight: 80,
   },
   statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#E8F5F0',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   statContent: {
     flex: 1,
@@ -1247,16 +1269,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontFamily: 'Poppins-Bold',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: 'Poppins-Medium',
     color: '#9ca3af',
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 8,
-    lineHeight: 12,
+    lineHeight: 14,
   },
   statChangeContainer: {
     flexDirection: 'row',
@@ -1274,14 +1294,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
   },
   chartHeader: {
     flexDirection: 'row',
@@ -1388,14 +1400,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 2,
     minHeight: 60,
   },
   menuIcon: {
@@ -1424,6 +1428,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 40,
+  },
+  timeRangeLoadingContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginRight: 8,
   },
   loadingText: {
     fontSize: 14,
@@ -1478,11 +1491,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     padding: 20,
     paddingBottom: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
     maxHeight: '90%',
     minHeight: 400,
   },
@@ -1500,6 +1508,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  menuHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   menuScroll: {
     flex: 1,
     paddingBottom: 20,
@@ -1513,9 +1526,15 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 12,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
   menuItemIcon: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1535,15 +1554,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Poppins-Regular',
     color: '#9ca3af',
-    marginLeft: 16,
   },
   closeButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    borderRadius: 18,
+    backgroundColor: '#f8fafc',
   },
   chartLegend: {
     flexDirection: 'row',
@@ -1623,11 +1641,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 32,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
     borderWidth: 1,
     borderColor: '#f1f5f9',
     minWidth: 280,

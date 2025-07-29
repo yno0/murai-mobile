@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import React from 'react';
 import {
     Animated,
@@ -12,6 +14,7 @@ import {
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import NotificationDetailModal from '../../components/notifications/NotificationDetailModal';
+import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
@@ -21,6 +24,7 @@ const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpaci
 
 function HomeScreen({ navigation }) {
   const { user } = useAuth(); // Get user from auth context
+  const { getAccessibleTextStyle, getAccessibleTouchableStyle } = useAccessibility();
   const [loading, setLoading] = React.useState(true);
   const [stats, setStats] = React.useState(null);
   const [chartData, setChartData] = React.useState(null);
@@ -36,6 +40,15 @@ function HomeScreen({ navigation }) {
     overall: { threatsBlocked: 0, sitesMonitored: 0, averageAccuracy: 0 },
     today: { inappropriateWordsFlagged: 0 }
   });
+  const [protectionStatus, setProtectionStatus] = React.useState({
+    isActive: true,
+    isLoading: true
+  });
+
+  // Sync-related state
+  const [lastSyncTime, setLastSyncTime] = React.useState(null);
+  const [isSyncing, setIsSyncing] = React.useState(false);
+  const [syncStatus, setSyncStatus] = React.useState('Not synced');
 
   const timeRange = 'today';
   const unreadCount = Array.isArray(notifications) ? notifications.filter(n => !n.isRead).length : 0;
@@ -141,6 +154,28 @@ function HomeScreen({ navigation }) {
     return date.toLocaleDateString();
   };
 
+  // Helper function to format last sync time
+  const formatLastSync = (syncTime) => {
+    if (!syncTime) return 'Not synced';
+
+    try {
+      const now = new Date();
+      const diffMs = now - syncTime;
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+      if (diffMinutes < 1) return 'Just now';
+      if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+      const diffHours = Math.floor(diffMinutes / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+
+      const diffDays = Math.floor(diffHours / 24);
+      return `${diffDays}d ago`;
+    } catch (error) {
+      return 'Not synced';
+    }
+  };
+
   const fetchNotifications = async () => {
     setNotifLoading(true);
     try {
@@ -209,6 +244,140 @@ function HomeScreen({ navigation }) {
     }
   };
 
+  const fetchProtectionStatus = React.useCallback(async () => {
+    try {
+      const response = await api.get('/users/extension-status');
+      setProtectionStatus({
+        isActive: response.data.extensionEnabled,
+        isLoading: false
+      });
+    } catch (err) {
+      console.error('Failed to fetch protection status:', err);
+      setProtectionStatus({
+        isActive: true, // Default to active on error
+        isLoading: false
+      });
+    }
+  }, []);
+
+  // Sync protection status and preferences
+  const syncProtectionStatus = React.useCallback(async () => {
+    if (!user) return;
+
+    setIsSyncing(true);
+    setSyncStatus('Syncing...');
+
+    try {
+      console.log('🔄 Auto-syncing protection status...');
+
+      let syncResult = null;
+
+      // Try to sync with server using extension-sync endpoint
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+        const response = await fetch('https://murai-server.onrender.com/api/users/extension-sync', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            syncType: 'auto',
+            timestamp: new Date().toISOString()
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        console.log('📡 Sync response status:', response.status);
+
+        if (response.ok) {
+          syncResult = await response.json();
+          console.log('✅ Sync successful:', syncResult);
+
+          if (syncResult && syncResult.preferences) {
+            // Update local storage with synced preferences
+            await AsyncStorage.setItem('user_preferences', JSON.stringify(syncResult.preferences));
+            console.log('💾 Synced preferences saved to local storage');
+          }
+        } else {
+          const errorText = await response.text();
+          console.error('❌ Sync response error:', response.status, errorText);
+          throw new Error(`Sync failed: ${response.status} - ${errorText}`);
+        }
+      } catch (syncError) {
+        console.log('❌ Server sync failed, using local preferences:', syncError.message);
+      }
+
+      if (syncResult && syncResult.preferences) {
+        // Update protection status from synced preferences
+        setProtectionStatus({
+          isActive: syncResult.preferences.extensionEnabled !== false,
+          isLoading: false
+        });
+
+        // Update last sync time
+        const now = new Date();
+        setLastSyncTime(now);
+        setSyncStatus('Synced');
+
+        console.log('✅ Protection status synced successfully');
+        console.log('📱 Synced preferences:', {
+          extensionEnabled: syncResult.preferences.extensionEnabled,
+          language: syncResult.preferences.language,
+          sensitivity: syncResult.preferences.sensitivity,
+          whitelistTerms: syncResult.preferences.whitelistTerms?.length || 0,
+          whitelistSites: syncResult.preferences.whitelistSite?.length || 0,
+          flagStyle: syncResult.preferences.flagStyle,
+          color: syncResult.preferences.color
+        });
+      } else {
+        // Fallback to getting protection status directly
+        await fetchProtectionStatus();
+
+        const now = new Date();
+        setLastSyncTime(now);
+        setSyncStatus('Synced (local)');
+      }
+    } catch (error) {
+      console.error('❌ Protection sync failed:', error);
+      setSyncStatus('Sync failed');
+      setTimeout(() => setSyncStatus('Not synced'), 3000);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [user, fetchProtectionStatus]);
+
+  // Auto-sync when tab is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('📱 Home tab focused - triggering auto-sync');
+      syncProtectionStatus();
+    }, [syncProtectionStatus])
+  );
+
+  const toggleProtection = async () => {
+    try {
+      const newStatus = !protectionStatus.isActive;
+      await api.put('/users/extension-toggle', { enabled: newStatus });
+      
+      setProtectionStatus(prev => ({
+        ...prev,
+        isActive: newStatus
+      }));
+    } catch (err) {
+      console.error('Failed to toggle protection:', err);
+    }
+  };
+
   const fetchHomeStats = React.useCallback(async () => {
     try {
       const response = await api.get('/api/home-stats');
@@ -224,12 +393,13 @@ function HomeScreen({ navigation }) {
     setLoading(true);
     setError('');
     try {
-      // Fetch home stats and dashboard data in parallel
+      // Fetch home stats, dashboard data, and protection status in parallel
       const [statsRes, chartRes, activityRes] = await Promise.all([
         api.get(`/user-dashboard/overview?timeRange=${selectedTimeRange}`),
         api.get(`/user-dashboard/activity-chart?timeRange=${selectedTimeRange}`),
         api.get(`/user-dashboard/user-activity?timeRange=${selectedTimeRange}`),
-        fetchHomeStats() // Fetch real home stats
+        fetchHomeStats(), // Fetch real home stats
+        fetchProtectionStatus() // Fetch protection status
       ]);
       setStats(statsRes.data);
       setChartData(chartRes.data);
@@ -240,7 +410,7 @@ function HomeScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [timeRange, fetchHomeStats]);
+  }, [timeRange, fetchHomeStats, fetchProtectionStatus]);
 
   React.useEffect(() => {
     fetchData();
@@ -307,6 +477,42 @@ function HomeScreen({ navigation }) {
     withOuterLines: false,
   };
 
+  // Get protection status colors and text
+  const getProtectionStatusConfig = () => {
+    if (protectionStatus.isLoading) {
+      return {
+        backgroundColor: '#f3f4f6',
+        iconColor: '#9ca3af',
+        title: 'Checking Protection Status...',
+        subtitle: 'Verifying your digital safety settings',
+        badgeText: '...',
+        badgeColor: '#9ca3af'
+      };
+    }
+
+    if (protectionStatus.isActive) {
+      return {
+        backgroundColor: '#02B97F',
+        iconColor: '#ffffff',
+        title: 'Protection Active',
+        subtitle: 'Your digital safety is being monitored 24/7',
+        badgeText: `${Math.round(homeStats.overall?.averageAccuracy || 0)}%`,
+        badgeColor: '#ffffff'
+      };
+    } else {
+      return {
+        backgroundColor: '#6b7280',
+        iconColor: '#ffffff',
+        title: 'Protection Inactive',
+        subtitle: 'Your digital safety is currently disabled',
+        badgeText: 'OFF',
+        badgeColor: '#ffffff'
+      };
+    }
+  };
+
+  const protectionConfig = getProtectionStatusConfig();
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header with Notification */}
@@ -321,21 +527,39 @@ function HomeScreen({ navigation }) {
       >
         <View style={styles.header}>
           <View style={styles.greetingContainer}>
-            <Text style={styles.greeting}>Hello {getUserFirstName()}</Text>
+            <Text style={getAccessibleTextStyle(styles.greeting)}>Hello {getUserFirstName()}</Text>
             <View style={styles.waveContainer}>
-              <Text style={styles.waveEmoji}>👋</Text>
+              <Text style={getAccessibleTextStyle(styles.waveEmoji)}>👋</Text>
             </View>
           </View>
-          <Text style={styles.subtitle}>Here&apos;s your digital safety overview</Text>
+          <Text style={getAccessibleTextStyle(styles.subtitle)}>Here&apos;s your digital safety overview</Text>
         </View>
-        <TouchableOpacity style={styles.notificationButton} onPress={openNotifModal}>
-          <MaterialCommunityIcons name="bell-outline" size={24} color="#02B97F" />
-          {unreadCount > 0 && (
-            <View style={styles.notifBadge}>
-              <Text style={styles.notifBadgeText}>{unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={getAccessibleTouchableStyle(styles.syncButton)}
+            onPress={syncProtectionStatus}
+            disabled={isSyncing}
+            accessibilityLabel={isSyncing ? "Syncing protection status" : "Refresh protection status"}
+          >
+            <MaterialCommunityIcons
+              name={isSyncing ? "sync" : "refresh"}
+              size={24}
+              color={isSyncing ? "#3b82f6" : "#02B97F"}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={getAccessibleTouchableStyle(styles.notificationButton)}
+            onPress={openNotifModal}
+            accessibilityLabel={`Notifications. ${unreadCount > 0 ? `${unreadCount} unread` : 'No unread notifications'}`}
+          >
+            <MaterialCommunityIcons name="bell-outline" size={24} color="#02B97F" />
+            {unreadCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </Animated.View>
 
       {/* Loading State */}
@@ -360,36 +584,71 @@ function HomeScreen({ navigation }) {
             }
           ]}
         >
-          <View style={styles.heroBackground}>
+          <View style={[styles.heroBackground, { backgroundColor: protectionConfig.backgroundColor }]}>
             <View style={styles.heroContent}>
               <View style={styles.heroIconContainer}>
-                <MaterialCommunityIcons name="shield-check" size={40} color="#ffffff" />
+                <MaterialCommunityIcons 
+                  name={protectionStatus.isActive ? "shield-check" : "shield-alert"} 
+                  size={40} 
+                  color={protectionConfig.iconColor} 
+                />
               </View>
               <View style={styles.heroTextContainer}>
-                <Text style={styles.heroTitle}>Protection Active</Text>
-                <Text style={styles.heroSubtitle}>Your digital safety is being monitored 24/7</Text>
+                <Text style={getAccessibleTextStyle(styles.heroTitle)}>{protectionConfig.title}</Text>
+                <Text style={getAccessibleTextStyle(styles.heroSubtitle)}>{protectionConfig.subtitle}</Text>
               </View>
-              <View style={styles.heroBadge}>
-                <Text style={styles.heroBadgeText}>
-                  {loading ? '...' : `${Math.round(homeStats.overall?.averageAccuracy || 0)}%`}
+              <View style={[styles.heroBadge, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                <Text style={getAccessibleTextStyle([styles.heroBadgeText, { color: protectionConfig.badgeColor }])}>
+                  {protectionConfig.badgeText}
                 </Text>
               </View>
             </View>
             <View style={styles.heroStats}>
               <View style={styles.heroStatItem}>
-                <Text style={styles.heroStatNumber}>
+                <Text style={getAccessibleTextStyle(styles.heroStatNumber)}>
                   {loading ? '...' : (homeStats.overall?.threatsBlocked || 0)}
                 </Text>
-                <Text style={styles.heroStatLabel}>Threats Blocked</Text>
+                <Text style={getAccessibleTextStyle(styles.heroStatLabel)}>Threats Blocked</Text>
               </View>
               <View style={styles.heroStatDivider} />
               <View style={styles.heroStatItem}>
-                <Text style={styles.heroStatNumber}>
+                <Text style={getAccessibleTextStyle(styles.heroStatNumber)}>
                   {loading ? '...' : (homeStats.overall?.sitesMonitored || 0)}
                 </Text>
-                <Text style={styles.heroStatLabel}>Sites Monitored</Text>
+                <Text style={getAccessibleTextStyle(styles.heroStatLabel)}>Sites Monitored</Text>
               </View>
             </View>
+
+            {/* Sync Status Indicator */}
+            {isSyncing && (
+              <View style={styles.syncIndicator}>
+                <MaterialCommunityIcons
+                  name="sync"
+                  size={16}
+                  color="#ffffff"
+                  style={{ transform: [{ rotate: '360deg' }] }}
+                />
+                <Text style={getAccessibleTextStyle(styles.syncIndicatorText)}>Auto-syncing settings...</Text>
+              </View>
+            )}
+
+            {/* Protection Toggle Button */}
+            <TouchableOpacity
+              style={getAccessibleTouchableStyle([styles.protectionToggleButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }])}
+              onPress={toggleProtection}
+              disabled={protectionStatus.isLoading}
+              accessibilityLabel={protectionStatus.isActive ? 'Disable Protection' : 'Enable Protection'}
+              accessibilityState={{ disabled: protectionStatus.isLoading }}
+            >
+              <MaterialCommunityIcons
+                name={protectionStatus.isActive ? "power-off" : "power"}
+                size={20}
+                color="#ffffff"
+              />
+              <Text style={getAccessibleTextStyle(styles.protectionToggleText)}>
+                {protectionStatus.isActive ? 'Disable Protection' : 'Enable Protection'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       )}
@@ -404,7 +663,7 @@ function HomeScreen({ navigation }) {
         <View style={styles.notifModalOverlay}>
           <View style={styles.notifModalContent}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#374151' }}>Notifications</Text>
+              <Text style={getAccessibleTextStyle({ fontSize: 18, fontWeight: 'bold', color: '#374151' })}>Notifications</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 {unreadCount > 0 && (
                   <TouchableOpacity
@@ -573,11 +832,27 @@ function HomeScreen({ navigation }) {
             ]}
             onPress={() => navigation.navigate('Group')}
           >
-            <View style={[styles.quickActionIconBg, { backgroundColor: '#e8f5f0' }]}>
-              <MaterialCommunityIcons name="account-group" size={28} color="#02B97F" />
+            <View style={[
+              styles.quickActionIconBg, 
+              { 
+                backgroundColor: protectionStatus.isActive ? '#e8f5f0' : '#fef2f2',
+                opacity: protectionStatus.isActive ? 1 : 0.6
+              }
+            ]}>
+              <MaterialCommunityIcons 
+                name="account-group" 
+                size={28} 
+                color={protectionStatus.isActive ? "#02B97F" : "#6b7280"} 
+              />
             </View>
-            <Text style={styles.quickActionTitle}>Groups</Text>
-            <Text style={styles.quickActionSubtitle}>Manage safety groups</Text>
+            <Text style={[
+              styles.quickActionTitle,
+              { color: protectionStatus.isActive ? '#1f2937' : '#9ca3af' }
+            ]}>Groups</Text>
+            <Text style={[
+              styles.quickActionSubtitle,
+              { color: protectionStatus.isActive ? '#6b7280' : '#9ca3af' }
+            ]}>Manage safety groups</Text>
           </AnimatedTouchableOpacity>
 
           <AnimatedTouchableOpacity
@@ -595,11 +870,27 @@ function HomeScreen({ navigation }) {
             ]}
             onPress={() => navigation.navigate('Dashboard')}
           >
-            <View style={[styles.quickActionIconBg, { backgroundColor: '#e8f5f0' }]}>
-              <MaterialCommunityIcons name="chart-line" size={28} color="#02B97F" />
+            <View style={[
+              styles.quickActionIconBg, 
+              { 
+                backgroundColor: protectionStatus.isActive ? '#e8f5f0' : '#fef2f2',
+                opacity: protectionStatus.isActive ? 1 : 0.6
+              }
+            ]}>
+              <MaterialCommunityIcons 
+                name="chart-line" 
+                size={28} 
+                color={protectionStatus.isActive ? "#02B97F" : "#6b7280"} 
+              />
             </View>
-            <Text style={styles.quickActionTitle}>Analytics</Text>
-            <Text style={styles.quickActionSubtitle}>View detailed reports</Text>
+            <Text style={[
+              styles.quickActionTitle,
+              { color: protectionStatus.isActive ? '#1f2937' : '#9ca3af' }
+            ]}>Analytics</Text>
+            <Text style={[
+              styles.quickActionSubtitle,
+              { color: protectionStatus.isActive ? '#6b7280' : '#9ca3af' }
+            ]}>View detailed reports</Text>
           </AnimatedTouchableOpacity>
 
           <AnimatedTouchableOpacity
@@ -617,11 +908,27 @@ function HomeScreen({ navigation }) {
             ]}
             onPress={() => navigation.navigate('Profile')}
           >
-            <View style={[styles.quickActionIconBg, { backgroundColor: '#e8f5f0' }]}>
-              <MaterialCommunityIcons name="cog" size={28} color="#02B97F" />
+            <View style={[
+              styles.quickActionIconBg, 
+              { 
+                backgroundColor: protectionStatus.isActive ? '#e8f5f0' : '#fef2f2',
+                opacity: protectionStatus.isActive ? 1 : 0.6
+              }
+            ]}>
+              <MaterialCommunityIcons 
+                name="cog" 
+                size={28} 
+                color={protectionStatus.isActive ? "#02B97F" : "#6b7280"} 
+              />
             </View>
-            <Text style={styles.quickActionTitle}>Settings</Text>
-            <Text style={styles.quickActionSubtitle}>Configure preferences</Text>
+            <Text style={[
+              styles.quickActionTitle,
+              { color: protectionStatus.isActive ? '#1f2937' : '#9ca3af' }
+            ]}>Settings</Text>
+            <Text style={[
+              styles.quickActionSubtitle,
+              { color: protectionStatus.isActive ? '#6b7280' : '#9ca3af' }
+            ]}>Configure preferences</Text>
           </AnimatedTouchableOpacity>
 
           <AnimatedTouchableOpacity
@@ -639,11 +946,27 @@ function HomeScreen({ navigation }) {
             ]}
             onPress={() => navigation.navigate('Extension')}
           >
-            <View style={[styles.quickActionIconBg, { backgroundColor: '#e8f5f0' }]}>
-              <MaterialCommunityIcons name="puzzle" size={28} color="#02B97F" />
+            <View style={[
+              styles.quickActionIconBg, 
+              { 
+                backgroundColor: protectionStatus.isActive ? '#e8f5f0' : '#fef2f2',
+                opacity: protectionStatus.isActive ? 1 : 0.6
+              }
+            ]}>
+              <MaterialCommunityIcons 
+                name="puzzle" 
+                size={28} 
+                color={protectionStatus.isActive ? "#02B97F" : "#6b7280"} 
+              />
             </View>
-            <Text style={styles.quickActionTitle}>Extension</Text>
-            <Text style={styles.quickActionSubtitle}>Configure extension</Text>
+            <Text style={[
+              styles.quickActionTitle,
+              { color: protectionStatus.isActive ? '#1f2937' : '#9ca3af' }
+            ]}>Extension</Text>
+            <Text style={[
+              styles.quickActionSubtitle,
+              { color: protectionStatus.isActive ? '#6b7280' : '#9ca3af' }
+            ]}>Configure extension</Text>
           </AnimatedTouchableOpacity>
         </View>
       </Animated.View>
@@ -672,19 +995,43 @@ function HomeScreen({ navigation }) {
             <MaterialCommunityIcons name="chevron-right" size={20} color="#02B97F" />
           </TouchableOpacity>
         </View>
-        {/* Activity List */}
-        <View style={{ maxHeight: 320 }}>
+          
+          {/* Activity List Container */}
+          <View style={styles.activityListContainer}>
           {loading ? (
-            <Text style={styles.emptyStateText}>Loading...</Text>
+              <View style={styles.emptyStateContainer}>
+                <MaterialCommunityIcons name="loading" size={24} color="#9ca3af" />
+                <Text style={styles.emptyStateText}>Loading activities...</Text>
+              </View>
           ) : error ? (
+              <View style={styles.emptyStateContainer}>
+                <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#ef4444" />
             <Text style={styles.emptyStateText}>{error}</Text>
+              </View>
           ) : recentActivity.length === 0 ? (
+              <View style={styles.emptyStateContainer}>
+                <MaterialCommunityIcons name="clock-outline" size={24} color="#9ca3af" />
             <Text style={styles.emptyStateText}>No recent activity</Text>
+                <Text style={styles.emptyStateSubtext}>Your activity will appear here</Text>
+              </View>
           ) : (
             <View style={styles.activityList}>
               {recentActivity.slice(0, 5).map((item, idx) => (
-                <View key={item.id ? String(item.id) : String(idx)} style={styles.activityItem}>
-                  <View style={[styles.activityIcon, { backgroundColor: '#f3f4f6' }]}>
+                  <TouchableOpacity 
+                    key={item.id ? String(item.id) : String(idx)} 
+                    style={[
+                      styles.activityItem,
+                      idx === recentActivity.slice(0, 5).length - 1 && { borderBottomWidth: 0 }
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[
+                      styles.activityIcon, 
+                      { 
+                        backgroundColor: protectionStatus.isActive ? '#f3f4f6' : '#fef2f2',
+                        opacity: protectionStatus.isActive ? 1 : 0.6
+                      }
+                    ]}>
                     <MaterialCommunityIcons
                       name={
                         item.type === 'flagged' ? 'alert-circle-outline' :
@@ -713,16 +1060,24 @@ function HomeScreen({ navigation }) {
                   </View>
                   <View style={styles.activityContent}>
                     <View style={styles.activityTopLine}>
-                      <Text style={styles.activityText}>{item.details || item.type || 'Activity'}</Text>
+                        <Text style={[
+                          styles.activityText,
+                          { color: protectionStatus.isActive ? '#1f2937' : '#9ca3af' }
+                        ]}>
+                          {item.details || item.type || 'Activity'}
+                        </Text>
                       <Text style={styles.activityTime}>
                         {item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                       </Text>
                     </View>
-                    <Text style={styles.activityDetails}>
+                      <Text style={[
+                        styles.activityDetails,
+                        { color: protectionStatus.isActive ? '#6b7280' : '#9ca3af' }
+                      ]}>
                       {item.user ? `By ${item.user}` : 'System'}
                     </Text>
                   </View>
-                </View>
+                  </TouchableOpacity>
               ))}
             </View>
           )}
@@ -748,6 +1103,29 @@ const styles = StyleSheet.create({
   },
   header: {
     flex: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  syncButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 6,
   },
   greetingContainer: {
     flexDirection: 'row',
@@ -996,6 +1374,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   viewAllText: {
     fontSize: 14,
@@ -1003,20 +1389,53 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     marginRight: 4,
   },
-  emptyState: {
+  emptyStateContainer: {
     padding: 40,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   emptyStateText: {
     fontSize: 16,
     color: '#9ca3af',
     textAlign: 'center',
+    marginTop: 12,
+    fontFamily: 'Poppins-Medium',
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginTop: 4,
+    fontFamily: 'Poppins-Regular',
+  },
+  activityListContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 6,
   },
   activityList: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
     overflow: 'hidden',
-    marginTop: 10,
   },
   activityItem: {
     flexDirection: 'row',
@@ -1024,6 +1443,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
+    backgroundColor: '#ffffff',
   },
   activityIcon: {
     width: 40,
@@ -1032,6 +1452,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   activityContent: {
     flex: 1,
@@ -1134,7 +1562,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontFamily: 'Poppins-Bold',
     color: '#ffffff',
     marginBottom: 4,
@@ -1270,6 +1698,37 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Regular',
     color: '#6b7280',
     textAlign: 'center',
+  },
+  protectionToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    marginTop: 16,
+    gap: 8,
+  },
+  protectionToggleText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
+  },
+  syncIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+  },
+  syncIndicatorText: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+    color: '#ffffff',
+    marginLeft: 8,
   },
 });
 

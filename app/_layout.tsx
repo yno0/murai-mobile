@@ -3,6 +3,7 @@ import React from "react";
 import { View } from "react-native";
 import 'react-native-svg';
 import SplashScreen from "./components/SplashScreen";
+import { AccessibilityProvider } from "./context/AccessibilityContext";
 import { AuthProvider } from "./context/AuthContext";
 import { checkFontAvailability, loadPoppinsFonts } from "./utils/fontLoader";
 import registerSVGComponents from "./utils/svgSetup";
@@ -55,13 +56,15 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: "fade",
-          contentStyle: { backgroundColor: BG }
-        }}
-      />
+      <AccessibilityProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: "fade",
+            contentStyle: { backgroundColor: BG }
+          }}
+        />
+      </AccessibilityProvider>
     </AuthProvider>
   );
 }

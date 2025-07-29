@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -211,7 +211,7 @@ function WebsiteAnalyticsScreen({ navigation }) {
     { title: 'Dashboard Overview', icon: 'view-dashboard', action: () => navigation.navigate('DashboardMain') },
     { title: 'Detection Analytics', icon: 'shield-search', action: () => navigation.navigate('DetectionAnalytics') },
     { title: 'Where It Happened', icon: 'web', action: () => setIsMenuOpen(false) },
-    { title: 'People & Activity', icon: 'account-group', action: () => navigation.navigate('UserActivityAnalytics') },
+
   ];
 
   const toggleMenu = () => {
@@ -228,23 +228,19 @@ function WebsiteAnalyticsScreen({ navigation }) {
   const monitoringStats = [
     {
       metric: 'Total Websites',
-      value: websiteData.totalWebsites?.toString() || '0',
-      change: websiteData.monitoringStats?.changes?.websites || '0'
+      value: websiteData.totalWebsites?.toString() || '0'
     },
     {
       metric: 'Active Monitoring',
-      value: websiteData.monitoringStats?.activeMonitoring?.toString() || '0',
-      change: websiteData.monitoringStats?.changes?.websites || '0'
+      value: websiteData.monitoringStats?.activeMonitoring?.toString() || '0'
     },
     {
       metric: 'High-Risk Sites',
-      value: websiteData.monitoringStats?.highRiskSites?.toString() || '0',
-      change: '0' // High-risk sites don't have a direct comparison metric
+      value: websiteData.monitoringStats?.highRiskSites?.toString() || '0'
     },
     {
       metric: 'AI Accuracy',
-      value: `${websiteData.monitoringStats?.aiAccuracy || 0}%`,
-      change: websiteData.monitoringStats?.changes?.accuracy || '0%'
+      value: `${websiteData.monitoringStats?.aiAccuracy || 0}%`
     },
   ];
 
@@ -273,10 +269,15 @@ function WebsiteAnalyticsScreen({ navigation }) {
         ]}
       >
         <View style={styles.timeRangeSelectorHeader}>
-          <MaterialCommunityIcons name="clock-outline" size={20} color="#6b7280" />
-          <Text style={styles.timeRangeSelectorTitle}>Time Period</Text>
+          <MaterialCommunityIcons name="clock-outline" size={20} color="#02B97F" />
+          <Text style={styles.timeRangeSelectorTitle}>Select Time Period</Text>
         </View>
-        <View style={styles.timeRangeButtonsContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.timeRangeScrollContainer}
+          contentContainerStyle={styles.timeRangeScrollContent}
+        >
           {timeRanges.map((range) => (
             <TouchableOpacity
               key={range}
@@ -285,28 +286,35 @@ function WebsiteAnalyticsScreen({ navigation }) {
                 selectedTimeRange === range && styles.timeRangeButtonActive,
               ]}
               onPress={() => handleTimeRangeChange(range)}
+              activeOpacity={0.7}
             >
-              <MaterialCommunityIcons
-                name={
-                  range === 'Today' ? 'calendar-today' :
-                  range === 'Week' ? 'calendar-week' :
-                  range === 'Month' ? 'calendar-month' :
-                  'calendar-range'
-                }
-                size={16}
-                color={selectedTimeRange === range ? '#ffffff' : '#6b7280'}
-              />
+              <View style={[
+                styles.timeRangeIconContainer,
+                selectedTimeRange === range && { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+              ]}>
+                <MaterialCommunityIcons
+                  name={
+                    range === 'Today' ? 'calendar-today' :
+                    range === 'Week' ? 'calendar-week' :
+                    range === 'Month' ? 'calendar-month' :
+                    'calendar-range'
+                  }
+                  size={18}
+                  color={selectedTimeRange === range ? '#ffffff' : '#6b7280'}
+                />
+              </View>
               <Text
                 style={[
                   styles.timeRangeText,
                   selectedTimeRange === range && styles.timeRangeTextActive,
                 ]}
+                numberOfLines={1}
               >
                 {range}
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       </Animated.View>
 
       {/* MURAi Monitoring Status - Moved to left side */}
@@ -351,7 +359,6 @@ function WebsiteAnalyticsScreen({ navigation }) {
               >
                 <Text style={styles.statValue}>{stat.value}</Text>
                 <Text style={styles.statLabel}>{stat.metric}</Text>
-                <Text style={styles.statChange}>{stat.change}</Text>
               </View>
             ))}
           </Animated.View>
@@ -514,26 +521,25 @@ function WebsiteAnalyticsScreen({ navigation }) {
               {/* Handle Bar */}
               <View style={styles.handleBar} />
 
-              {/* Header */}
+              {/* Close Button */}
               <View style={styles.menuHeader}>
-                <Text style={styles.menuTitle}>MURAi Dashboard</Text>
+                <View style={styles.menuHeaderContent} />
                 <TouchableOpacity style={styles.closeButton} onPress={toggleMenu}>
-                  <MaterialCommunityIcons name="close" size={24} color="#374151" />
+                  <MaterialCommunityIcons name="close" size={20} color="#6b7280" />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
-                {/* Analytics Section */}
+                {/* Analytics Menu Items */}
                 <View style={styles.menuSection}>
-                  <Text style={styles.sectionTitle}>Analytics</Text>
                   {sideMenuItems.map((item, index) => (
                     <TouchableOpacity
                       key={index}
                       style={styles.menuItem}
                       onPress={() => handleMenuAction(item.action)}
                     >
-                      <View style={styles.menuItemIcon}>
-                        <MaterialCommunityIcons name={item.icon} size={24} color="#374151" />
+                      <View style={[styles.menuItemIcon, { backgroundColor: '#E8F5F0' }]}>
+                        <MaterialCommunityIcons name={item.icon} size={22} color="#02B97F" />
                       </View>
                       <View style={styles.menuItemContent}>
                         <Text style={styles.menuItemText}>{item.title}</Text>
@@ -544,14 +550,9 @@ function WebsiteAnalyticsScreen({ navigation }) {
                            'User activity & interactions'}
                         </Text>
                       </View>
-                      <MaterialCommunityIcons name="chevron-right" size={20} color="#9ca3af" />
+                      <MaterialCommunityIcons name="chevron-right" size={18} color="#02B97F" />
                     </TouchableOpacity>
                   ))}
-                </View>
-                
-                {/* Debug: Show menu items count */}
-                <View style={styles.debugSection}>
-                  <Text style={styles.debugText}>Menu Items: {sideMenuItems.length}</Text>
                 </View>
               </ScrollView>
             </View>
@@ -611,30 +612,62 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
   },
+  timeRangeScrollContainer: {
+    flexDirection: 'row',
+  },
+  timeRangeScrollContent: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   timeRangeButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 16,
     backgroundColor: '#ffffff',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#e5e7eb',
-    gap: 6,
+    gap: 8,
+    minWidth: 130,
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   timeRangeButtonActive: {
     backgroundColor: '#02B97F',
     borderColor: '#02B97F',
+    shadowColor: '#02B97F',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   timeRangeText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'Poppins-SemiBold',
     color: '#6b7280',
   },
   timeRangeTextActive: {
     color: '#ffffff',
+  },
+  timeRangeIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   section: {
     marginBottom: 24,
@@ -913,11 +946,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     padding: 20,
     paddingBottom: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
     maxHeight: '90%',
     minHeight: 400,
   },
@@ -935,6 +963,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  menuHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   menuTitle: {
     fontSize: 18,
     fontFamily: 'Poppins-SemiBold',
@@ -947,12 +980,6 @@ const styles = StyleSheet.create({
   menuSection: {
     marginBottom: 20,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#374151',
-    marginBottom: 12,
-  },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -960,20 +987,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   menuItemIcon: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 12,
-    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -993,12 +1011,12 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
   },
   closeButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    borderRadius: 18,
+    backgroundColor: '#f8fafc',
   },
   debugSection: {
     padding: 16,

@@ -1,21 +1,21 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Clipboard,
-    Dimensions,
-    FlatList,
-    Modal,
-    Platform,
-    ScrollView,
-    Share,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Clipboard,
+  Dimensions,
+  FlatList,
+  Modal,
+  Platform,
+  ScrollView,
+  Share,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Header from '../../components/common/Header';
@@ -599,7 +599,7 @@ export default function GroupDetailsScreen() {
                         <MaterialCommunityIcons
                           name="crown"
                           size={12}
-                          color="#f59e0b"
+                          color="#02B97F"
                         />
                         <Text style={[styles.roleText, styles.adminRoleText]}>
                           Admin
@@ -703,70 +703,48 @@ export default function GroupDetailsScreen() {
       <Modal
         visible={editModalVisible}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setEditModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.enhancedModalContent}>
-            {/* Modal Handle */}
-            <View style={styles.modalHandle} />
+          <View style={styles.minimalModalContent}>
+            <Text style={styles.minimalModalTitle}>Rename Group</Text>
+            
+            <TextInput
+              style={styles.minimalInput}
+              value={editGroupName}
+              onChangeText={setEditGroupName}
+              placeholder="Enter group name"
+              placeholderTextColor="#9CA3AF"
+              autoFocus
+            />
 
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <View style={styles.modalTitleContainer}>
-                <MaterialCommunityIcons name="pencil-outline" size={24} color="#02B97F" />
-                <Text style={styles.modalTitle}>Rename Group</Text>
+            {editError ? (
+              <View style={styles.minimalErrorContainer}>
+                <MaterialCommunityIcons name="alert-circle" size={16} color="#dc2626" />
+                <Text style={styles.minimalErrorText}>{editError}</Text>
               </View>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setEditModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={20} color="#6b7280" />
+            ) : null}
+
+            <View style={styles.minimalButtonContainer}>
+              <TouchableOpacity
+                style={styles.minimalCancelButton}
+                onPress={() => setEditModalVisible(false)}
+                disabled={editLoading}
+              >
+                <Text style={styles.minimalCancelText}>Cancel</Text>
               </TouchableOpacity>
-            </View>
-
-            {/* Content */}
-            <View style={styles.cleanEditContent}>
-              <View style={styles.cleanInputContainer}>
-                <Text style={styles.cleanInputLabel}>Group Name</Text>
-                <TextInput
-                  style={styles.cleanInput}
-                  value={editGroupName}
-                  onChangeText={setEditGroupName}
-                  placeholder="Enter group name"
-                  placeholderTextColor="#9CA3AF"
-                  autoFocus
-                />
-              </View>
-
-              {editError ? (
-                <View style={styles.cleanErrorContainer}>
-                  <MaterialCommunityIcons name="alert-circle" size={16} color="#dc2626" />
-                  <Text style={styles.cleanErrorText}>{editError}</Text>
-                </View>
-              ) : null}
-
-              {/* Action Buttons */}
-              <View style={styles.cleanButtonContainer}>
-                <TouchableOpacity
-                  style={styles.cleanCancelButton}
-                  onPress={() => setEditModalVisible(false)}
-                  disabled={editLoading}
-                >
-                  <Text style={styles.cleanCancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.cleanSaveButton}
-                  onPress={handleEditGroup}
-                  disabled={editLoading}
-                >
-                  {editLoading ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <>
-                      <MaterialCommunityIcons name="check" size={18} color="#fff" />
-                      <Text style={styles.cleanSaveButtonText}>Save Changes</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.minimalSaveButton}
+                onPress={handleEditGroup}
+                disabled={editLoading}
+              >
+                {editLoading ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <Text style={styles.minimalSaveText}>Save</Text>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -775,100 +753,66 @@ export default function GroupDetailsScreen() {
       <Modal
         visible={infoModalVisible}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setInfoModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.enhancedModalContent}>
-            {/* Modal Handle */}
-            <View style={styles.modalHandle} />
-
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <View style={styles.modalTitleContainer}>
-                <MaterialCommunityIcons name="information" size={24} color="#02B97F" />
-                <Text style={styles.modalTitle}>Group Information</Text>
+          <View style={styles.minimalModalContent}>
+            <Text style={styles.minimalModalTitle}>Group Information</Text>
+            
+            {/* Group Code */}
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Group Code</Text>
+              <View style={styles.codeRow}>
+                <Text style={styles.codeText}>{groupData?.shortCode || '-'}</Text>
+                {groupData?.shortCode && (
+                  <TouchableOpacity
+                    style={styles.copyButton}
+                    onPress={() => handleCopyCode(groupData.shortCode)}
+                  >
+                    <MaterialCommunityIcons name="content-copy" size={16} color="#02B97F" />
+                  </TouchableOpacity>
+                )}
               </View>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setInfoModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={20} color="#6b7280" />
-              </TouchableOpacity>
             </View>
 
-            {/* Content */}
-            <View style={styles.cleanModalContent}>
-              {/* Group Header */}
-              <View style={styles.cleanGroupHeader}>
-                <View style={styles.cleanGroupIcon}>
-                  <MaterialCommunityIcons name="account-group" size={28} color="#02B97F" />
-                </View>
-                <View style={styles.cleanGroupInfo}>
-                  <Text style={styles.cleanGroupName}>{groupData?.name}</Text>
-                  <Text style={styles.cleanMemberCount}>
-                    {groupData?.memberCount || (groupData?.members?.length || 0)} members
-                  </Text>
-                </View>
+            {/* Created Date */}
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Created</Text>
+              <Text style={styles.infoValue}>{formatDateTime(groupData?.createdAt)}</Text>
+            </View>
+
+            {/* Your Role */}
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Your Role</Text>
+              <Text style={[styles.infoValue, { color: isAdmin ? '#02B97F' : '#6b7280' }]}>
+                {isAdmin ? 'Admin' : 'Member'}
+              </Text>
+            </View>
+
+            {/* Copy Success Message */}
+            {copied && (
+              <View style={styles.successMessage}>
+                <MaterialCommunityIcons name="check-circle" size={16} color="#10b981" />
+                <Text style={styles.successText}>Code copied!</Text>
               </View>
+            )}
 
-              {/* Group Details */}
-              <View style={styles.cleanDetailsSection}>
-                {/* Group Code Row */}
-                <View style={styles.cleanInfoRow}>
-                  <View style={styles.cleanInfoLeft}>
-                    <MaterialCommunityIcons name="key-variant" size={20} color="#02B97F" />
-                    <Text style={styles.cleanInfoLabel}>Group Code</Text>
-                  </View>
-                  <View style={styles.cleanCodeContainer}>
-                    <Text style={styles.cleanCodeText}>{groupData?.shortCode || '-'}</Text>
-                    {groupData?.shortCode && (
-                      <TouchableOpacity
-                        style={styles.cleanCopyBtn}
-                        onPress={() => handleCopyCode(groupData.shortCode)}
-                      >
-                        <MaterialCommunityIcons name="content-copy" size={16} color="#02B97F" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-
-                {/* Created Date Row */}
-                <View style={styles.cleanInfoRow}>
-                  <View style={styles.cleanInfoLeft}>
-                    <MaterialCommunityIcons name="calendar" size={20} color="#02B97F" />
-                    <Text style={styles.cleanInfoLabel}>Created</Text>
-                  </View>
-                  <Text style={styles.cleanInfoValue}>{formatDateTime(groupData?.createdAt)}</Text>
-                </View>
-
-                {/* Role Row */}
-                <View style={styles.cleanInfoRow}>
-                  <View style={styles.cleanInfoLeft}>
-                    <MaterialCommunityIcons name="crown" size={20} color="#02B97F" />
-                    <Text style={styles.cleanInfoLabel}>Your Role</Text>
-                  </View>
-                  <View style={styles.cleanRoleBadge}>
-                    <Text style={[styles.cleanRoleText, { color: isAdmin ? '#02B97F' : '#6b7280' }]}>
-                      {isAdmin ? 'Admin' : 'Member'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Copy Success Message */}
-              {copied && (
-                <View style={styles.cleanSuccessMessage}>
-                  <MaterialCommunityIcons name="check-circle" size={16} color="#10b981" />
-                  <Text style={styles.cleanSuccessText}>Code copied to clipboard!</Text>
-                </View>
-              )}
-
-              {/* Action Buttons */}
+            {/* Action Buttons */}
+            <View style={styles.minimalButtonContainer}>
+              <TouchableOpacity
+                style={styles.minimalCancelButton}
+                onPress={() => setInfoModalVisible(false)}
+              >
+                <Text style={styles.minimalCancelText}>Close</Text>
+              </TouchableOpacity>
               {!isAdmin && (
-                <View style={styles.cleanActionSection}>
-                  <TouchableOpacity style={styles.cleanLeaveButton} onPress={handleLeaveGroup}>
-                    <MaterialCommunityIcons name="exit-to-app" size={20} color="#dc2626" />
-                    <Text style={styles.cleanLeaveButtonText}>Leave Group</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={styles.minimalRemoveButton}
+                  onPress={handleLeaveGroup}
+                >
+                  <Text style={styles.minimalRemoveText}>Leave Group</Text>
+                </TouchableOpacity>
               )}
             </View>
           </View>
@@ -878,66 +822,51 @@ export default function GroupDetailsScreen() {
       <Modal
         visible={inviteModalVisible}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setInviteModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.enhancedModalContent}>
-            {/* Modal Handle */}
-            <View style={styles.modalHandle} />
+          <View style={styles.minimalModalContent}>
+            <Text style={styles.minimalModalTitle}>Invite to Group</Text>
+            
+            <Text style={styles.minimalModalText}>
+              Share this code with others to invite them to "{groupData?.name}"
+            </Text>
 
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <View style={styles.modalTitleContainer}>
-                <MaterialCommunityIcons name="account-plus" size={24} color="#02B97F" />
-                <Text style={styles.modalTitle}>Invite to Group</Text>
-              </View>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setInviteModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={20} color="#6b7280" />
-              </TouchableOpacity>
+            {/* Code Display */}
+            <View style={styles.minimalCodeContainer}>
+              <Text style={styles.minimalCodeText}>{groupData?.shortCode || '-'}</Text>
+              {groupData?.shortCode && (
+                <TouchableOpacity 
+                  style={styles.minimalCopyButton}
+                  onPress={() => handleCopyCode(groupData.shortCode)}
+                >
+                  <MaterialCommunityIcons name="content-copy" size={18} color="#02B97F" />
+                </TouchableOpacity>
+              )}
             </View>
 
-            {/* Content */}
-            <View style={styles.modalContentContainer}>
-              {/* Invite Instructions */}
-              <View style={styles.inviteInstructions}>
-                <Text style={styles.instructionTitle}>Share this code with others</Text>
-                <Text style={styles.instructionText}>
-                  Anyone with this code can join "{groupData?.name}"
-                </Text>
+            {/* Copy Success Message */}
+            {copied && (
+              <View style={styles.minimalSuccessMessage}>
+                <MaterialCommunityIcons name="check-circle" size={16} color="#10b981" />
+                <Text style={styles.minimalSuccessText}>Code copied!</Text>
               </View>
+            )}
 
-              {/* Code Display */}
-              <View style={styles.codeDisplayCard}>
-                <View style={styles.codeDisplayHeader}>
-                  <MaterialCommunityIcons name="key-variant" size={20} color="#6b7280" />
-                  <Text style={styles.codeDisplayLabel}>Group Code</Text>
-                </View>
-                <View style={styles.codeDisplayContainer}>
-                  <Text style={styles.codeDisplayText}>{groupData?.shortCode || '-'}</Text>
-                  {groupData?.shortCode && (
-                    <TouchableOpacity style={styles.copyBtnLarge} onPress={() => handleCopyCode(groupData.shortCode)}>
-                      <MaterialCommunityIcons name="content-copy" size={20} color="#02B97F" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              {/* Copy Success Message */}
-              {copied && (
-                <View style={styles.successMessage}>
-                  <MaterialCommunityIcons name="check-circle" size={16} color="#10b981" />
-                  <Text style={styles.successText}>Code copied to clipboard!</Text>
-                </View>
-              )}
-
-              {/* Action Buttons */}
-              <View style={styles.inviteActions}>
-                <TouchableOpacity style={styles.shareBtnEnhanced} onPress={() => handleShare(groupData?.shortCode)}>
-                  <MaterialCommunityIcons name="share-variant" size={20} color="#ffffff" />
-                  <Text style={styles.shareBtnTextEnhanced}>Share Invite</Text>
-                </TouchableOpacity>
-              </View>
+            <View style={styles.minimalButtonContainer}>
+              <TouchableOpacity
+                style={styles.minimalCancelButton}
+                onPress={() => setInviteModalVisible(false)}
+              >
+                <Text style={styles.minimalCancelText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.minimalShareButton}
+                onPress={() => handleShare(groupData?.shortCode)}
+              >
+                <Text style={styles.minimalShareText}>Share</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1086,41 +1015,31 @@ export default function GroupDetailsScreen() {
         onRequestClose={() => setRemoveMemberModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <MaterialCommunityIcons name="account-minus" size={24} color="#ef4444" />
-              <Text style={styles.modalTitle}>Remove Member</Text>
-            </View>
-
-            <Text style={styles.confirmationText}>
-              Are you sure you want to remove "{memberToRemove?.name || 'this member'}" from the group?
+          <View style={styles.minimalModalContent}>
+            <Text style={styles.minimalModalTitle}>Remove Member</Text>
+            <Text style={styles.minimalModalText}>
+              Remove "{memberToRemove?.name || 'this member'}" from the group?
             </Text>
-
-            <Text style={styles.warningText}>
-              This action cannot be undone. The member will need a new invite to rejoin.
-            </Text>
-
-            <View style={styles.modalActions}>
+            <View style={styles.minimalButtonContainer}>
               <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
+                style={styles.minimalCancelButton}
                 onPress={() => {
                   setRemoveMemberModalVisible(false);
                   setMemberToRemove(null);
                 }}
                 disabled={removeLoading}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.minimalCancelText}>Cancel</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
-                style={[styles.button, { backgroundColor: '#ef4444' }]}
+                style={styles.minimalRemoveButton}
                 onPress={confirmRemoveMember}
                 disabled={removeLoading}
               >
                 {removeLoading ? (
                   <ActivityIndicator color="#ffffff" size="small" />
                 ) : (
-                  <Text style={styles.removeButtonText}>Remove</Text>
+                  <Text style={styles.minimalRemoveText}>Remove</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1178,6 +1097,7 @@ export default function GroupDetailsScreen() {
           <Text style={[styles.tabText, activeTab === 'members' && styles.activeTabText]}>
             Members ({groupData?.memberCount || (groupData?.members?.length || 0)})
           </Text>
+
         </TouchableOpacity>
 
         {/* Only show Activity tab for admins */}
@@ -1195,6 +1115,7 @@ export default function GroupDetailsScreen() {
             <Text style={[styles.tabText, activeTab === 'activity' && styles.activeTabText]}>
               Activity
             </Text>
+
           </TouchableOpacity>
         )}
       </View>
@@ -1654,6 +1575,253 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 20,
   },
+  warningIconContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  enhancedConfirmationText: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 26,
+  },
+  enhancedWarningText: {
+    fontSize: 15,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 22,
+  },
+  enhancedButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  enhancedCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  enhancedCancelButtonText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#64748b',
+  },
+  enhancedRemoveButton: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  enhancedRemoveButtonText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
+  },
+  minimalModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    width: '80%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  minimalModalTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1f2937',
+    marginBottom: 16,
+  },
+  minimalModalText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  minimalButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  minimalCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+  },
+  minimalCancelText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+  },
+  minimalRemoveButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+  },
+  minimalRemoveText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#ffffff',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    width: '100%',
+  },
+  infoLabel: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+  },
+  infoValue: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1f2937',
+  },
+  codeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  codeText: {
+    fontSize: 16,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    color: '#02B97F',
+  },
+  copyButton: {
+    padding: 4,
+  },
+  minimalInput: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#1f2937',
+    backgroundColor: '#ffffff',
+    width: '100%',
+    marginBottom: 16,
+  },
+  minimalErrorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  minimalErrorText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#dc2626',
+    marginLeft: 6,
+  },
+  minimalSaveButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#02B97F',
+    alignItems: 'center',
+  },
+  minimalSaveText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#ffffff',
+  },
+  minimalCodeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    gap: 12,
+  },
+  minimalCodeText: {
+    fontSize: 20,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontWeight: '700',
+    color: '#02B97F',
+    letterSpacing: 2,
+  },
+  minimalCopyButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#E8F5F0',
+  },
+  minimalSuccessMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0fdf4',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  minimalSuccessText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#16a34a',
+  },
+  minimalShareButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#02B97F',
+    alignItems: 'center',
+  },
+  minimalShareText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#ffffff',
+  },
   modalActions: {
     flexDirection: 'row',
     gap: 12,
@@ -1678,7 +1846,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginHorizontal: 4,
     marginTop: 20,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 4,
     borderWidth: 2,
@@ -1698,7 +1866,7 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     backgroundColor: '#ffffff',
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: '#02B97F',
     shadowColor: 'rgba(2, 185, 127, 0.4)',
     shadowOffset: { width: 0, height: 2 },
@@ -1718,6 +1886,7 @@ const styles = StyleSheet.create({
     color: '#02B97F',
     fontWeight: '600',
   },
+
   content: {
     flex: 1,
     paddingHorizontal: 4,
@@ -1816,15 +1985,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   adminCard: {
-    backgroundColor: 'rgba(245, 158, 11, 0.05)',
+    backgroundColor: 'rgba(2, 185, 127, 0.05)',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.2)',
+    borderColor: 'rgba(2, 185, 127, 0.2)',
   },
   adminAvatar: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    backgroundColor: 'rgba(2, 185, 127, 0.1)',
+    borderColor: 'rgba(2, 185, 127, 0.3)',
   },
   emptyMembersContainer: {
     alignItems: 'center',
@@ -1854,11 +2023,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
   },
   memberInfo: {
     flexDirection: 'row',
@@ -1904,7 +2068,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   adminRoleTag: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: 'rgba(2, 185, 127, 0.1)',
   },
   roleText: {
     fontSize: 12,
@@ -1914,7 +2078,7 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   adminRoleText: {
-    color: '#f59e0b',
+    color: '#02B97F',
   },
   memberJoined: {
     fontSize: 12,

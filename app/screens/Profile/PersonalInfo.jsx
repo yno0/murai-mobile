@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from "@react-navigation/native";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useAccessibility } from "../../context/AccessibilityContext";
 import { useAuth } from "../../context/AuthContext";
 
 // Helper function to get current time
@@ -16,6 +17,7 @@ const getCurrentTime = () => {
 export default function PersonalInfo() {
   const navigation = useNavigation();
   const { user, loading, logout } = useAuth();
+  const { getAccessibleTextStyle, getAccessibleTouchableStyle } = useAccessibility();
 
   const profileOptions = [
     {
@@ -98,15 +100,15 @@ export default function PersonalInfo() {
 
           <View style={styles.managerSection}>
             <View style={styles.managerItem}>
-              <Text style={styles.managerLabel}>Email</Text>
-              <Text style={styles.managerName}>
+              <Text style={getAccessibleTextStyle(styles.managerLabel)}>Email</Text>
+              <Text style={getAccessibleTextStyle(styles.managerName)}>
                 {loading ? 'Loading...' : (user?.email || 'user@example.com')}
               </Text>
             </View>
             <View style={styles.managerItem}>
-              <Text style={styles.managerLabel}>Status</Text>
+              <Text style={getAccessibleTextStyle(styles.managerLabel)}>Status</Text>
               <View style={styles.departmentContainer}>
-                <Text style={styles.departmentText}>Active</Text>
+                <Text style={getAccessibleTextStyle(styles.departmentText)}>Active</Text>
                 <Feather name="chevron-right" size={16} color="#A8AAB0" />
               </View>
             </View>
@@ -118,12 +120,14 @@ export default function PersonalInfo() {
           {profileOptions.map((option) => (
             <TouchableOpacity
               key={option.id}
-              style={styles.menuItem}
+              style={getAccessibleTouchableStyle(styles.menuItem)}
               onPress={option.onPress}
+              accessibilityLabel={option.title}
+              accessibilityRole="button"
             >
               <View style={styles.menuLeft}>
                 <Feather name={option.icon} size={20} color="#A8AAB0" />
-                <Text style={styles.menuText}>{option.title}</Text>
+                <Text style={getAccessibleTextStyle(styles.menuText)}>{option.title}</Text>
               </View>
               <Feather name="chevron-right" size={20} color="#A8AAB0" />
             </TouchableOpacity>
@@ -132,12 +136,14 @@ export default function PersonalInfo() {
 
         {/* Logout Button */}
         <TouchableOpacity
-          style={[styles.logoutButton, loading && styles.logoutButtonDisabled]}
+          style={getAccessibleTouchableStyle([styles.logoutButton, loading && styles.logoutButtonDisabled])}
           onPress={logout}
           disabled={loading}
+          accessibilityLabel={loading ? 'Logging out...' : 'Logout'}
+          accessibilityState={{ disabled: loading }}
         >
           <Feather name="log-out" size={16} color={loading ? '#9CA3AF' : '#01B97F'} />
-          <Text style={[styles.logoutText, loading && styles.logoutTextDisabled]}>
+          <Text style={getAccessibleTextStyle([styles.logoutText, loading && styles.logoutTextDisabled])}>
             {loading ? 'Logging out...' : 'Logout'}
           </Text>
         </TouchableOpacity>

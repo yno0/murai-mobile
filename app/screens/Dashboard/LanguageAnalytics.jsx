@@ -10,6 +10,7 @@ import {
     View
 } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
@@ -85,11 +86,11 @@ function LanguageAnalyticsScreen({ navigation }) {
         detectedWords.reduce((sum, word) => sum + (word.responseTime || 250), 0) / detectedWords.length : 250;
 
       const safetyMetrics = [
-        { metric: 'Overall Safety Score', value: `${avgAccuracy.toFixed(1)}%`, change: '+2%', color: '#02B97F' },
-        { metric: 'Content Quality Index', value: '92%', change: '+4%', color: '#3b82f6' },
-        { metric: 'Toxicity Detection Rate', value: '98.5%', change: '+1.2%', color: '#8b5cf6' },
-        { metric: 'Avg Response Time', value: `${(avgResponseTime / 1000).toFixed(1)}s`, change: '-0.3s', color: '#ef4444' },
-        { metric: 'Language Coverage', value: `${Object.keys(languageCount).length} Languages`, change: '+1', color: '#f59e0b' },
+        { metric: 'Overall Safety Score', value: `${avgAccuracy.toFixed(1)}%`, color: '#02B97F' },
+        { metric: 'Content Quality Index', value: '92%', color: '#3b82f6' },
+        { metric: 'Toxicity Detection Rate', value: '98.5%', color: '#8b5cf6' },
+        { metric: 'Avg Response Time', value: `${(avgResponseTime / 1000).toFixed(1)}s`, color: '#ef4444' },
+        { metric: 'Language Coverage', value: `${Object.keys(languageCount).length} Languages`, color: '#f59e0b' },
       ];
 
       // Process detections by language with severity
@@ -140,7 +141,7 @@ function LanguageAnalyticsScreen({ navigation }) {
   // Effect to load data on component mount and time range change
   useEffect(() => {
     fetchLanguageData(selectedTimeRange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [selectedTimeRange]);
 
   // Use dynamic data instead of static
@@ -170,11 +171,11 @@ function LanguageAnalyticsScreen({ navigation }) {
 
   // Use dynamic safety metrics data
   const safetyMetrics = languageData.safetyMetrics.length > 0 ? languageData.safetyMetrics : [
-    { metric: 'Overall Safety Score', value: '96%', change: '+2%', color: '#02B97F' },
-    { metric: 'Content Quality Index', value: '92%', change: '+4%', color: '#3b82f6' },
-    { metric: 'Toxicity Detection Rate', value: '98.5%', change: '+1.2%', color: '#8b5cf6' },
-    { metric: 'False Positive Rate', value: '1.8%', change: '-0.3%', color: '#ef4444' },
-    { metric: 'Language Coverage', value: '4 Languages', change: '+1', color: '#f59e0b' },
+    { metric: 'Overall Safety Score', value: '96%', color: '#02B97F' },
+    { metric: 'Content Quality Index', value: '92%', color: '#3b82f6' },
+    { metric: 'Toxicity Detection Rate', value: '98.5%', color: '#8b5cf6' },
+    { metric: 'False Positive Rate', value: '1.8%', color: '#ef4444' },
+    { metric: 'Language Coverage', value: '4 Languages', color: '#f59e0b' },
   ];
 
   // Static fallback data is now handled in the state initialization above
@@ -192,25 +193,53 @@ function LanguageAnalyticsScreen({ navigation }) {
 
       {/* Time Range Selector */}
       <View style={styles.timeRangeContainer}>
-        {timeRanges.map((range) => (
-          <TouchableOpacity
-            key={range}
-            style={[
-              styles.timeRangeButton,
-              selectedTimeRange === range && styles.timeRangeButtonActive,
-            ]}
-            onPress={() => handleTimeRangeChange(range)}
-          >
-            <Text
+        <View style={styles.timeRangeSelectorHeader}>
+          <MaterialCommunityIcons name="clock-outline" size={20} color="#02B97F" />
+          <Text style={styles.timeRangeSelectorTitle}>Select Time Period</Text>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.timeRangeScrollContainer}
+          contentContainerStyle={styles.timeRangeScrollContent}
+        >
+          {timeRanges.map((range) => (
+            <TouchableOpacity
+              key={range}
               style={[
-                styles.timeRangeText,
-                selectedTimeRange === range && styles.timeRangeTextActive,
+                styles.timeRangeButton,
+                selectedTimeRange === range && styles.timeRangeButtonActive,
               ]}
+              onPress={() => handleTimeRangeChange(range)}
+              activeOpacity={0.7}
             >
-              {range}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <View style={[
+                styles.timeRangeIconContainer,
+                selectedTimeRange === range && { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+              ]}>
+                <MaterialCommunityIcons
+                  name={
+                    range === 'Today' ? 'calendar-today' :
+                    range === 'Week' ? 'calendar-week' :
+                    range === 'Month' ? 'calendar-month' :
+                    'calendar-range'
+                  }
+                  size={18}
+                  color={selectedTimeRange === range ? '#ffffff' : '#6b7280'}
+                />
+              </View>
+              <Text
+                style={[
+                  styles.timeRangeText,
+                  selectedTimeRange === range && styles.timeRangeTextActive,
+                ]}
+                numberOfLines={1}
+              >
+                {range}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Safety Score */}
@@ -237,9 +266,6 @@ function LanguageAnalyticsScreen({ navigation }) {
             </View>
             <View style={styles.scoreDetails}>
               <Text style={styles.scoreDescription}>Your digital environment is highly protected</Text>
-              <Text style={styles.scoreChange}>
-                {safetyMetrics[0]?.change || '+2%'} improvement this {selectedTimeRange.toLowerCase()}
-              </Text>
             </View>
           </View>
         )}
@@ -347,26 +373,82 @@ const styles = StyleSheet.create({
     width: 40,
   },
   timeRangeContainer: {
-    flexDirection: 'row',
     marginBottom: 20,
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 16,
+  },
+  timeRangeSelectorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  timeRangeSelectorTitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#374151',
+  },
+  timeRangeScrollContainer: {
+    // Add any specific styles for the ScrollView if needed
+  },
+  timeRangeScrollContent: {
+    alignItems: 'center',
+    paddingRight: 10, // Add some padding to the right for the last button
+  },
+  timeRangeButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     gap: 8,
   },
   timeRangeButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    gap: 8,
+    minWidth: 130,
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   timeRangeButtonActive: {
     backgroundColor: '#02B97F',
+    borderColor: '#02B97F',
+    shadowColor: '#02B97F',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   timeRangeText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: '#374151',
+    fontSize: 13,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#6b7280',
   },
   timeRangeTextActive: {
-    fontFamily: 'Poppins-SemiBold',
     color: '#ffffff',
+  },
+  timeRangeIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   section: {
     marginBottom: 30,
@@ -511,12 +593,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Regular',
     color: '#6b7280',
   },
-  languageName: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    color: '#111827',
-    marginBottom: 4,
-  },
+
   severityBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,

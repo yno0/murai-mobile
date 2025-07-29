@@ -346,6 +346,7 @@ export const globalStyles = {
 // Accessibility settings
 export const ACCESSIBILITY = {
   minTouchTarget: 44,
+  largeTouchTarget: 56,
   focusIndicator: {
     borderWidth: 2,
     borderColor: COLORS.PRIMARY,
@@ -356,5 +357,37 @@ export const ACCESSIBILITY = {
     TEXT: "#FFFFFF",
     ACCENT: "#FFFFFF",
     BORDER: "#FFFFFF",
+    PRIMARY: "#FFFFFF",
+    SECONDARY: "#CCCCCC",
   },
-}; 
+  // Font scale multipliers
+  fontScales: {
+    small: 0.8,
+    normal: 1.0,
+    large: 1.2,
+    extraLarge: 1.5,
+  },
+  // Motion preferences
+  motion: {
+    reduced: {
+      duration: 150,
+      easing: 'ease-out',
+    },
+    normal: {
+      duration: 300,
+      easing: 'ease-in-out',
+    },
+  },
+  // Utility functions
+  getAccessibleFontSize: (baseSize, scale = 1, isLargeText = false) => {
+    const effectiveScale = isLargeText ? Math.max(scale, 1.2) : scale;
+    return Math.round(baseSize * effectiveScale);
+  },
+  getAccessibleTouchTarget: (baseSize, isLargeTouchTargets = false) => {
+    const minSize = isLargeTouchTargets ? ACCESSIBILITY.largeTouchTarget : ACCESSIBILITY.minTouchTarget;
+    return Math.max(baseSize, minSize);
+  },
+  getAccessibleColors: (isHighContrast = false) => {
+    return isHighContrast ? ACCESSIBILITY.highContrast : null;
+  },
+};

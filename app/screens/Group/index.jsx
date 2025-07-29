@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MainHeader from '../../components/common/MainHeader';
+import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
@@ -21,6 +22,7 @@ const { width } = Dimensions.get('window');
 
 function GroupsScreen({ navigation }) {
   const { user } = useAuth();
+  const { getAccessibleTextStyle, getAccessibleTouchableStyle } = useAccessibility();
   const [groups, setGroups] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('create');
@@ -173,19 +175,21 @@ function GroupsScreen({ navigation }) {
       ]}
     >
       <TouchableOpacity
-        style={styles.groupCard}
+        style={getAccessibleTouchableStyle(styles.groupCard)}
         onPress={() => handleGroupPress(item)}
         activeOpacity={0.7}
+        accessibilityLabel={`${item.name} group. ${(typeof item.memberCount === 'number' ? item.memberCount : (item.members ? item.members.length : 0))} members`}
+        accessibilityRole="button"
       >
         <View style={styles.groupRow}>
           <View style={styles.groupIconContainer}>
             <MaterialCommunityIcons name="account-group" size={28} color="#02B97F" />
           </View>
           <View style={styles.groupInfo}>
-            <Text style={styles.groupName}>{item.name}</Text>
+            <Text style={getAccessibleTextStyle(styles.groupName)}>{item.name}</Text>
             <View style={styles.groupMeta}>
               <MaterialCommunityIcons name="account-multiple" size={16} color="#6b7280" />
-              <Text style={styles.memberCount}>
+              <Text style={getAccessibleTextStyle(styles.memberCount)}>
                 {(typeof item.memberCount === 'number' ? item.memberCount : (item.members ? item.members.length : 0))} members
               </Text>
             </View>
@@ -224,16 +228,22 @@ function GroupsScreen({ navigation }) {
       <View style={styles.searchContainer}>
         <MaterialCommunityIcons name="magnify" size={20} color="#6b7280" style={{ marginRight: 8 }} />
         <TextInput
-          style={styles.searchInput}
+          style={getAccessibleTextStyle(styles.searchInput)}
           placeholder="Search groups..."
           placeholderTextColor="#9CA3AF"
           value={search}
           onChangeText={setSearch}
           autoCorrect={false}
           returnKeyType="search"
+          accessibilityLabel="Search groups"
         />
         {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')} style={styles.clearBtn} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+          <TouchableOpacity
+            onPress={() => setSearch('')}
+            style={getAccessibleTouchableStyle(styles.clearBtn)}
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            accessibilityLabel="Clear search"
+          >
             <MaterialCommunityIcons name="close-circle" size={20} color="#6b7280" />
           </TouchableOpacity>
         )}
@@ -242,13 +252,13 @@ function GroupsScreen({ navigation }) {
       {loading ? (
         <View style={styles.emptyState}>
           <MaterialCommunityIcons name="account-group-outline" size={64} color="#D1D5DB" />
-          <Text style={styles.emptyText}>Loading...</Text>
+          <Text style={getAccessibleTextStyle(styles.emptyText)}>Loading...</Text>
         </View>
       ) : filteredGroups.length === 0 ? (
         <View style={styles.emptyState}>
           <MaterialCommunityIcons name="account-group-outline" size={64} color="#D1D5DB" />
-          <Text style={styles.emptyText}>No groups found</Text>
-          <Text style={styles.emptySubtext}>Create or join a group to get started</Text>
+          <Text style={getAccessibleTextStyle(styles.emptyText)}>No groups found</Text>
+          <Text style={getAccessibleTextStyle(styles.emptySubtext)}>Create or join a group to get started</Text>
         </View>
       ) : (
         <FlatList
