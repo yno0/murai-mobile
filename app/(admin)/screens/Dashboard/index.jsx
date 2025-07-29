@@ -15,7 +15,7 @@ import { LineChart } from "react-native-chart-kit";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import MainHeader from "../../../components/common/MainHeader";
 
-const API_BASE_URL = "http://localhost:3000/api";
+const API_BASE_URL = "https://murai-server.onrender.com/api";
 
 const dashboardService = {
   getOverview: async (timeRange) => {
@@ -226,6 +226,16 @@ export default function AdminDashboardScreen({ navigation }) {
         riskLevel: site.riskLevel || 'medium'
       })) || [];
 
+      console.log('Admin Dashboard API Data:', {
+        overview,
+        chartData,
+        chartLabels: chartData?.labels,
+        detectionsData: chartData?.datasets?.[0]?.data,
+        reportsData: chartData?.datasets?.[1]?.data,
+        totalDetections: chartData?.datasets?.[0]?.data?.reduce((a, b) => a + b, 0),
+        totalReports: chartData?.datasets?.[1]?.data?.reduce((a, b) => a + b, 0)
+      });
+
       setDashboardData({
         overview,
         chartData,
@@ -332,24 +342,18 @@ export default function AdminDashboardScreen({ navigation }) {
     },
   };
 
-  const selectedData = detectionReportsData[selectedTimeRange];
-  const detectionChartData = {
-    labels: selectedData.labels,
+  // Use actual API data instead of mock data
+  const detectionChartData = dashboardData.chartData || {
+    labels: ["", "", "", "", "", "", ""],
     datasets: [
-      {
-        data: selectedData.detections,
-        color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
-        fillShadowGradient: "rgba(1, 185, 127, 0.1)",
-        fillShadowGradientOpacity: 0.1,
-      },
-      {
-        data: selectedData.reports,
-        color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
-        fillShadowGradient: "rgba(59, 130, 246, 0.1)",
-        fillShadowGradientOpacity: 0.1,
-      },
+      { label: "Detections", data: [0, 0, 0, 0, 0, 0, 0] },
+      { label: "Reports", data: [0, 0, 0, 0, 0, 0, 0] },
     ],
   };
+
+  // Extract data for chart rendering
+  const detectionsData = detectionChartData.datasets?.[0]?.data || [0, 0, 0, 0, 0, 0, 0];
+  const reportsData = detectionChartData.datasets?.[1]?.data || [0, 0, 0, 0, 0, 0, 0];
 
   const overallStats = dashboardData.overview
     ? [
@@ -616,6 +620,12 @@ export default function AdminDashboardScreen({ navigation }) {
         subtitle="Admin real-time protection insights"
         rightActions={[
           {
+            icon: "refresh-cw",
+            iconType: "feather",
+            onPress: onRefresh,
+            loading: isRefreshing,
+          },
+          {
             icon: "menu",
             iconType: "feather",
             onPress: toggleMenu,
@@ -708,7 +718,7 @@ export default function AdminDashboardScreen({ navigation }) {
               labels: detectionChartData.labels,
               datasets: [
                 {
-                  data: selectedData.detections,
+                  data: detectionsData,
                   color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
                   strokeWidth: 3,
                   withDots: true,
@@ -716,7 +726,7 @@ export default function AdminDashboardScreen({ navigation }) {
                   fillShadowGradientOpacity: 0.6,
                 },
                 {
-                  data: selectedData.reports,
+                  data: reportsData,
                   color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
                   strokeWidth: 3,
                   withDots: true,
@@ -776,16 +786,22 @@ export default function AdminDashboardScreen({ navigation }) {
         ))}
       </View>
 
-      {/* New Analytics Sections */}
-      <View style={styles.analyticsSectionContainer}>
+      {/* Analytics Sections */}
+      <View style={styles.analyticsContainer}>
+        <View style={styles.analyticsSectionContainer}>
         <View style={styles.sectionTitleContainer}>
           <Text style={styles.analyticsSectionTitle}>Top Flagged Content</Text>
-          {isUpdating && (
-            <View style={styles.updateIndicator}>
-              <ActivityIndicator size="small" color="#3b82f6" />
-              <Text style={styles.updateText}>Updating...</Text>
-            </View>
-          )}
+          <View style={styles.sectionTitleRight}>
+            {dashboardData.topFlaggedContent.length > 0 && (
+              <Text style={styles.itemCount}>{dashboardData.topFlaggedContent.length} items</Text>
+            )}
+            {isUpdating && (
+              <View style={styles.updateIndicator}>
+                <ActivityIndicator size="small" color="#3b82f6" />
+                <Text style={styles.updateText}>Updating...</Text>
+              </View>
+            )}
+          </View>
         </View>
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -794,40 +810,65 @@ export default function AdminDashboardScreen({ navigation }) {
               Loading top flagged content...
             </Text>
           </View>
+        ) : dashboardData.topFlaggedContent.length === 0 ? (
+          <View style={styles.emptyStateContainer}>
+            <MaterialCommunityIcons name="shield-alert-outline" size={48} color="#9ca3af" />
+            <Text style={styles.emptyStateText}>No flagged content found</Text>
+            <Text style={styles.emptyStateSubtext}>Content detection data will appear here</Text>
+          </View>
         ) : (
-          <View style={styles.analyticsList}>
-            {dashboardData.topFlaggedContent.map((item) => (
-              <View key={item.id} style={styles.analyticsListItem}>
-                <View style={styles.analyticsItemLeft}>
-                  <Text style={styles.analyticsListItemText}>{item.term}</Text>
-                  <View style={[styles.severityBadge, {
-                    backgroundColor: item.severity === 'high' ? '#fee2e2' :
-                                   item.severity === 'medium' ? '#fef3c7' : '#f0fdf4',
-                  }]}>
-                    <Text style={[styles.severityText, {
-                      color: item.severity === 'high' ? '#dc2626' :
-                             item.severity === 'medium' ? '#d97706' : '#16a34a',
-                    }]}>
-                      {item.severity}
-                    </Text>
+          <ScrollView
+            style={styles.analyticsScrollView}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+          >
+            <View style={styles.analyticsList}>
+              {dashboardData.topFlaggedContent.map((item, index) => (
+                <View key={item.id} style={[
+                  styles.analyticsListItem,
+                  index === dashboardData.topFlaggedContent.length - 1 && styles.lastItem
+                ]}>
+                  <View style={styles.analyticsItemLeft}>
+                    <View style={styles.analyticsItemHeader}>
+                      <Text style={styles.analyticsListItemText} numberOfLines={1}>{item.term}</Text>
+                      <Text style={styles.analyticsListItemValue}>{item.count}</Text>
+                    </View>
+                    <View style={styles.analyticsItemFooter}>
+                      <View style={[styles.severityBadge, {
+                        backgroundColor: item.severity === 'high' ? '#fee2e2' :
+                                       item.severity === 'medium' ? '#fef3c7' : '#f0fdf4',
+                      }]}>
+                        <Text style={[styles.severityText, {
+                          color: item.severity === 'high' ? '#dc2626' :
+                                 item.severity === 'medium' ? '#d97706' : '#16a34a',
+                        }]}>
+                          {item.severity} severity
+                        </Text>
+                      </View>
+                      <Text style={styles.itemIndex}>#{index + 1}</Text>
+                    </View>
                   </View>
                 </View>
-                <Text style={styles.analyticsListItemValue}>{item.count}</Text>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          </ScrollView>
         )}
       </View>
 
       <View style={styles.analyticsSectionContainer}>
         <View style={styles.sectionTitleContainer}>
           <Text style={styles.analyticsSectionTitle}>Top Monitored Websites</Text>
-          {isUpdating && (
-            <View style={styles.updateIndicator}>
-              <ActivityIndicator size="small" color="#3b82f6" />
-              <Text style={styles.updateText}>Updating...</Text>
-            </View>
-          )}
+          <View style={styles.sectionTitleRight}>
+            {dashboardData.topMonitoredWebsites.length > 0 && (
+              <Text style={styles.itemCount}>{dashboardData.topMonitoredWebsites.length} sites</Text>
+            )}
+            {isUpdating && (
+              <View style={styles.updateIndicator}>
+                <ActivityIndicator size="small" color="#3b82f6" />
+                <Text style={styles.updateText}>Updating...</Text>
+              </View>
+            )}
+          </View>
         </View>
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -836,102 +877,107 @@ export default function AdminDashboardScreen({ navigation }) {
               Loading top monitored websites...
             </Text>
           </View>
+        ) : dashboardData.topMonitoredWebsites.length === 0 ? (
+          <View style={styles.emptyStateContainer}>
+            <MaterialCommunityIcons name="web" size={48} color="#9ca3af" />
+            <Text style={styles.emptyStateText}>No monitored websites found</Text>
+            <Text style={styles.emptyStateSubtext}>Website monitoring data will appear here</Text>
+          </View>
         ) : (
-          <View style={styles.analyticsList}>
-            {dashboardData.topMonitoredWebsites.map((item) => (
-              <View key={item.id} style={styles.analyticsListItem}>
-                <View style={styles.analyticsItemLeft}>
-                  <Text style={styles.analyticsListItemText}>{item.url}</Text>
-                  <View style={[styles.riskBadge, {
-                    backgroundColor: item.riskLevel === 'high' ? '#fee2e2' :
-                                   item.riskLevel === 'medium' ? '#fef3c7' : '#f0fdf4',
-                  }]}>
-                    <Text style={[styles.riskText, {
-                      color: item.riskLevel === 'high' ? '#dc2626' :
-                             item.riskLevel === 'medium' ? '#d97706' : '#16a34a',
-                    }]}>
-                      {item.riskLevel} risk
-                    </Text>
+          <ScrollView
+            style={styles.analyticsScrollView}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+          >
+            <View style={styles.analyticsList}>
+              {dashboardData.topMonitoredWebsites.map((item, index) => (
+                <View key={item.id} style={[
+                  styles.analyticsListItem,
+                  index === dashboardData.topMonitoredWebsites.length - 1 && styles.lastItem
+                ]}>
+                  <View style={styles.analyticsItemLeft}>
+                    <View style={styles.analyticsItemHeader}>
+                      <Text style={styles.analyticsListItemText} numberOfLines={1}>{item.url}</Text>
+                      <Text style={styles.analyticsListItemValue}>{item.issues} issues</Text>
+                    </View>
+                    <View style={styles.analyticsItemFooter}>
+                      <View style={[styles.riskBadge, {
+                        backgroundColor: item.riskLevel === 'high' ? '#fee2e2' :
+                                       item.riskLevel === 'medium' ? '#fef3c7' : '#f0fdf4',
+                      }]}>
+                        <Text style={[styles.riskText, {
+                          color: item.riskLevel === 'high' ? '#dc2626' :
+                                 item.riskLevel === 'medium' ? '#d97706' : '#16a34a',
+                        }]}>
+                          {item.riskLevel} risk
+                        </Text>
+                      </View>
+                      <Text style={styles.itemIndex}>#{index + 1}</Text>
+                    </View>
                   </View>
                 </View>
-                <Text style={styles.analyticsListItemValue}>{item.issues}</Text>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          </ScrollView>
         )}
       </View>
+      </View>
 
-
+      {/* Bottom Sheet Menu */}
       <Modal
         visible={isMenuOpen}
         transparent={true}
         animationType="slide"
         onRequestClose={toggleMenu}
+        statusBarTranslucent={true}
       >
-        <TouchableOpacity style={styles.overlay} onPress={toggleMenu}>
+        <View style={styles.overlay}>
+          <TouchableOpacity style={styles.overlayTouchable} onPress={toggleMenu} />
           <View style={styles.bottomSheetContainer}>
             <View style={styles.bottomSheet}>
-              <View style={styles.handleBar} />
+              {/* Handle Bar and Close Button */}
               <View style={styles.menuHeader}>
-                <Text style={styles.menuTitle}>Admin Dashboard</Text>
+                <View style={styles.handleBar} />
                 <TouchableOpacity
                   style={styles.closeButton}
                   onPress={toggleMenu}
                 >
-                  <MaterialCommunityIcons
-                    name="close"
-                    size={24}
-                    color="#374151"
-                  />
+                  <MaterialCommunityIcons name="close" size={20} color="#6b7280" />
                 </TouchableOpacity>
               </View>
-              <ScrollView
-                style={styles.menuScroll}
-                showsVerticalScrollIndicator={false}
-              >
+
+              <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
+                {/* Analytics Menu Items */}
                 <View style={styles.menuSection}>
-                  <Text style={styles.sectionTitle}>Analytics</Text>
+                  <Text style={styles.sectionTitle}>Analytics Sections</Text>
                   {sideMenuItems.map((item, index) => (
                     <TouchableOpacity
                       key={index}
                       style={styles.menuItem}
                       onPress={() => handleMenuAction(item.action)}
                     >
-                      <View style={styles.menuItemIcon}>
-                        <MaterialCommunityIcons
-                          name={item.icon}
-                          size={24}
-                          color="#374151"
-                        />
+                      <View style={[styles.menuItemIcon, { backgroundColor: '#E8F5F0' }]}>
+                        <MaterialCommunityIcons name={item.icon} size={22} color="#01B97F" />
                       </View>
                       <View style={styles.menuItemContent}>
                         <Text style={styles.menuItemText}>{item.title}</Text>
                         <Text style={styles.menuItemSubtitle}>
-                          {index === 0
-                            ? "Main dashboard overview"
-                            : index === 1
-                            ? "Detection analytics and details"
-                            : index === 2
-                            ? "Sites analytics and details"
-                            : index === 3
-                            ? "Languages analytics and details"
-                            : index === 4
-                            ? "Groups analytics and details"
-                            : "Patterns over time analytics and details"}
+                          {index === 0 ? 'Main dashboard overview' :
+                           index === 1 ? 'Detection analytics and details' :
+                           index === 2 ? 'Sites analytics and details' :
+                           index === 3 ? 'Languages analytics and details' :
+                           index === 4 ? 'Groups analytics and details' :
+                           'Patterns over time analytics and details'}
                         </Text>
                       </View>
-                      <MaterialCommunityIcons
-                        name="chevron-right"
-                        size={20}
-                        color="#9ca3af"
-                      />
+                      <MaterialCommunityIcons name="chevron-right" size={18} color="#01B97F" />
                     </TouchableOpacity>
                   ))}
                 </View>
               </ScrollView>
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Custom Date Range Modal */}
@@ -1306,6 +1352,13 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
   },
+  overlayTouchable: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   bottomSheetContainer: {
     flex: 1,
     justifyContent: "flex-end",
@@ -1316,6 +1369,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    paddingBottom: 40,
+    maxHeight: '90%',
+    minHeight: 500,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
@@ -1327,14 +1383,17 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: "#e5e7eb",
     borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 15,
   },
   menuHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 15,
+  },
+  menuHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   menuScroll: {
     flex: 1,
@@ -1373,40 +1432,111 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "#f3f4f6",
   },
+  analyticsContainer: {
+    gap: 20,
+    marginBottom: 20,
+  },
   analyticsSectionContainer: {
     backgroundColor: "#ffffff",
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 30,
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: "#f3f4f6",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  sectionTitleContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  sectionTitleRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   analyticsSectionTitle: {
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
     color: "#111827",
-    marginBottom: 16,
+  },
+  itemCount: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#6b7280",
+  },
+  analyticsScrollView: {
+    maxHeight: 300,
   },
   analyticsList: {
-    gap: 10,
+    gap: 0,
   },
   analyticsListItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
     borderBottomWidth: 1,
     borderBottomColor: "#f3f4f6",
   },
-  analyticsListItemText: {
-    fontSize: 14,
-    fontFamily: "Poppins-Regular",
-    color: "#374151",
+  lastItem: {
+    borderBottomWidth: 0,
   },
-  analyticsListItemValue: {
+  analyticsItemLeft: {
+    flex: 1,
+  },
+  analyticsItemHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  analyticsItemFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  analyticsListItemText: {
     fontSize: 14,
     fontFamily: "Poppins-Medium",
     color: "#111827",
+    flex: 1,
+    marginRight: 10,
+  },
+  analyticsListItemValue: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#3b82f6",
+  },
+  itemIndex: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#9ca3af",
+  },
+  emptyStateContainer: {
+    alignItems: "center",
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    fontFamily: "Poppins-Medium",
+    color: "#6b7280",
+    marginTop: 12,
+    textAlign: "center",
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#9ca3af",
+    marginTop: 4,
+    textAlign: "center",
   },
   modalOverlay: {
     flex: 1,
@@ -1637,39 +1767,31 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontFamily: "Poppins-SemiBold",
   },
-  analyticsItemLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   severityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginLeft: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   severityText: {
     fontSize: 10,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: 'Poppins-SemiBold',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   riskBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginLeft: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   riskText: {
     fontSize: 10,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: 'Poppins-SemiBold',
     textTransform: 'uppercase',
-  },
-  sectionTitleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+    letterSpacing: 0.5,
   },
   updateIndicator: {
     flexDirection: 'row',

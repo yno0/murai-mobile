@@ -7,6 +7,12 @@ import User from '../../models/userModel.js';
 
 const router = express.Router();
 
+// Test endpoint
+router.get('/test', (req, res) => {
+  console.log('🧪 Test endpoint hit!');
+  res.json({ message: 'Dashboard routes working!', timestamp: new Date().toISOString() });
+});
+
 // Middleware to authenticate JWT
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -105,6 +111,7 @@ router.get('/overview', /* authenticateToken, */ async (req, res) => {
 router.get('/activity-chart', /* authenticateToken, */ async (req, res) => {
   try {
     const { timeRange = 'last 7 days' } = req.query;
+    console.log('🔥 Activity chart requested with timeRange:', timeRange, 'at', new Date().toISOString());
 
     const chartData = [];
     const labels = [];
@@ -137,38 +144,62 @@ router.get('/activity-chart', /* authenticateToken, */ async (req, res) => {
         labels.push(`${hour.toString().padStart(2, '0')}:00`);
       }
     } else {
-      // For other time ranges, show daily data
-      let days = 7;
-      switch (timeRange.toLowerCase()) {
-        case 'last 7 days':
-          days = 7;
-          break;
-        case 'last 30 days':
-          days = 30;
-          break;
-        default:
-          days = 7;
-      }
+      // For other time ranges, show daily or yearly data
+      if (timeRange.toLowerCase() === 'all time') {
+        // For "All Time", show yearly data from last year and current year
+        const currentYear = new Date().getFullYear();
+        const lastYear = currentYear - 1;
 
-      for (let i = days - 1; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        date.setHours(0, 0, 0, 0);
+        for (const year of [lastYear, currentYear]) {
+          const yearStart = new Date(year, 0, 1); // January 1st of the year
+          const yearEnd = new Date(year + 1, 0, 1); // January 1st of next year
 
-        const nextDate = new Date(date);
-        nextDate.setDate(nextDate.getDate() + 1);
+          const [detections, reports] = await Promise.all([
+            DetectedWord.countDocuments({
+              createdAt: { $gte: yearStart, $lt: yearEnd }
+            }),
+            Report.countDocuments({
+              createdAt: { $gte: yearStart, $lt: yearEnd }
+            })
+          ]);
 
-        const [detections, reports] = await Promise.all([
-          DetectedWord.countDocuments({
-            createdAt: { $gte: date, $lt: nextDate }
-          }),
-          Report.countDocuments({
-            createdAt: { $gte: date, $lt: nextDate }
-          })
-        ]);
+          chartData.push({ detections: detections, reports: reports });
+          labels.push(year.toString());
+        }
+      } else {
+        // For other time ranges, show daily data
+        let days = 7;
+        switch (timeRange.toLowerCase()) {
+          case 'last 7 days':
+            days = 7;
+            break;
+          case 'last 30 days':
+            days = 30;
+            break;
+          default:
+            days = 7;
+        }
 
-        chartData.push({ detections: detections, reports: reports });
-        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        for (let i = days - 1; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          date.setHours(0, 0, 0, 0);
+
+          const nextDate = new Date(date);
+          nextDate.setDate(nextDate.getDate() + 1);
+
+          const [detections, reports] = await Promise.all([
+            DetectedWord.countDocuments({
+              createdAt: { $gte: date, $lt: nextDate }
+            }),
+            Report.countDocuments({
+              createdAt: { $gte: date, $lt: nextDate }
+            })
+          ]);
+
+          chartData.push({ detections: detections, reports: reports });
+          labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        }
       }
     }
 

@@ -6,7 +6,8 @@ import User from '../models/userModel.js';
 
 dotenv.config();
 
-const MONGO_URI = process.env.MONGO_URI;
+// Use deployed MongoDB URI
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mhrkp:mhrkp123@cluster0.ixhqy.mongodb.net/murai-db?retryWrites=true&w=majority&appName=Cluster0';
 
 async function connectDB() {
   try {
@@ -32,14 +33,17 @@ function getRandomElement(array) {
 }
 
 function getTodayDateTime() {
+  // Get today's date in UTC to match server timezone
   const today = new Date();
+  const utcToday = new Date(today.getTime() + (today.getTimezoneOffset() * 60000));
+
   // Generate random time throughout today
   const hours = getRandomNumber(0, 23);
   const minutes = getRandomNumber(0, 59);
   const seconds = getRandomNumber(0, 59);
-  
-  today.setHours(hours, minutes, seconds, 0);
-  return today;
+
+  utcToday.setUTCHours(hours, minutes, seconds, 0);
+  return utcToday;
 }
 
 // Sample data arrays
@@ -235,44 +239,45 @@ async function generateTodayDetectionsAndReports() {
     const detections = await generateTodayDetections(users, 30);
     const reports = await generateTodayReports(users, 30);
 
-    // Get today's statistics
+    // Get today's statistics using UTC
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const utcToday = new Date(today.getTime() + (today.getTimezoneOffset() * 60000));
+    utcToday.setUTCHours(0, 0, 0, 0);
+    const utcTomorrow = new Date(utcToday);
+    utcTomorrow.setUTCDate(utcTomorrow.getUTCDate() + 1);
 
     const todayStats = {
-      detections: await DetectedWord.countDocuments({ 
-        createdAt: { $gte: today, $lt: tomorrow } 
+      detections: await DetectedWord.countDocuments({
+        createdAt: { $gte: utcToday, $lt: utcTomorrow }
       }),
-      reports: await Report.countDocuments({ 
-        createdAt: { $gte: today, $lt: tomorrow } 
+      reports: await Report.countDocuments({
+        createdAt: { $gte: utcToday, $lt: utcTomorrow }
       })
     };
 
     console.log('\n🎉 Today\'s data generation completed!');
-    console.log(`📊 Today's Summary (${today.toDateString()}):`);
+    console.log(`📊 Today's Summary (${utcToday.toDateString()}):`);
     console.log(`- Total Detections: ${todayStats.detections}`);
     console.log(`- Total Reports: ${todayStats.reports}`);
     console.log(`- Users involved: ${users.length}`);
 
     // Show hourly distribution
     const hourlyDetections = await DetectedWord.aggregate([
-      { $match: { createdAt: { $gte: today, $lt: tomorrow } } },
-      { $group: { 
-          _id: { $hour: "$createdAt" }, 
-          count: { $sum: 1 } 
-        } 
+      { $match: { createdAt: { $gte: utcToday, $lt: utcTomorrow } } },
+      { $group: {
+          _id: { $hour: "$createdAt" },
+          count: { $sum: 1 }
+        }
       },
       { $sort: { "_id": 1 } }
     ]);
 
     const hourlyReports = await Report.aggregate([
-      { $match: { createdAt: { $gte: today, $lt: tomorrow } } },
-      { $group: { 
-          _id: { $hour: "$createdAt" }, 
-          count: { $sum: 1 } 
-        } 
+      { $match: { createdAt: { $gte: utcToday, $lt: utcTomorrow } } },
+      { $group: {
+          _id: { $hour: "$createdAt" },
+          count: { $sum: 1 }
+        }
       },
       { $sort: { "_id": 1 } }
     ]);
