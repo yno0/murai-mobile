@@ -238,6 +238,70 @@ router.post("/extension-sync", authenticateToken, async (req, res) => {
   }
 });
 
+// PUT /api/users/extension-toggle - Toggle extension enabled state
+router.put("/extension-toggle", authenticateToken, async (req, res) => {
+  try {
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: "Invalid enabled value. Must be boolean." });
+    }
+
+    let pref = await Preference.findOne({ userId: req.user.id });
+    if (!pref) {
+      pref = new Preference({ userId: req.user.id, extensionEnabled: enabled });
+    } else {
+      pref.extensionEnabled = enabled;
+      pref.updatedAt = new Date();
+    }
+    await pref.save();
+
+    // Log user activity for extension toggle
+    await logUserActivity(
+      req.user.id,
+      "update",
+      `Extension ${enabled ? 'enabled' : 'disabled'}`,
+      "extension_control",
+      {
+        extensionEnabled: enabled,
+        timestamp: new Date()
+      }
+    );
+
+    res.json({
+      message: `Extension ${enabled ? 'enabled' : 'disabled'} successfully`,
+      extensionEnabled: pref.extensionEnabled,
+      preferences: pref
+    });
+  } catch (err) {
+    console.error("Extension toggle error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+// GET /api/users/extension-status - Get extension status
+router.get("/extension-status", authenticateToken, async (req, res) => {
+  try {
+    const pref = await Preference.findOne({ userId: req.user.id });
+
+    if (!pref) {
+      return res.json({
+        extensionEnabled: true, // Default value
+        message: "No preferences found, using default"
+      });
+    }
+
+    res.json({
+      extensionEnabled: pref.extensionEnabled,
+      lastUpdated: pref.updatedAt,
+      preferences: pref
+    });
+  } catch (err) {
+    console.error("Extension status error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
 // GET /api/users/active-time
 router.get("/active-time", authenticateToken, async (req, res) => {
   try {

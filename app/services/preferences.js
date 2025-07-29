@@ -10,6 +10,7 @@ const DEFAULT_PREFERENCES = {
   flagStyle: 'highlight',
   isHighlighted: true,
   color: '#374151',
+  extensionEnabled: true,
 };
 
 // Local storage keys
@@ -84,6 +85,59 @@ export const resetPreferences = async () => {
     return DEFAULT_PREFERENCES;
   } catch (error) {
     console.log('Failed to reset preferences:', error.message);
+    throw error;
+  }
+};
+
+// Extension-specific functions
+export const toggleExtension = async (enabled) => {
+  try {
+    const res = await api.put('/users/extension-toggle', { enabled });
+    console.log(`Extension ${enabled ? 'enabled' : 'disabled'} successfully`);
+    return res.data;
+  } catch (error) {
+    console.log('Failed to toggle extension on server:', error.message);
+
+    // Fallback to updating preferences locally
+    const currentPrefs = await getPreferences();
+    const updatedPrefs = { ...currentPrefs, extensionEnabled: enabled };
+    await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(updatedPrefs));
+
+    return { extensionEnabled: enabled, preferences: updatedPrefs };
+  }
+};
+
+export const getExtensionStatus = async () => {
+  try {
+    const res = await api.get('/users/extension-status');
+    return res.data;
+  } catch (error) {
+    console.log('Failed to get extension status from server:', error.message);
+
+    // Fallback to local preferences
+    const prefs = await getPreferences();
+    return {
+      extensionEnabled: prefs.extensionEnabled !== false,
+      preferences: prefs
+    };
+  }
+};
+
+export const syncExtensionSettings = async (syncType = 'manual') => {
+  try {
+    const res = await api.post('/users/extension-sync', {
+      syncType,
+      timestamp: new Date().toISOString()
+    });
+
+    // Update local storage with synced preferences
+    if (res.data.preferences) {
+      await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(res.data.preferences));
+    }
+
+    return res.data;
+  } catch (error) {
+    console.log('Failed to sync extension settings:', error.message);
     throw error;
   }
 };

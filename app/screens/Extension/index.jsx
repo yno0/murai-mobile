@@ -1,18 +1,21 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
 import {
-    Animated,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    View
+  Animated,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MainHeader from '../../components/common/MainHeader';
 import { useAuth } from '../../context/AuthContext';
-import { getPreferences } from '../../services/preferences';
+import { getPreferences, updatePreferences } from '../../services/preferences';
 import ExtensionSettings from './ExtensionSettings';
+
+// Import services directly
 
 export default function ExtensionScreen() {
   const [extensionEnabled, setExtensionEnabled] = useState(false);
@@ -230,7 +233,7 @@ export default function ExtensionScreen() {
   // Auto-sync functionality when tab is focused
   const { user } = useAuth();
 
-  const syncExtensionSettings = useCallback(async () => {
+  const syncExtensionSettingsLocal = useCallback(async () => {
     if (!user) return;
 
     setIsSyncing(true);
@@ -239,10 +242,57 @@ export default function ExtensionScreen() {
     try {
       console.log('🔄 Auto-syncing extension settings...');
 
-      // Get latest preferences from mobile app
-      const preferences = await getPreferences();
+      let syncResult = null;
 
-      if (preferences) {
+      // Try to sync with server using extension-sync endpoint
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+        const response = await fetch('https://murai-server.onrender.com/api/users/extension-sync', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            syncType: 'auto',
+            timestamp: new Date().toISOString()
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        console.log('📡 Sync response status:', response.status);
+
+        if (response.ok) {
+          syncResult = await response.json();
+          console.log('✅ Sync successful:', syncResult);
+
+          if (syncResult && syncResult.preferences) {
+            // Update local storage with synced preferences
+            await AsyncStorage.setItem('user_preferences', JSON.stringify(syncResult.preferences));
+            console.log('💾 Synced preferences saved to local storage');
+          }
+        } else {
+          const errorText = await response.text();
+          console.error('❌ Sync response error:', response.status, errorText);
+          throw new Error(`Sync failed: ${response.status} - ${errorText}`);
+        }
+      } catch (syncError) {
+        console.log('❌ Server sync failed, using local preferences:', syncError.message);
+      }
+
+      if (syncResult && syncResult.preferences) {
+        // Update extension enabled state from synced preferences
+        setExtensionEnabled(syncResult.preferences.extensionEnabled !== false);
+
         // Update last sync time
         const now = new Date();
         setLastSyncTime(now);
@@ -250,17 +300,23 @@ export default function ExtensionScreen() {
 
         console.log('✅ Extension settings synced successfully');
         console.log('📱 Synced preferences:', {
-          language: preferences.language,
-          sensitivity: preferences.sensitivity,
-          whitelistTerms: preferences.whitelistTerms?.length || 0,
-          whitelistSites: preferences.whitelistSite?.length || 0,
-          flagStyle: preferences.flagStyle,
-          isHighlighted: preferences.isHighlighted,
-          color: preferences.color
+          extensionEnabled: syncResult.preferences.extensionEnabled,
+          language: syncResult.preferences.language,
+          sensitivity: syncResult.preferences.sensitivity,
+          whitelistTerms: syncResult.preferences.whitelistTerms?.length || 0,
+          whitelistSites: syncResult.preferences.whitelistSite?.length || 0,
+          flagStyle: syncResult.preferences.flagStyle,
+          isHighlighted: syncResult.preferences.isHighlighted,
+          color: syncResult.preferences.color
         });
       } else {
-        setSyncStatus('No settings found');
-        setTimeout(() => setSyncStatus('Not synced'), 2000);
+        // Fallback to getting preferences directly
+        const preferences = await getPreferences();
+        setExtensionEnabled(preferences.extensionEnabled !== false);
+
+        const now = new Date();
+        setLastSyncTime(now);
+        setSyncStatus('Synced (local)');
       }
     } catch (error) {
       console.error('❌ Extension sync failed:', error);
@@ -275,12 +331,78 @@ export default function ExtensionScreen() {
   useFocusEffect(
     useCallback(() => {
       console.log('📱 Extension tab focused - triggering auto-sync');
-      syncExtensionSettings();
-    }, [syncExtensionSettings])
+      syncExtensionSettingsLocal();
+    }, [syncExtensionSettingsLocal])
   );
 
-  const toggleExtension = () => {
-    setExtensionEnabled(!extensionEnabled);
+  const toggleExtensionLocal = async () => {
+    const newState = !extensionEnabled;
+    setExtensionEnabled(newState);
+
+    try {
+      console.log('🔄 Attempting to toggle extension to:', newState);
+
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        console.log('❌ No authentication token found, using fallback');
+        throw new Error('No authentication token found');
+      }
+
+      console.log('🔑 Token found, making server request...');
+
+      // Try to update extension state on server first
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch('https://murai-server.onrender.com/api/users/extension-toggle', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ enabled: newState }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log('📡 Server response status:', response.status);
+      console.log('📡 Server response headers:', response.headers);
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Extension state updated on server:', result);
+
+        // Update local storage with the server response
+        if (result.preferences) {
+          await AsyncStorage.setItem('user_preferences', JSON.stringify(result.preferences));
+          console.log('💾 Local preferences updated');
+        }
+        return; // Success, exit early
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Server response error:', response.status, errorText);
+        throw new Error(`Server update failed: ${response.status} - ${errorText}`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to update extension state on server:', error.message);
+
+      // Fallback to updating preferences directly
+      try {
+        console.log('🔄 Attempting fallback to local preferences...');
+        const currentPrefs = await getPreferences();
+        await updatePreferences({
+          ...currentPrefs,
+          extensionEnabled: newState
+        });
+        console.log('✅ Extension state updated via fallback:', newState);
+      } catch (fallbackError) {
+        console.error('❌ Fallback also failed:', fallbackError);
+        // Revert the state if both methods failed
+        setExtensionEnabled(!newState);
+        console.log('🔄 Reverted extension state due to complete failure');
+      }
+    }
   };
 
   // Helper function to format time
@@ -333,7 +455,7 @@ export default function ExtensionScreen() {
           {
             icon: isSyncing ? 'sync' : 'refresh',
             color: isSyncing ? '#3b82f6' : '#02B97F',
-            onPress: syncExtensionSettings,
+            onPress: syncExtensionSettingsLocal,
             disabled: isSyncing
           },
           {
@@ -436,12 +558,12 @@ export default function ExtensionScreen() {
               styles.powerButton,
               extensionEnabled && styles.powerButtonActive,
               {
-                backgroundColor: extensionEnabled ? '#111827' : '#1F2937',
+                backgroundColor: extensionEnabled ? '#02B97F' : '#1F2937',
                 borderColor: extensionEnabled ? 'rgba(2, 185, 127, 0.7)' : 'rgba(107, 114, 128, 0.3)',
                 shadowColor: extensionEnabled ? 'rgba(2, 185, 127, 0.4)' : '#000',
               }
             ]}
-            onPress={toggleExtension}
+            onPress={toggleExtensionLocal}
             android_ripple={{
               color: extensionEnabled ? 'rgba(2, 185, 127, 0.2)' : 'rgba(107, 114, 128, 0.2)',
               borderless: true,
@@ -451,15 +573,15 @@ export default function ExtensionScreen() {
             <View style={[
               styles.powerButtonInner,
               {
-                backgroundColor: extensionEnabled ? 'rgba(2, 185, 127, 0.15)' : 'rgba(31, 41, 55, 0.1)',
+                backgroundColor: extensionEnabled ? 'rgba(255, 255, 255, 0.15)' : 'rgba(31, 41, 55, 0.1)',
                 borderWidth: extensionEnabled ? 1 : 0,
-                borderColor: extensionEnabled ? 'rgba(2, 185, 127, 0.3)' : 'transparent'
+                borderColor: extensionEnabled ? 'rgba(255, 255, 255, 0.3)' : 'transparent'
               }
             ]}>
               <MaterialCommunityIcons
                 name="power"
                 size={42}
-                color={extensionEnabled ? "#02B97F" : "#9CA3AF"}
+                color={extensionEnabled ? "#FFFFFF" : "#9CA3AF"}
               />
             </View>
           </Pressable>
@@ -528,7 +650,7 @@ export default function ExtensionScreen() {
                 fontSize: isSyncing ? 14 : (lastSyncTime ? 16 : 14)
               }
             ]}>
-              {isSyncing ? syncStatus : String(formatLastSync(lastSyncTime))}
+              {isSyncing ? syncStatus : formatLastSync(lastSyncTime)}
             </Text>
           </Animated.View>
 
@@ -562,7 +684,7 @@ export default function ExtensionScreen() {
               styles.statusInfoValue,
               { color: '#1f2937' }
             ]}>
-              {String(formatTime(activeTime))}
+              {formatTime(activeTime)}
             </Text>
           </Animated.View>
         </Animated.View>

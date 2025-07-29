@@ -1,15 +1,14 @@
-import { Feather } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -420,7 +419,7 @@ function DetectionAnalyticsScreen({ navigation }) {
   ] : [];
 
   const sideMenuItems = [
-    { title: 'Dashboard Overview', icon: 'bar-chart-2', action: () => navigation.navigate('DashboardMain') },
+    { title: 'Dashboard Overview', icon: 'view-dashboard', action: () => navigation.navigate('DashboardMain') },
     { title: 'Detection Analytics', icon: 'shield-search', action: () => setIsMenuOpen(false) },
     { title: 'Where It Happened', icon: 'web', action: () => navigation.navigate('WebsiteAnalytics') },
     { title: 'People & Activity', icon: 'account-group', action: () => navigation.navigate('UserActivityAnalytics') },
@@ -442,7 +441,7 @@ function DetectionAnalyticsScreen({ navigation }) {
         subtitle="Comprehensive detection insights"
         rightActions={[
           {
-            icon: 'menu',
+            icon: 'list',
             iconType: 'feather',
             onPress: toggleMenu
           }
@@ -905,30 +904,29 @@ function DetectionAnalyticsScreen({ navigation }) {
         )}
       </Animated.View>
 
-      {/* Side Menu Modal */}
+      {/* Bottom Sheet Menu */}
       <Modal
-        animationType="slide"
-        transparent={true}
         visible={isMenuOpen}
-        onRequestClose={() => setIsMenuOpen(false)}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={toggleMenu}
+        statusBarTranslucent={true}
       >
         <View style={styles.overlay}>
-          <TouchableOpacity
-            style={styles.bottomSheetContainer}
-            activeOpacity={1}
-            onPress={() => setIsMenuOpen(false)}
-          >
+          <TouchableOpacity style={styles.overlayTouchable} onPress={toggleMenu} />
+          <View style={styles.bottomSheetContainer}>
             <View style={styles.bottomSheet}>
+              {/* Handle Bar */}
               <View style={styles.handleBar} />
+
+              {/* Header */}
               <View style={styles.menuHeader}>
-                <Text style={styles.sectionTitle}>Navigation</Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => setIsMenuOpen(false)}
-                >
-                  <Feather name="x" size={20} color="#6b7280" />
+                <Text style={styles.menuTitle}>MURAi Dashboard</Text>
+                <TouchableOpacity style={styles.closeButton} onPress={toggleMenu}>
+                  <MaterialCommunityIcons name="close" size={24} color="#374151" />
                 </TouchableOpacity>
               </View>
+
               <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
                 {/* Analytics Section */}
                 <View style={styles.menuSection}>
@@ -955,9 +953,14 @@ function DetectionAnalyticsScreen({ navigation }) {
                     </TouchableOpacity>
                   ))}
                 </View>
+                
+                {/* Debug: Show menu items count */}
+                <View style={styles.debugSection}>
+                  <Text style={styles.debugText}>Menu Items: {sideMenuItems.length}</Text>
+                </View>
               </ScrollView>
             </View>
-          </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </ScrollView>
@@ -1333,6 +1336,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
+  overlayTouchable: {
+    flex: 1,
+  },
   bottomSheetContainer: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -1343,11 +1349,14 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    paddingBottom: 40,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 10,
+    maxHeight: '90%',
+    minHeight: 400,
   },
   handleBar: {
     width: 40,
@@ -1363,8 +1372,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  menuTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#111827',
+  },
   menuScroll: {
     flex: 1,
+    paddingBottom: 20,
   },
   menuSection: {
     marginBottom: 20,
@@ -1421,6 +1436,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 20,
     backgroundColor: '#f3f4f6',
+  },
+  debugSection: {
+    padding: 16,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  debugText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    textAlign: 'center',
   },
   flaggedWordsLegend: {
     flexDirection: 'row',

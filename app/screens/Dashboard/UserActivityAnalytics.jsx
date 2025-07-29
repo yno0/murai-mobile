@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
   Dimensions,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,6 +11,7 @@ import {
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import MainHeader from '../../components/common/MainHeader';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
@@ -24,6 +26,7 @@ function UserActivityAnalyticsScreen({ navigation }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [userActivityData, setUserActivityData] = useState({
     activityBreakdown: [],
     recentActivity: [],
@@ -35,6 +38,23 @@ function UserActivityAnalyticsScreen({ navigation }) {
 
   const timeRanges = ['Today', 'Week', 'Month', 'Year'];
   const [userGroups, setUserGroups] = useState([]);
+
+  // Menu items
+  const sideMenuItems = [
+    { title: 'Dashboard Overview', icon: 'view-dashboard', action: () => navigation.navigate('DashboardMain') },
+    { title: 'Detection Analytics', icon: 'shield-search', action: () => navigation.navigate('DetectionAnalytics') },
+    { title: 'Where It Happened', icon: 'web', action: () => navigation.navigate('WebsiteAnalytics') },
+    { title: 'People & Activity', icon: 'account-group', action: () => setIsMenuOpen(false) },
+  ];
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  const handleMenuAction = (action) => {
+    setIsMenuOpen(false);
+    action();
+  };
 
   // Dynamic group options based on user's created groups
   const groupOptions = [
@@ -394,14 +414,18 @@ function UserActivityAnalyticsScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color="#374151" />
-        </TouchableOpacity>
-        <Text style={styles.title}>People & Activity</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <MainHeader
+        title="People & Activity"
+        subtitle="User activity & alert interactions"
+        rightActions={[
+          {
+            icon: 'list',
+            iconType: 'feather',
+            onPress: toggleMenu
+          }
+        ]}
+        style={{ paddingHorizontal: 0 }}
+      />
 
       {/* Group Selection Dropdown */}
       <View style={styles.dropdownContainer}>
@@ -635,6 +659,66 @@ function UserActivityAnalyticsScreen({ navigation }) {
           </View>
         </View>
       </View>
+
+      {/* Bottom Sheet Menu */}
+      <Modal
+        visible={isMenuOpen}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={toggleMenu}
+        statusBarTranslucent={true}
+      >
+        <View style={styles.overlay}>
+          <TouchableOpacity style={styles.overlayTouchable} onPress={toggleMenu} />
+          <View style={styles.bottomSheetContainer}>
+            <View style={styles.bottomSheet}>
+              {/* Handle Bar */}
+              <View style={styles.handleBar} />
+
+              {/* Header */}
+              <View style={styles.menuHeader}>
+                <Text style={styles.menuTitle}>MURAi Dashboard</Text>
+                <TouchableOpacity style={styles.closeButton} onPress={toggleMenu}>
+                  <MaterialCommunityIcons name="close" size={24} color="#374151" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
+                {/* Analytics Section */}
+                <View style={styles.menuSection}>
+                  <Text style={styles.sectionTitle}>Analytics</Text>
+                  {sideMenuItems.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.menuItem}
+                      onPress={() => handleMenuAction(item.action)}
+                    >
+                      <View style={styles.menuItemIcon}>
+                        <MaterialCommunityIcons name={item.icon} size={24} color="#374151" />
+                      </View>
+                      <View style={styles.menuItemContent}>
+                        <Text style={styles.menuItemText}>{item.title}</Text>
+                        <Text style={styles.menuItemSubtitle}>
+                          {index === 0 ? 'Main dashboard overview' :
+                           index === 1 ? 'Comprehensive detection insights' :
+                           index === 2 ? 'Website monitoring & stats' :
+                           'User activity & interactions'}
+                        </Text>
+                      </View>
+                      <MaterialCommunityIcons name="chevron-right" size={20} color="#9ca3af" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                
+                {/* Debug: Show menu items count */}
+                <View style={styles.debugSection}>
+                  <Text style={styles.debugText}>Menu Items: {sideMenuItems.length}</Text>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -644,27 +728,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
     paddingHorizontal: 20,
-    paddingTop: 50,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontFamily: 'Poppins-Medium',
-    color: '#111827',
-  },
-  placeholder: {
-    width: 40,
+    paddingBottom: 20,
   },
   dropdownContainer: {
     backgroundColor: '#ffffff',
@@ -982,6 +1046,118 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Regular',
     color: '#374151',
     marginLeft: 12,
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  overlayTouchable: {
+    flex: 1,
+  },
+  bottomSheetContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'transparent',
+  },
+  bottomSheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+    maxHeight: '90%',
+    minHeight: 400,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 15,
+  },
+  menuHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  menuTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#111827',
+  },
+  menuScroll: {
+    flex: 1,
+    paddingBottom: 20,
+  },
+  menuSection: {
+    marginBottom: 20,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  menuItemIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  menuItemContent: {
+    flex: 1,
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  menuItemSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#9ca3af',
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+  },
+  debugSection: {
+    padding: 16,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  debugText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+    textAlign: 'center',
   },
 });
 

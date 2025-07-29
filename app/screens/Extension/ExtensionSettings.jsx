@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    ToastAndroid,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  ToastAndroid,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { getPreferences, updatePreferences } from '../../services/preferences';
@@ -50,6 +50,9 @@ export default function ExtensionSettings({ onClose }) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Extension enable/disable state
+  const [extensionEnabled, setExtensionEnabled] = useState(true);
+
   // All settings state
   const [selectedLanguage, setSelectedLanguage] = useState('both');
   const [sensitivity, setSensitivity] = useState('medium');
@@ -74,6 +77,7 @@ export default function ExtensionSettings({ onClose }) {
         const prefs = await getPreferences();
 
         const loadedPrefs = {
+          extensionEnabled: prefs.extensionEnabled !== false, // Default to true if not set
           selectedLanguage: prefs.language === 'Tagalog' ? 'tagalog' : prefs.language === 'English' ? 'english' : 'both',
           sensitivity: (prefs.sensitivity || 'medium').toLowerCase(),
           whitelist: {
@@ -85,6 +89,7 @@ export default function ExtensionSettings({ onClose }) {
           flagColor: prefs.color || '#374151',
         };
 
+        setExtensionEnabled(loadedPrefs.extensionEnabled);
         setSelectedLanguage(loadedPrefs.selectedLanguage);
         setSensitivity(loadedPrefs.sensitivity);
         setWhitelist(loadedPrefs.whitelist);
@@ -100,6 +105,7 @@ export default function ExtensionSettings({ onClose }) {
 
         // Set default values if loading fails
         const defaultPrefs = {
+          extensionEnabled: true,
           selectedLanguage: 'both',
           sensitivity: 'medium',
           whitelist: { sites: [], terms: [] },
@@ -108,6 +114,7 @@ export default function ExtensionSettings({ onClose }) {
           flagColor: '#374151',
         };
 
+        setExtensionEnabled(defaultPrefs.extensionEnabled);
         setSelectedLanguage(defaultPrefs.selectedLanguage);
         setSensitivity(defaultPrefs.sensitivity);
         setWhitelist(defaultPrefs.whitelist);
@@ -125,6 +132,7 @@ export default function ExtensionSettings({ onClose }) {
 
   // Compare current state to initialPrefs
   const isDirty = initialPrefs && (
+    extensionEnabled !== initialPrefs.extensionEnabled ||
     selectedLanguage !== initialPrefs.selectedLanguage ||
     sensitivity !== initialPrefs.sensitivity ||
     flagStyle !== initialPrefs.flagStyle ||
@@ -156,6 +164,7 @@ export default function ExtensionSettings({ onClose }) {
 
     try {
       const prefsToSave = {
+        extensionEnabled,
         language: selectedLanguage === 'tagalog' ? 'Tagalog' : selectedLanguage === 'english' ? 'English' : 'Both',
         sensitivity: sensitivity.toLowerCase(),
         whitelistSite: whitelist.sites,
@@ -169,6 +178,7 @@ export default function ExtensionSettings({ onClose }) {
 
       // Update initial prefs to reflect saved state
       setInitialPrefs({
+        extensionEnabled,
         selectedLanguage,
         sensitivity,
         whitelist,
@@ -238,19 +248,9 @@ export default function ExtensionSettings({ onClose }) {
     setDeleteConfirm({ show: false, item: null, type: null });
   };
 
-  const removeFromWhitelist = (item, type) => {
-    setWhitelist(prev => {
-      setDirty(true);
-      return {
-        ...prev,
-        [type]: prev[type].filter(i => i !== item)
-      };
-    });
-  };
-
   const renderSectionHeader = (icon, title, subtitle) => (
     <View style={styles.sectionHeader}>
-      <View style={[styles.sectionIconContainer, { backgroundColor: 'rgba(54,220,166,0.08)' }]}> {/* #36DCA6 @ 8% */}
+      <View style={[styles.sectionIconContainer, { backgroundColor: `rgba(54,220,166,0.08)` }]}> {/* #36DCA6 @ 8% */}
         <MaterialCommunityIcons name={icon} size={24} color="#36DCA6" />
       </View>
       <View style={styles.sectionHeaderText}>
@@ -269,6 +269,7 @@ export default function ExtensionSettings({ onClose }) {
       const prefs = await getPreferences();
 
       const loadedPrefs = {
+        extensionEnabled: prefs.extensionEnabled !== false,
         selectedLanguage: prefs.language === 'Tagalog' ? 'tagalog' : prefs.language === 'English' ? 'english' : 'both',
         sensitivity: (prefs.sensitivity || 'medium').toLowerCase(),
         whitelist: {
@@ -280,6 +281,7 @@ export default function ExtensionSettings({ onClose }) {
         flagColor: prefs.color || '#374151',
       };
 
+      setExtensionEnabled(loadedPrefs.extensionEnabled);
       setSelectedLanguage(loadedPrefs.selectedLanguage);
       setSensitivity(loadedPrefs.sensitivity);
       setWhitelist(loadedPrefs.whitelist);
@@ -344,6 +346,31 @@ export default function ExtensionSettings({ onClose }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Extension Enable/Disable */}
+        <View style={styles.section}>
+          {renderSectionHeader(
+            "power",
+            "Extension Control",
+            "Enable or disable the extension functionality"
+          )}
+          <View style={styles.card}>
+            <View style={styles.settingRow}>
+              <View>
+                <Text style={styles.settingLabel}>Extension Enabled</Text>
+                <Text style={styles.settingSubtext}>
+                  {extensionEnabled ? 'Extension is active and filtering content' : 'Extension is disabled'}
+                </Text>
+              </View>
+              <Switch
+                value={extensionEnabled}
+                onValueChange={handleChange(setExtensionEnabled)}
+                trackColor={{ false: '#d1d5db', true: '#36DCA6' }}
+                thumbColor={extensionEnabled ? '#ffffff' : '#9ca3af'}
+              />
+            </View>
+          </View>
+        </View>
+
         {/* Language Selection */}
         <View style={styles.section}>
           {renderSectionHeader(
@@ -415,18 +442,18 @@ export default function ExtensionSettings({ onClose }) {
           <View style={styles.card}>
             <View style={styles.whitelistTabs}>
               <TouchableOpacity
-                style={[styles.whitelistTab, whitelistType === 'sites' && styles.whitelistTabActive]}
+                style={[styles.whitelistTab, whitelistType === `sites` && styles.whitelistTabActive]}
                 onPress={() => handleChange(setWhitelistType)('sites')}
               >
-                <Text style={[styles.whitelistTabText, whitelistType === 'sites' && styles.whitelistTabTextActive]}>
+                <Text style={[styles.whitelistTabText, whitelistType === `sites` && styles.whitelistTabTextActive]}>
                   Sites
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.whitelistTab, whitelistType === 'terms' && styles.whitelistTabActive]}
+                style={[styles.whitelistTab, whitelistType === `terms` && styles.whitelistTabActive]}
                 onPress={() => handleChange(setWhitelistType)('terms')}
               >
-                <Text style={[styles.whitelistTabText, whitelistType === 'terms' && styles.whitelistTabTextActive]}>
+                <Text style={[styles.whitelistTabText, whitelistType === `terms` && styles.whitelistTabTextActive]}>
                   Terms
                 </Text>
               </TouchableOpacity>
@@ -437,7 +464,7 @@ export default function ExtensionSettings({ onClose }) {
                 style={[styles.input, whitelistError ? styles.inputError : null]}
                 value={newWhitelistItem}
                 onChangeText={txt => { setNewWhitelistItem(txt); if (whitelistError) setWhitelistError(''); }}
-                placeholder={`Add ${whitelistType === 'sites' ? 'website' : 'term'}`}
+                placeholder={whitelistType === 'sites' ? 'Add website' : 'Add term'}
                 placeholderTextColor="#9ca3af"
               />
               <TouchableOpacity style={styles.addButton} onPress={addToWhitelist}>
@@ -448,10 +475,10 @@ export default function ExtensionSettings({ onClose }) {
 
             <FlatList
               data={whitelist[whitelistType] || []}
-              keyExtractor={(item, index) => item || index.toString()}
+              keyExtractor={(item, index) => item ? String(item) : index.toString()}
               renderItem={({ item }) => (
                 <View style={styles.whitelistItem}>
-                  <Text style={styles.whitelistItemText}>{item || ''}</Text>
+                  <Text style={styles.whitelistItemText}>{item ? String(item) : ''}</Text>
                   <TouchableOpacity
                     onPress={() => confirmRemoveFromWhitelist(item, whitelistType)}
                     style={styles.removeButton}
@@ -506,8 +533,8 @@ export default function ExtensionSettings({ onClose }) {
                 <Switch
                   value={showHighlight}
                   onValueChange={handleChange(setShowHighlight)}
-                  trackColor={{ false: '#d1d5db', true: '#374151' }}
-                  thumbColor={showHighlight ? '#374151' : '#9ca3af'}
+                  trackColor={{ false: '#d1d5db', true: '#36DCA6' }}
+                  thumbColor={showHighlight ? '#ffffff' : '#9ca3af'}
                 />
               </View>
             )}
@@ -538,14 +565,14 @@ export default function ExtensionSettings({ onClose }) {
               <View style={styles.previewContent}>
                 <Text style={styles.previewText}>This is some sample text with </Text>
                 {flagStyle === 'blur' ? (
-                  <View style={[styles.previewFlag, styles.previewBlur, { backgroundColor: flagColor }]}>
+                  <View style={[styles.previewFlag, styles.previewBlur, { backgroundColor: flagColor || '#374151' }]}>
                     <Text style={styles.previewFlagText}>inappropriate</Text>
                   </View>
                 ) : flagStyle === 'asterisk' ? (
-                  <Text style={[styles.previewAsterisk, { color: flagColor }]}>***********</Text>
+                  <Text style={[styles.previewAsterisk, { color: flagColor || '#374151' }]}>***********</Text>
                 ) : (
-                  <View style={[styles.previewHighlight, { backgroundColor: flagColor + '30' }]}>
-                    <Text style={[styles.previewHighlightText, { color: flagColor }]}>inappropriate</Text>
+                  <View style={[styles.previewHighlight, { backgroundColor: (flagColor || '#374151') + '30' }]}>
+                    <Text style={[styles.previewHighlightText, { color: flagColor || '#374151' }]}>inappropriate</Text>
                   </View>
                 )}
                 <Text style={styles.previewText}> content in it.</Text>
@@ -553,13 +580,13 @@ export default function ExtensionSettings({ onClose }) {
               {showHighlight && flagStyle !== 'highlight' && (
                 <View style={styles.previewContent}>
                   <Text style={styles.previewText}>With highlight enabled: </Text>
-                  <View style={[styles.previewHighlight, { backgroundColor: flagColor + '30' }]}>
+                  <View style={[styles.previewHighlight, { backgroundColor: (flagColor || '#374151') + '30' }]}>
                     {flagStyle === 'blur' ? (
-                      <View style={[styles.previewFlag, styles.previewBlur, { backgroundColor: flagColor }]}>
+                      <View style={[styles.previewFlag, styles.previewBlur, { backgroundColor: flagColor || '#374151' }]}>
                         <Text style={styles.previewFlagText}>inappropriate</Text>
                       </View>
                     ) : (
-                      <Text style={[styles.previewAsterisk, { color: flagColor }]}>***********</Text>
+                      <Text style={[styles.previewAsterisk, { color: flagColor || '#374151' }]}>***********</Text>
                     )}
                   </View>
                   <Text style={styles.previewText}> content</Text>
@@ -569,11 +596,14 @@ export default function ExtensionSettings({ onClose }) {
           </View>
         </View>
       </ScrollView>
+
       {isDirty && !saving && (
         <TouchableOpacity style={styles.saveButton} onPress={() => setConfirmVisible(true)}>
           <Text style={styles.saveButtonText}>Save Changes</Text>
         </TouchableOpacity>
       )}
+
+      {/* Save Confirmation Modal */}
       <Modal
         visible={confirmVisible}
         transparent
@@ -637,6 +667,7 @@ export default function ExtensionSettings({ onClose }) {
         </View>
       </Modal>
 
+      {/* Delete Confirmation Modal */}
       <Modal
         visible={deleteConfirm.show}
         transparent
@@ -650,7 +681,7 @@ export default function ExtensionSettings({ onClose }) {
             </View>
             <Text style={styles.deleteModalTitle}>Remove from Whitelist?</Text>
             <Text style={styles.deleteModalDescription}>
-              Are you sure you want to remove "{deleteConfirm.item || ''}" from the whitelist?
+              Do you want to remove this item?
             </Text>
             <View style={styles.deleteModalButtons}>
               <TouchableOpacity
@@ -775,6 +806,24 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 12,
   },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#374151',
+  },
+  settingSubtext: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#6b7280',
+    marginTop: 2,
+  },
   languageOptions: {
     flexDirection: 'row',
     gap: 12,
@@ -803,24 +852,40 @@ const styles = StyleSheet.create({
   languageOptionTextActive: {
     color: '#fff',
   },
-  sensitivityContainer: {
-    paddingHorizontal: 8,
-  },
-  sensitivityLabels: {
+  sensitivityLevelsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
+    gap: 12,
   },
-  sensitivityLabel: {
+  sensitivityLevelBtn: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginHorizontal: 2,
+  },
+  sensitivityLevelBtnActive: {
+    backgroundColor: '#374151',
+    borderColor: '#374151',
+  },
+  sensitivityLevelText: {
+    fontSize: 15,
+    fontFamily: 'Poppins-Medium',
+    color: '#6b7280',
+  },
+  sensitivityLevelTextActive: {
+    color: '#fff',
+  },
+  sensitivityDesc: {
     fontSize: 14,
     fontFamily: 'Poppins-Regular',
     color: '#6b7280',
-  },
-  sensitivityValue: {
-    fontSize: 16,
-    fontFamily: 'Poppins-Medium',
-    color: '#6366f1',
+    textAlign: 'center',
+    marginTop: 4,
   },
   whitelistTabs: {
     flexDirection: 'row',
@@ -932,24 +997,6 @@ const styles = StyleSheet.create({
   flagStyleTextActive: {
     color: '#fff',
   },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    marginBottom: 16,
-  },
-  settingLabel: {
-    fontSize: 16,
-    fontFamily: 'Poppins-Medium',
-    color: '#374151',
-  },
-  settingSubtext: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: '#6b7280',
-    marginTop: 2,
-  },
   colorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -974,40 +1021,63 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 4,
   },
-  sensitivityLevelsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    gap: 12,
-  },
-  sensitivityLevelBtn: {
-    flex: 1,
+  previewContainer: {
     backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    borderRadius: 10,
-    paddingVertical: 14,
+    marginTop: 8,
+  },
+  previewLabel: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  previewContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  previewText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#374151',
+    lineHeight: 24,
+  },
+  previewFlag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
     marginHorizontal: 2,
   },
-  sensitivityLevelBtnActive: {
-    backgroundColor: '#374151',
-    borderColor: '#374151',
+  previewBlur: {
+    opacity: 0.7,
   },
-  sensitivityLevelText: {
-    fontSize: 15,
-    fontFamily: 'Poppins-Medium',
-    color: '#6b7280',
-  },
-  sensitivityLevelTextActive: {
-    color: '#fff',
-  },
-  sensitivityDesc: {
-    fontSize: 14,
+  previewFlagText: {
+    fontSize: 16,
     fontFamily: 'Poppins-Regular',
-    color: '#6b7280',
-    textAlign: 'center',
-    marginTop: 4,
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  previewAsterisk: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginHorizontal: 2,
+  },
+  previewHighlight: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginHorizontal: 2,
+  },
+  previewHighlightText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   saveButton: {
     position: 'absolute',
@@ -1036,18 +1106,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 28,
-    width: '80%',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
   },
   saveModalContent: {
     backgroundColor: '#ffffff',
@@ -1271,63 +1329,5 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontFamily: 'Poppins-Medium',
-  },
-  previewContainer: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    marginTop: 8,
-  },
-  previewLabel: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    color: '#374151',
-    marginBottom: 12,
-  },
-  previewContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: 8,
-  },
-  previewText: {
-    fontSize: 16,
-    fontFamily: 'Poppins-Regular',
-    color: '#374151',
-    lineHeight: 24,
-  },
-  previewFlag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginHorizontal: 2,
-  },
-  previewBlur: {
-    opacity: 0.7,
-  },
-  previewFlagText: {
-    fontSize: 16,
-    fontFamily: 'Poppins-Regular',
-    color: '#ffffff',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  previewAsterisk: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginHorizontal: 2,
-  },
-  previewHighlight: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginHorizontal: 2,
-  },
-  previewHighlightText: {
-    fontSize: 16,
-    fontWeight: '500',
   },
 });
