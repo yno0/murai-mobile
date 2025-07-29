@@ -2,10 +2,10 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from "@react-navigation/native";
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from '../../context/AuthContext';
-import { api } from '../../services/api';
+import api from '../../services/api';
 
 export default function PrivacyControls() {
   const navigation = useNavigation();

@@ -23,6 +23,21 @@ export default function AccountManagement() {
   const [pwError, setPwError] = useState("");
   const [pwSuccess, setPwSuccess] = useState("");
 
+  // Password visibility states
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+
+  // Password validation states
+  const [pwValidation, setPwValidation] = useState({
+    minLength: false,
+    hasUppercase: false,
+    hasLowercase: false,
+    hasNumber: false,
+    hasSpecialChar: false,
+    passwordsMatch: false
+  });
+
   // Fetch user info on mount
   useEffect(() => {
     const fetchUser = async () => {
@@ -54,6 +69,33 @@ export default function AccountManagement() {
     const changed = JSON.stringify(currentData) !== JSON.stringify(originalData);
     setHasChanges(changed);
   }, [name, email, phone, originalData]);
+
+  // Password validation effect
+  useEffect(() => {
+    const validatePassword = (password) => {
+      return {
+        minLength: password.length >= 8,
+        hasUppercase: /[A-Z]/.test(password),
+        hasLowercase: /[a-z]/.test(password),
+        hasNumber: /\d/.test(password),
+        hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+        passwordsMatch: password === confirmPw && password.length > 0
+      };
+    };
+
+    if (newPw || confirmPw) {
+      setPwValidation(validatePassword(newPw));
+    } else {
+      setPwValidation({
+        minLength: false,
+        hasUppercase: false,
+        hasLowercase: false,
+        hasNumber: false,
+        hasSpecialChar: false,
+        passwordsMatch: false
+      });
+    }
+  }, [newPw, confirmPw]);
 
   // Handle field editing
   const handleEditField = (field) => {
@@ -224,25 +266,87 @@ export default function AccountManagement() {
   const handleChangePassword = async () => {
     setPwError("");
     setPwSuccess("");
+
+    // Validate all fields are filled
     if (!currentPw || !newPw || !confirmPw) {
       setPwError("All fields are required");
       return;
     }
-    if (newPw !== confirmPw) {
+
+    // Validate password requirements
+    if (!pwValidation.minLength) {
+      setPwError("New password must be at least 8 characters long");
+      return;
+    }
+    if (!pwValidation.hasUppercase) {
+      setPwError("New password must contain at least one uppercase letter");
+      return;
+    }
+    if (!pwValidation.hasLowercase) {
+      setPwError("New password must contain at least one lowercase letter");
+      return;
+    }
+    if (!pwValidation.hasNumber) {
+      setPwError("New password must contain at least one number");
+      return;
+    }
+    if (!pwValidation.hasSpecialChar) {
+      setPwError("New password must contain at least one special character");
+      return;
+    }
+    if (!pwValidation.passwordsMatch) {
       setPwError("New passwords do not match");
       return;
     }
+
+    // Check if new password is same as current
+    if (currentPw === newPw) {
+      setPwError("New password must be different from current password");
+      return;
+    }
+
     setPwLoading(true);
     try {
-      await api.post('/users/change-password', { currentPassword: currentPw, newPassword: newPw });
-      setPwSuccess("Password updated successfully");
-      setCurrentPw(""); setNewPw(""); setConfirmPw("");
-      setTimeout(() => { setPwModalVisible(false); setPwSuccess(""); }, 1200);
+      const response = await api.post('/users/change-password', {
+        currentPassword: currentPw,
+        newPassword: newPw
+      });
+
+      setPwSuccess("Password updated successfully!");
+
+      // Clear form and close modal after success
+      setTimeout(() => {
+        setCurrentPw("");
+        setNewPw("");
+        setConfirmPw("");
+        setShowCurrentPw(false);
+        setShowNewPw(false);
+        setShowConfirmPw(false);
+        setPwModalVisible(false);
+        setPwSuccess("");
+        setPwError("");
+      }, 1500);
+
     } catch (err) {
-      setPwError(err?.response?.data?.message || "Failed to change password");
+      console.error('Change password error:', err);
+      const errorMessage = err?.response?.data?.message || "Failed to change password";
+      setPwError(errorMessage);
     } finally {
       setPwLoading(false);
     }
+  };
+
+  // Reset password modal state when closing
+  const handleClosePasswordModal = () => {
+    setCurrentPw("");
+    setNewPw("");
+    setConfirmPw("");
+    setShowCurrentPw(false);
+    setShowNewPw(false);
+    setShowConfirmPw(false);
+    setPwError("");
+    setPwSuccess("");
+    setPwModalVisible(false);
   };
 
   if (loading) {
@@ -516,7 +620,7 @@ export default function AccountManagement() {
         visible={pwModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setPwModalVisible(false)}
+        onRequestClose={handleClosePasswordModal}
       >
         <View style={styles.pwModalOverlay}>
           <View style={styles.pwModalContent}>
@@ -533,11 +637,21 @@ export default function AccountManagement() {
                   style={styles.pwInput}
                   placeholder="Enter current password"
                   placeholderTextColor="#A8AAB0"
-                  secureTextEntry
+                  secureTextEntry={!showCurrentPw}
                   value={currentPw}
                   onChangeText={setCurrentPw}
                   editable={!pwLoading}
                 />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowCurrentPw(!showCurrentPw)}
+                >
+                  <Feather
+                    name={showCurrentPw ? "eye-off" : "eye"}
+                    size={16}
+                    color="#A8AAB0"
+                  />
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -549,28 +663,151 @@ export default function AccountManagement() {
                   style={styles.pwInput}
                   placeholder="Enter new password"
                   placeholderTextColor="#A8AAB0"
-                  secureTextEntry
+                  secureTextEntry={!showNewPw}
                   value={newPw}
                   onChangeText={setNewPw}
                   editable={!pwLoading}
                 />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowNewPw(!showNewPw)}
+                >
+                  <Feather
+                    name={showNewPw ? "eye-off" : "eye"}
+                    size={16}
+                    color="#A8AAB0"
+                  />
+                </TouchableOpacity>
               </View>
+
+              {/* Password Requirements */}
+              {newPw.length > 0 && (
+                <View style={styles.passwordRequirements}>
+                  <Text style={styles.requirementsTitle}>Password Requirements:</Text>
+                  <View style={styles.requirementsList}>
+                    <View style={styles.requirementItem}>
+                      <Feather
+                        name={pwValidation.minLength ? "check-circle" : "circle"}
+                        size={14}
+                        color={pwValidation.minLength ? "#10B981" : "#A8AAB0"}
+                      />
+                      <Text style={[
+                        styles.requirementText,
+                        pwValidation.minLength && styles.requirementMet
+                      ]}>
+                        At least 8 characters
+                      </Text>
+                    </View>
+                    <View style={styles.requirementItem}>
+                      <Feather
+                        name={pwValidation.hasUppercase ? "check-circle" : "circle"}
+                        size={14}
+                        color={pwValidation.hasUppercase ? "#10B981" : "#A8AAB0"}
+                      />
+                      <Text style={[
+                        styles.requirementText,
+                        pwValidation.hasUppercase && styles.requirementMet
+                      ]}>
+                        One uppercase letter
+                      </Text>
+                    </View>
+                    <View style={styles.requirementItem}>
+                      <Feather
+                        name={pwValidation.hasLowercase ? "check-circle" : "circle"}
+                        size={14}
+                        color={pwValidation.hasLowercase ? "#10B981" : "#A8AAB0"}
+                      />
+                      <Text style={[
+                        styles.requirementText,
+                        pwValidation.hasLowercase && styles.requirementMet
+                      ]}>
+                        One lowercase letter
+                      </Text>
+                    </View>
+                    <View style={styles.requirementItem}>
+                      <Feather
+                        name={pwValidation.hasNumber ? "check-circle" : "circle"}
+                        size={14}
+                        color={pwValidation.hasNumber ? "#10B981" : "#A8AAB0"}
+                      />
+                      <Text style={[
+                        styles.requirementText,
+                        pwValidation.hasNumber && styles.requirementMet
+                      ]}>
+                        One number
+                      </Text>
+                    </View>
+                    <View style={styles.requirementItem}>
+                      <Feather
+                        name={pwValidation.hasSpecialChar ? "check-circle" : "circle"}
+                        size={14}
+                        color={pwValidation.hasSpecialChar ? "#10B981" : "#A8AAB0"}
+                      />
+                      <Text style={[
+                        styles.requirementText,
+                        pwValidation.hasSpecialChar && styles.requirementMet
+                      ]}>
+                        One special character
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Confirm New Password</Text>
-              <View style={styles.inputContainer}>
-                <Feather name="check-circle" size={16} color="#A8AAB0" />
+              <View style={[
+                styles.inputContainer,
+                confirmPw.length > 0 && !pwValidation.passwordsMatch && styles.inputError,
+                confirmPw.length > 0 && pwValidation.passwordsMatch && styles.inputSuccess
+              ]}>
+                <Feather
+                  name="check-circle"
+                  size={16}
+                  color={
+                    confirmPw.length > 0 && pwValidation.passwordsMatch
+                      ? "#10B981"
+                      : "#A8AAB0"
+                  }
+                />
                 <TextInput
                   style={styles.pwInput}
                   placeholder="Confirm new password"
                   placeholderTextColor="#A8AAB0"
-                  secureTextEntry
+                  secureTextEntry={!showConfirmPw}
                   value={confirmPw}
                   onChangeText={setConfirmPw}
                   editable={!pwLoading}
                 />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowConfirmPw(!showConfirmPw)}
+                >
+                  <Feather
+                    name={showConfirmPw ? "eye-off" : "eye"}
+                    size={16}
+                    color="#A8AAB0"
+                  />
+                </TouchableOpacity>
               </View>
+
+              {/* Password Match Indicator */}
+              {confirmPw.length > 0 && (
+                <View style={styles.matchIndicator}>
+                  <Feather
+                    name={pwValidation.passwordsMatch ? "check-circle" : "x-circle"}
+                    size={14}
+                    color={pwValidation.passwordsMatch ? "#10B981" : "#EF4444"}
+                  />
+                  <Text style={[
+                    styles.matchText,
+                    pwValidation.passwordsMatch ? styles.matchSuccess : styles.matchError
+                  ]}>
+                    {pwValidation.passwordsMatch ? "Passwords match" : "Passwords do not match"}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {!!pwError && (
@@ -589,15 +826,24 @@ export default function AccountManagement() {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.pwBtn, styles.cancelBtn]}
-                onPress={() => setPwModalVisible(false)}
+                onPress={handleClosePasswordModal}
                 disabled={pwLoading}
               >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.pwBtn, styles.confirmBtn]}
+                style={[
+                  styles.pwBtn,
+                  styles.confirmBtn,
+                  (!pwValidation.minLength || !pwValidation.hasUppercase ||
+                   !pwValidation.hasLowercase || !pwValidation.hasNumber ||
+                   !pwValidation.hasSpecialChar || !pwValidation.passwordsMatch ||
+                   !currentPw) && styles.confirmBtnDisabled
+                ]}
                 onPress={handleChangePassword}
-                disabled={pwLoading}
+                disabled={pwLoading || !pwValidation.minLength || !pwValidation.hasUppercase ||
+                         !pwValidation.hasLowercase || !pwValidation.hasNumber ||
+                         !pwValidation.hasSpecialChar || !pwValidation.passwordsMatch || !currentPw}
               >
                 {pwLoading ? (
                   <ActivityIndicator color="#fff" size={16} />
@@ -948,5 +1194,67 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Regular',
     color: '#10B981',
     flex: 1,
+  },
+  // Password visibility and validation styles
+  eyeButton: {
+    padding: 4,
+  },
+  inputError: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  inputSuccess: {
+    borderColor: '#10B981',
+    backgroundColor: '#F0FDF4',
+  },
+  passwordRequirements: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  requirementsTitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  requirementsList: {
+    gap: 6,
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  requirementText: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#9CA3AF',
+  },
+  requirementMet: {
+    color: '#10B981',
+  },
+  matchIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 6,
+  },
+  matchText: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+  },
+  matchSuccess: {
+    color: '#10B981',
+  },
+  matchError: {
+    color: '#EF4444',
+  },
+  confirmBtnDisabled: {
+    backgroundColor: '#D1D5DB',
+    opacity: 0.6,
   },
 });
