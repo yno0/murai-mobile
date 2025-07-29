@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { BORDER_RADIUS, COLORS, SPACING } from '../../../constants/theme';
+import { COLORS, SPACING } from '../../../constants/theme';
 import api from '../../../services/api'; // Adjusted path
 
 const { width } = Dimensions.get('window');
@@ -111,60 +111,89 @@ function AdminHomeScreen({ navigation }) {
     fetchData();
   }, [fetchData]);
 
-  // Prepare chart data for LineChart with better handling of actual data
+  // Prepare chart data for LineChart with both detections and reports (following admin dashboard approach)
   const preparedChartData = React.useMemo(() => {
-    if (chartData && chartData.datasets && chartData.datasets[0] && chartData.datasets[0].data) {
-      const actualData = chartData.datasets[0].data;
+    console.log('Raw chartData received:', chartData);
+
+    if (chartData && chartData.datasets && chartData.datasets.length >= 2) {
+      const detectionsData = chartData.datasets[0].data || [];
+      const reportsData = chartData.datasets[1].data || [];
       const actualLabels = chartData.labels || [];
 
-      // Ensure we have at least some data points for the chart
-      const minDataPoints = 7;
-      const paddedData = [...actualData];
-      const paddedLabels = [...actualLabels];
+      console.log('Chart data processing:', {
+        detectionsData,
+        reportsData,
+        actualLabels,
+        detectionsSum: detectionsData.reduce((a, b) => a + b, 0),
+        reportsSum: reportsData.reduce((a, b) => a + b, 0),
+        datasets: chartData.datasets
+      });
 
-      // Pad with zeros if we don't have enough data points
-      while (paddedData.length < minDataPoints) {
-        paddedData.push(0);
-        paddedLabels.push('');
-      }
+      // Ensure we have valid data arrays
+      const validDetections = Array.isArray(detectionsData) && detectionsData.length > 0 ? detectionsData : [0, 0, 0, 0, 0, 0, 0, 0];
+      const validReports = Array.isArray(reportsData) && reportsData.length > 0 ? reportsData : [0, 0, 0, 0, 0, 0, 0, 0];
+      const validLabels = Array.isArray(actualLabels) && actualLabels.length > 0 ? actualLabels : ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'];
 
       return {
-        labels: paddedLabels.slice(0, minDataPoints),
+        labels: validLabels,
         datasets: [
           {
-            data: paddedData.slice(0, minDataPoints),
+            data: validDetections,
+            color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`, // Green for detections
             strokeWidth: 3,
-            color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+            withDots: true,
+            fillShadowGradient: "rgba(1, 185, 127, 0.6)",
+            fillShadowGradientOpacity: 0.6,
+          },
+          {
+            data: validReports,
+            color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`, // Blue for reports
+            strokeWidth: 3,
+            withDots: true,
+            fillShadowGradient: "rgba(59, 130, 246, 0.6)",
+            fillShadowGradientOpacity: 0.6,
           },
         ],
       };
     }
 
-    // Fallback data
+    console.log('Using fallback chart data - no valid data received');
+    // Fallback data with both datasets
     return {
-      labels: ['6AM', '9AM', '12PM', '3PM', '6PM', '9PM', '12AM'],
+      labels: ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'],
       datasets: [
         {
-          data: [0, 0, 0, 0, 0, 0, 0],
+          data: [0, 0, 0, 0, 0, 0, 0, 0],
+          color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
           strokeWidth: 3,
-          color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+          withDots: true,
+          fillShadowGradient: "rgba(1, 185, 127, 0.6)",
+          fillShadowGradientOpacity: 0.6,
+        },
+        {
+          data: [0, 0, 0, 0, 0, 0, 0, 0],
+          color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+          strokeWidth: 3,
+          withDots: true,
+          fillShadowGradient: "rgba(59, 130, 246, 0.6)",
+          fillShadowGradientOpacity: 0.6,
         },
       ],
     };
   }, [chartData]);
 
   const chartConfig = {
-    backgroundColor: 'transparent',
-    backgroundGradientFrom: COLORS.BG,
-    backgroundGradientTo: COLORS.BG,
+    backgroundColor: "transparent",
+    backgroundGradientFrom: "#ffffff",
+    backgroundGradientTo: "#ffffff",
     decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`, // Using COLORS.SUCCESS
-    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`, // Using COLORS.TEXT_SECONDARY
+    color: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(156, 163, 175, ${opacity})`,
     style: {
-      borderRadius: BORDER_RADIUS.lg,
+      borderRadius: 16,
     },
     propsForDots: {
-      r: '0',
+      r: "0",
     },
     propsForBackgroundLines: {
       strokeWidth: 0,
@@ -367,24 +396,32 @@ function AdminHomeScreen({ navigation }) {
           </View>
         ) : (
           <>
-            <LineChart
-              data={preparedChartData}
-              width={width - 40}
-              height={180}
-              chartConfig={chartConfig}
-              bezier
-              style={styles.chart}
-              withDots={false}
-              withShadow={false}
-              withFill={true}
-            />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <LineChart
+                data={preparedChartData}
+                width={Math.max(preparedChartData.labels.length * 80, width - 40)}
+                height={220}
+                chartConfig={{
+                  ...chartConfig,
+                  propsForBackgroundLines: { stroke: "#f3f4f6" },
+                  propsForLabels: { fontFamily: "Poppins-Medium" },
+                }}
+                style={styles.chart}
+                fromZero
+                withDots={true}
+                withShadow={true}
+                withInnerLines={true}
+                withHorizontalLabels={true}
+                withVerticalLabels={true}
+              />
+            </ScrollView>
             <View style={styles.chartLegend}>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: '#01B97F' }]} />
                 <Text style={styles.legendText}>Detections</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#A8AAB0' }]} />
+                <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
                 <Text style={styles.legendText}>Reports</Text>
               </View>
             </View>
@@ -634,6 +671,12 @@ const styles = StyleSheet.create({
   chart: {
     marginVertical: 0,
     paddingRight: 0,
+  },
+  chartScrollContainer: {
+    flex: 1,
+  },
+  chartScrollContent: {
+    paddingRight: 20,
   },
   chartLegend: {
     flexDirection: 'row',

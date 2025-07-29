@@ -15,7 +15,7 @@ import { LineChart } from "react-native-chart-kit";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import MainHeader from "../../../components/common/MainHeader";
 
-const API_BASE_URL = "https://murai-server.onrender.com/api";
+const API_BASE_URL = "http://localhost:3000/api";
 
 const dashboardService = {
   getOverview: async (timeRange) => {
