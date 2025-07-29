@@ -77,9 +77,6 @@ export default function PersonalInfo() {
               </View>
               <View style={styles.onlineIndicator} />
             </View>
-            <TouchableOpacity style={styles.editImageButton}>
-              <Text style={styles.editImageText}>Edit Image</Text>
-            </TouchableOpacity>
           </View>
 
           <View style={styles.timeContainer}>
@@ -219,17 +216,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#01B97F',
     borderWidth: 2,
     borderColor: '#ffffff',
-  },
-  editImageButton: {
-    backgroundColor: '#F7F7F7',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  editImageText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    color: '#6C6C6C',
   },
   timeContainer: {
     flexDirection: 'row',

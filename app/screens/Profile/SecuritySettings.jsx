@@ -22,14 +22,6 @@ export default function SecuritySettings() {
     Alert.alert("Change Password", "Password change functionality would be implemented here");
   };
 
-  const handleViewSessions = () => {
-    Alert.alert("Active Sessions", "View active sessions functionality would be implemented here");
-  };
-
-  const handleSecurityAudit = () => {
-    Alert.alert("Security Audit", "Security audit functionality would be implemented here");
-  };
-
   const securityOptions = [
     {
       key: 'sessionTimeout',
@@ -51,18 +43,6 @@ export default function SecuritySettings() {
       description: 'Update your account password',
       icon: 'key',
       onPress: handleChangePassword,
-    },
-    {
-      title: 'Active Sessions',
-      description: 'View and manage active sessions',
-      icon: 'monitor',
-      onPress: handleViewSessions,
-    },
-    {
-      title: 'Security Audit',
-      description: 'Review your security settings',
-      icon: 'search',
-      onPress: handleSecurityAudit,
     },
   ];
 
@@ -141,24 +121,6 @@ export default function SecuritySettings() {
           ))}
         </View>
 
-        {/* Security Status Card */}
-        <View style={styles.statusCard}>
-          <View style={styles.cardHeader}>
-            <Feather name="check-circle" size={20} color="#01B97F" />
-            <Text style={styles.cardTitle}>Security Status</Text>
-          </View>
-
-          <View style={styles.statusContent}>
-            <View style={styles.statusIcon}>
-              <Feather name="shield" size={32} color="#01B97F" />
-            </View>
-            <Text style={styles.statusTitle}>Account Secure</Text>
-            <Text style={styles.statusDescription}>
-              Your account security is up to date. Keep your settings current to maintain protection.
-            </Text>
-          </View>
-        </View>
-
         <View style={styles.bottomSpacing} />
       </ScrollView>
     </View>
@@ -217,17 +179,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   actionsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  statusCard: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 20,
@@ -304,33 +255,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Poppins-Regular',
     color: '#A8AAB0',
-  },
-  statusContent: {
-    alignItems: 'center',
-    textAlign: 'center',
-  },
-  statusIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#F0FDF4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  statusTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins-Bold',
-    color: '#1D1D1F',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  statusDescription: {
-    fontSize: 16,
-    fontFamily: 'Poppins-Regular',
-    color: '#A8AAB0',
-    lineHeight: 24,
-    textAlign: 'center',
   },
   bottomSpacing: {
     height: 40,

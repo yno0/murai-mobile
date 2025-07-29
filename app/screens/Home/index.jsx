@@ -2,14 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import React from 'react';
 import {
-    Animated,
-    Dimensions,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Animated,
+  Dimensions,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -534,32 +534,18 @@ function HomeScreen({ navigation }) {
           </View>
           <Text style={getAccessibleTextStyle(styles.subtitle)}>Here&apos;s your digital safety overview</Text>
         </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={getAccessibleTouchableStyle(styles.syncButton)}
-            onPress={syncProtectionStatus}
-            disabled={isSyncing}
-            accessibilityLabel={isSyncing ? "Syncing protection status" : "Refresh protection status"}
-          >
-            <MaterialCommunityIcons
-              name={isSyncing ? "sync" : "refresh"}
-              size={24}
-              color={isSyncing ? "#3b82f6" : "#02B97F"}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={getAccessibleTouchableStyle(styles.notificationButton)}
-            onPress={openNotifModal}
-            accessibilityLabel={`Notifications. ${unreadCount > 0 ? `${unreadCount} unread` : 'No unread notifications'}`}
-          >
-            <MaterialCommunityIcons name="bell-outline" size={24} color="#02B97F" />
-            {unreadCount > 0 && (
-              <View style={styles.notifBadge}>
-                <Text style={styles.notifBadgeText}>{unreadCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={getAccessibleTouchableStyle(styles.notificationButton)}
+          onPress={openNotifModal}
+          accessibilityLabel={`Notifications. ${unreadCount > 0 ? `${unreadCount} unread` : 'No unread notifications'}`}
+        >
+          <MaterialCommunityIcons name="bell-outline" size={24} color="#02B97F" />
+          {unreadCount > 0 && (
+            <View style={styles.notifBadge}>
+              <Text style={styles.notifBadgeText}>{unreadCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </Animated.View>
 
       {/* Loading State */}
@@ -1084,6 +1070,8 @@ function HomeScreen({ navigation }) {
         </View>
       </Animated.View>
       )}
+
+      <View style={styles.bottomSpacing} />
     </ScrollView>
   );
 }
@@ -1103,29 +1091,6 @@ const styles = StyleSheet.create({
   },
   header: {
     flex: 1,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  syncButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
   },
   greetingContainer: {
     flexDirection: 'row',
@@ -1729,6 +1694,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Medium',
     color: '#ffffff',
     marginLeft: 8,
+  },
+  bottomSpacing: {
+    height: 100, // Adjust as needed for spacing at the bottom
   },
 });
 
