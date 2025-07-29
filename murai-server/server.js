@@ -23,6 +23,11 @@ app.use(cors());
 app.use(express.json());
 app.use('/api', routes);
 
+// Add detection routes
+import('./routes/detectionRoutes.js').then(module => {
+  app.use('/api/detections', module.default);
+});
+
 app.use(session({ secret: 'your_secret', resave: false, saveUninitialized: true }));
 app.use(passport.initialize());
 app.use(passport.session());

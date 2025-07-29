@@ -336,10 +336,14 @@ export default function ExtensionSettings({ onClose }) {
           <MaterialCommunityIcons name="close" size={24} color="#374151" />
         </TouchableOpacity>
         <Text style={styles.title}>Extension Settings</Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Language Selection */}
         <View style={styles.section}>
           {renderSectionHeader(
@@ -396,7 +400,7 @@ export default function ExtensionSettings({ onClose }) {
               ))}
             </View>
             <Text style={styles.sensitivityDesc}>
-              {SENSITIVITY_LEVELS.find(l => l.id === sensitivity)?.desc}
+              {SENSITIVITY_LEVELS.find(l => l.id === sensitivity)?.desc || 'Select a sensitivity level'}
             </Text>
           </View>
         </View>
@@ -443,11 +447,11 @@ export default function ExtensionSettings({ onClose }) {
             {whitelistError ? <Text style={styles.inputErrorText}>{whitelistError}</Text> : null}
 
             <FlatList
-              data={whitelist[whitelistType]}
-              keyExtractor={item => item}
+              data={whitelist[whitelistType] || []}
+              keyExtractor={(item, index) => item || index.toString()}
               renderItem={({ item }) => (
                 <View style={styles.whitelistItem}>
-                  <Text style={styles.whitelistItemText}>{item}</Text>
+                  <Text style={styles.whitelistItemText}>{item || ''}</Text>
                   <TouchableOpacity
                     onPress={() => confirmRemoveFromWhitelist(item, whitelistType)}
                     style={styles.removeButton}
@@ -646,7 +650,7 @@ export default function ExtensionSettings({ onClose }) {
             </View>
             <Text style={styles.deleteModalTitle}>Remove from Whitelist?</Text>
             <Text style={styles.deleteModalDescription}>
-              Are you sure you want to remove "{deleteConfirm.item}" from the whitelist?
+              Are you sure you want to remove "{deleteConfirm.item || ''}" from the whitelist?
             </Text>
             <View style={styles.deleteModalButtons}>
               <TouchableOpacity
@@ -679,8 +683,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 24,
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
     backgroundColor: '#f8fafc',
@@ -710,10 +714,15 @@ const styles = StyleSheet.create({
     color: '#374151',
     letterSpacing: 0.2,
   },
+  headerSpacer: {
+    width: 40,
+  },
   content: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingBottom: 100, // Add padding to prevent overlap with save button
+  },
+  scrollContent: {
+    paddingBottom: 120, // Extra space for save button on mobile
   },
   section: {
     marginTop: 32,
@@ -890,7 +899,7 @@ const styles = StyleSheet.create({
   },
   flagStyles: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     marginBottom: 16,
   },
   flagStyle: {
@@ -898,13 +907,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#f8fafc',
-    paddingVertical: 14,
-    borderRadius: 10,
+    gap: 6,
+    backgroundColor: '#ffffff',
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    marginHorizontal: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   flagStyleActive: {
     backgroundColor: '#374151',
@@ -997,7 +1011,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     position: 'absolute',
-    bottom: 24,
+    bottom: Platform.OS === 'ios' ? 34 : 24,
     left: 20,
     right: 20,
     backgroundColor: '#36DCA6',

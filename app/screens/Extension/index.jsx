@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import {
-  Animated,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View
+    Animated,
+    Modal,
+    Pressable,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MainHeader from '../../components/common/MainHeader';
+import { useAuth } from '../../context/AuthContext';
+import { getPreferences } from '../../services/preferences';
 import ExtensionSettings from './ExtensionSettings';
 
 export default function ExtensionScreen() {
@@ -24,9 +27,11 @@ export default function ExtensionScreen() {
   const [statusCardsScale] = useState(new Animated.Value(0.8));
   const [shakeAnim] = useState(new Animated.Value(0));
 
-  // Mock sync data - replace with real data from your service
-  const [lastSyncTime, setLastSyncTime] = useState(null); // null means not synced
-  const [activeTime, setActiveTime] = useState(0); // in minutes
+  // Real sync data with auto-sync functionality
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [activeTime, setActiveTime] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('Not synced');
 
   // Complex animation sequence
   React.useEffect(() => {
@@ -222,6 +227,80 @@ export default function ExtensionScreen() {
     };
   }, [extensionEnabled]);
 
+  // Auto-sync functionality when tab is focused
+  const { user } = useAuth();
+
+  const syncExtensionSettings = useCallback(async () => {
+    if (!user) return;
+
+    setIsSyncing(true);
+    setSyncStatus('Syncing...');
+
+    try {
+      console.log('🔄 Auto-syncing extension settings from database...');
+
+      // Get latest preferences from database via API
+      const preferences = await getPreferences();
+
+      if (preferences) {
+        // Update last sync time
+        const now = new Date();
+        setLastSyncTime(now);
+        setSyncStatus('Synced');
+
+        console.log('✅ Extension settings synced successfully from database');
+        console.log('📱 Synced preferences from DB:', {
+          language: preferences.language,
+          sensitivity: preferences.sensitivity,
+          whitelistTerms: preferences.whitelistTerms?.length || 0,
+          whitelistSites: preferences.whitelistSite?.length || 0,
+          flagStyle: preferences.flagStyle,
+          isHighlighted: preferences.isHighlighted,
+          color: preferences.color,
+          updatedAt: preferences.updatedAt
+        });
+
+        // Log sync activity to server
+        try {
+          const { user: authUser } = useAuth();
+          if (authUser?.token) {
+            await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000'}/api/users/extension-sync`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${authUser.token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                syncType: 'mobile_auto',
+                platform: 'mobile',
+                timestamp: new Date().toISOString()
+              })
+            });
+          }
+        } catch (logError) {
+          console.log('Failed to log sync activity:', logError);
+        }
+      } else {
+        setSyncStatus('No settings found');
+        setTimeout(() => setSyncStatus('Not synced'), 2000);
+      }
+    } catch (error) {
+      console.error('❌ Extension sync failed:', error);
+      setSyncStatus('Sync failed');
+      setTimeout(() => setSyncStatus('Not synced'), 3000);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [user]);
+
+  // Auto-sync when tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      console.log('📱 Extension tab focused - triggering auto-sync');
+      syncExtensionSettings();
+    }, [syncExtensionSettings])
+  );
+
   const toggleExtension = () => {
     setExtensionEnabled(!extensionEnabled);
   };
@@ -274,6 +353,12 @@ export default function ExtensionScreen() {
         subtitle="Manage your protection settings"
         rightActions={[
           {
+            icon: isSyncing ? 'sync' : 'refresh',
+            color: isSyncing ? '#3b82f6' : '#02B97F',
+            onPress: syncExtensionSettings,
+            disabled: isSyncing
+          },
+          {
             icon: 'cog',
             color: '#02B97F',
             onPress: () => setSettingsVisible(true)
@@ -297,6 +382,19 @@ export default function ExtensionScreen() {
             {extensionEnabled ? 'PROTECTION ACTIVE' : 'PROTECTION INACTIVE'}
           </Text>
         </View>
+
+        {/* Auto-Sync Status Indicator */}
+        {isSyncing && (
+          <View style={styles.syncIndicator}>
+            <MaterialCommunityIcons
+              name="sync"
+              size={16}
+              color="#3b82f6"
+              style={{ transform: [{ rotate: '360deg' }] }}
+            />
+            <Text style={styles.syncIndicatorText}>Auto-syncing settings...</Text>
+          </View>
+        )}
       </View>
 
       {/* Enhanced Power Button */}
@@ -433,25 +531,26 @@ export default function ExtensionScreen() {
           ]}>
             <View style={styles.statusInfoHeader}>
               <MaterialCommunityIcons
-                name={lastSyncTime ? "sync" : "sync-off"}
+                name={isSyncing ? "sync" : (lastSyncTime ? "sync" : "sync-off")}
                 size={20}
-                color="#02B97F"
+                color={isSyncing ? "#3b82f6" : "#02B97F"}
+                style={isSyncing ? { transform: [{ rotate: '360deg' }] } : {}}
               />
               <Text style={[
                 styles.statusInfoTitle,
-                { color: "#02B97F" }
+                { color: isSyncing ? "#3b82f6" : "#02B97F" }
               ]}>
-                Last Sync
+                {isSyncing ? 'Syncing...' : 'Last Sync'}
               </Text>
             </View>
             <Text style={[
               styles.statusInfoValue,
               {
-                color: lastSyncTime ? '#1f2937' : '#ef4444',
-                fontSize: lastSyncTime ? 16 : 14
+                color: isSyncing ? '#3b82f6' : (lastSyncTime ? '#1f2937' : '#ef4444'),
+                fontSize: isSyncing ? 14 : (lastSyncTime ? 16 : 14)
               }
             ]}>
-              {String(formatLastSync(lastSyncTime))}
+              {isSyncing ? syncStatus : String(formatLastSync(lastSyncTime))}
             </Text>
           </Animated.View>
 
@@ -658,5 +757,25 @@ const styles = StyleSheet.create({
     marginTop: 28,
     marginBottom: 32,
     paddingHorizontal: 20,
+  },
+
+  // Sync indicator styles
+  syncIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+  },
+  syncIndicatorText: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+    color: '#3b82f6',
+    marginLeft: 6,
   },
 });
