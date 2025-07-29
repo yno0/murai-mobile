@@ -25,6 +25,7 @@ function AdminHomeScreen({ navigation }) {
   const [notifications, setNotifications] = React.useState([]); // Admin notifications
   const [notifModalVisible, setNotifModalVisible] = React.useState(false);
   const [notifLoading, setNotifLoading] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -58,59 +59,99 @@ function AdminHomeScreen({ navigation }) {
     }
   };
 
-  React.useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = React.useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
       setLoading(true);
-      try {
-        // Fetch dashboard data using admin endpoints
-        const [statsRes, chartRes, reportsRes, usersRes] = await Promise.all([
-          api.get('/dashboard/overview?timeRange=today'),
-          api.get('/dashboard/activity-chart?timeRange=today'),
-          api.get('/admin/reports?limit=5&sortBy=createdAt&sortOrder=desc'),
-          api.get('/admin/users?limit=1'), // Just to get total count
-        ]);
+    }
 
-        setStats(statsRes.data);
-        setChartData(chartRes.data);
-        setRecentReports(reportsRes.data.reports || []);
-        setTotalUsers(usersRes.data.pagination?.totalUsers || 0);
-      } catch (err) {
-        console.error("Failed to load admin dashboard data:", err);
-        // Set fallback data
-        setStats({
-          harmfulContentDetected: { value: '0', change: '+0%' },
-          websitesMonitored: { value: '0', change: '+0' },
-          protectionEffectiveness: { value: '95.0%', change: '+0%' }
-        });
-        setRecentReports([]);
-        setTotalUsers(0);
-      } finally {
+    try {
+      // Fetch dashboard data using admin endpoints with current timestamp to avoid cache
+      const timestamp = new Date().getTime();
+      const [statsRes, chartRes, reportsRes, usersRes] = await Promise.all([
+        api.get(`/dashboard/overview?timeRange=today&_t=${timestamp}`),
+        api.get(`/dashboard/activity-chart?timeRange=today&_t=${timestamp}`),
+        api.get(`/admin/reports?limit=5&sortBy=createdAt&sortOrder=desc&_t=${timestamp}`),
+        api.get(`/admin/users?limit=1&_t=${timestamp}`), // Just to get total count
+      ]);
+
+      setStats(statsRes.data);
+      setChartData(chartRes.data);
+      setRecentReports(reportsRes.data.reports || []);
+      setTotalUsers(usersRes.data.pagination?.totalUsers || 0);
+
+      if (isRefresh) {
+        console.log('✅ Dashboard data refreshed successfully');
+      }
+    } catch (err) {
+      console.error("Failed to load admin dashboard data:", err);
+      // Set fallback data
+      setStats({
+        harmfulContentDetected: { value: '0', change: '+0%' },
+        websitesMonitored: { value: '0', change: '+0' },
+        protectionEffectiveness: { value: '95.0%', change: '+0%' }
+      });
+      setRecentReports([]);
+      setTotalUsers(0);
+    } finally {
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
         setLoading(false);
       }
-    };
-    fetchData();
+    }
   }, []);
 
-  // Prepare chart data for LineChart
-  const preparedChartData = chartData ? {
-    labels: chartData.labels || ['', '', '', '', '', '', ''],
-    datasets: [
-      {
-        data: chartData.datasets?.[0]?.data || [0, 0, 0, 0, 0, 0, 0],
-        strokeWidth: 3,
-        color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`, // Using COLORS.SUCCESS
-      },
-    ],
-  } : {
-    labels: ['', '', '', '', '', '', ''],
-    datasets: [
-      {
-        data: [0, 0, 0, 0, 0, 0, 0],
-        strokeWidth: 3,
-        color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`, // Using COLORS.SUCCESS
-      },
-    ],
-  };
+  const handleRefresh = React.useCallback(() => {
+    fetchData(true);
+  }, [fetchData]);
+
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Prepare chart data for LineChart with better handling of actual data
+  const preparedChartData = React.useMemo(() => {
+    if (chartData && chartData.datasets && chartData.datasets[0] && chartData.datasets[0].data) {
+      const actualData = chartData.datasets[0].data;
+      const actualLabels = chartData.labels || [];
+
+      // Ensure we have at least some data points for the chart
+      const minDataPoints = 7;
+      const paddedData = [...actualData];
+      const paddedLabels = [...actualLabels];
+
+      // Pad with zeros if we don't have enough data points
+      while (paddedData.length < minDataPoints) {
+        paddedData.push(0);
+        paddedLabels.push('');
+      }
+
+      return {
+        labels: paddedLabels.slice(0, minDataPoints),
+        datasets: [
+          {
+            data: paddedData.slice(0, minDataPoints),
+            strokeWidth: 3,
+            color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+          },
+        ],
+      };
+    }
+
+    // Fallback data
+    return {
+      labels: ['6AM', '9AM', '12PM', '3PM', '6PM', '9PM', '12AM'],
+      datasets: [
+        {
+          data: [0, 0, 0, 0, 0, 0, 0],
+          strokeWidth: 3,
+          color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+        },
+      ],
+    };
+  }, [chartData]);
 
   const chartConfig = {
     backgroundColor: 'transparent',
@@ -155,17 +196,25 @@ function AdminHomeScreen({ navigation }) {
     },
   };
 
-  // Format recent reports for display
+  // Format recent reports for display with better formatting
   const formatRecentReports = (reports) => {
-    return reports.slice(0, 5).map(report => ({
-      id: report._id,
-      type: report.status === 'pending' ? 'warning' : report.status === 'resolved' ? 'success' : 'info',
-      message: `${report.type?.replace('_', ' ') || 'Report'}: ${report.reportedText?.substring(0, 60) || 'No content'}${report.reportedText?.length > 60 ? '...' : ''}`,
-      time: getTimeAgo(new Date(report.createdAt)),
-      icon: report.status === 'pending' ? 'clock' : report.status === 'resolved' ? 'check-circle' : 'info',
-      color: report.status === 'pending' ? COLORS.WARNING : report.status === 'resolved' ? COLORS.SUCCESS : COLORS.PRIMARY,
-      category: report.category || 'general'
-    }));
+    return reports.slice(0, 5).map(report => {
+      const reportType = report.type?.replace('_', ' ') || 'Report';
+      const reportText = report.reportedText || 'No content available';
+      const truncatedText = reportText.length > 45 ? `${reportText.substring(0, 45)}...` : reportText;
+
+      return {
+        id: report._id,
+        type: report.status === 'pending' ? 'warning' : report.status === 'resolved' ? 'success' : 'info',
+        title: `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`,
+        message: truncatedText,
+        time: getTimeAgo(new Date(report.createdAt)),
+        icon: report.status === 'pending' ? 'clock-outline' : report.status === 'resolved' ? 'check-circle-outline' : 'information-outline',
+        color: report.status === 'pending' ? COLORS.WARNING : report.status === 'resolved' ? COLORS.SUCCESS : COLORS.PRIMARY,
+        category: report.category || 'general',
+        status: report.status || 'pending'
+      };
+    });
   };
 
   // Helper function to get time ago
@@ -187,20 +236,33 @@ function AdminHomeScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header with Notification */}
+      {/* Header with Notification and Refresh */}
       <View style={styles.topHeader}>
         <View style={styles.header}>
           <Text style={styles.greeting}>Hello Admin,</Text>
           <Text style={styles.subtitle}>Here&apos;s a quick overview of the system.</Text>
         </View>
-        <TouchableOpacity style={styles.notificationButton} onPress={openNotifModal}>
-          <MaterialCommunityIcons name="bell-outline" size={24} color="#A8AAB0" />
-          {unreadCount > 0 && (
-            <View style={styles.notifBadge}>
-              <Text style={styles.notifBadgeText}>{unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, refreshing && styles.actionButtonDisabled]}
+            onPress={handleRefresh}
+            disabled={refreshing}
+          >
+            <MaterialCommunityIcons
+              name="refresh"
+              size={20}
+              color={refreshing ? "#A8AAB0" : "#01B97F"}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.notificationButton} onPress={openNotifModal}>
+            <MaterialCommunityIcons name="bell-outline" size={24} color="#A8AAB0" />
+            {unreadCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Notification Modal */}
@@ -296,10 +358,12 @@ function AdminHomeScreen({ navigation }) {
             <MaterialCommunityIcons name="chevron-right" size={16} color="#01B97F" />
           </TouchableOpacity>
         </View>
-        {loading ? (
+        {loading || refreshing ? (
           <View style={styles.chartLoadingContainer}>
             <ActivityIndicator size="large" color="#01B97F" />
-            <Text style={styles.chartLoadingText}>Loading today&apos;s activity...</Text>
+            <Text style={styles.chartLoadingText}>
+              {refreshing ? 'Refreshing activity data...' : 'Loading today\'s activity...'}
+            </Text>
           </View>
         ) : (
           <>
@@ -343,32 +407,47 @@ function AdminHomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
         <View style={{ maxHeight: 320 }}>
-          {loading ? (
+          {loading || refreshing ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#01B97F" />
-              <Text style={styles.loadingText}>Loading reports...</Text>
+              <Text style={styles.loadingText}>
+                {refreshing ? 'Refreshing reports...' : 'Loading reports...'}
+              </Text>
             </View>
           ) : formattedReports.length === 0 ? (
             <Text style={styles.emptyStateText}>No recent reports</Text>
           ) : (
             <ScrollView style={styles.activityList} showsVerticalScrollIndicator={false}>
-              {formattedReports.map((item) => (
-                <View key={item.id} style={styles.activityItem}>
-                  <View style={[styles.activityIcon, { backgroundColor: item.color + '10' }]}>
+              {formattedReports.map((item, index) => (
+                <View key={item.id} style={[
+                  styles.activityItem,
+                  index === formattedReports.length - 1 && styles.lastActivityItem
+                ]}>
+                  <View style={[styles.activityIcon, { backgroundColor: item.color + '15' }]}>
                     <MaterialCommunityIcons
                       name={item.icon}
-                      size={20}
+                      size={22}
                       color={item.color}
                     />
                   </View>
                   <View style={styles.activityContent}>
                     <View style={styles.activityTopLine}>
-                      <Text style={styles.activityText}>{item.message}</Text>
+                      <Text style={styles.activityTitle} numberOfLines={1}>{item.title}</Text>
                       <Text style={styles.activityTime}>{item.time}</Text>
                     </View>
-                    <Text style={styles.activityDetails}>
-                      {item.category} • {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                    <Text style={styles.activityMessage} numberOfLines={2}>
+                      {item.message}
                     </Text>
+                    <View style={styles.activityBottomLine}>
+                      <Text style={styles.activityCategory}>
+                        {item.category.charAt(0).toUpperCase() + item.category.slice(1)}
+                      </Text>
+                      <View style={[styles.statusBadge, { backgroundColor: item.color + '20' }]}>
+                        <Text style={[styles.statusText, { color: item.color }]}>
+                          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
               ))}
@@ -392,6 +471,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: SPACING.xl,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F7F7F7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionButtonDisabled: {
+    opacity: 0.5,
   },
   header: {
     flex: 1,
@@ -609,18 +704,22 @@ const styles = StyleSheet.create({
   },
   activityItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
+    alignItems: 'flex-start',
+    padding: 18,
     borderBottomWidth: 1,
-    borderBottomColor: '#F7F7F7', // Container light color
+    borderBottomColor: '#F7F7F7',
+  },
+  lastActivityItem: {
+    borderBottomWidth: 0,
   },
   activityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
+    marginTop: 2,
   },
   activityContent: {
     flex: 1,
@@ -634,17 +733,52 @@ const styles = StyleSheet.create({
   activityText: {
     fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
-    color: '#1D1D1F', // Font bold color
+    color: '#1D1D1F',
+  },
+  activityTitle: {
+    fontSize: 15,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1D1D1F',
+    flex: 1,
+    marginRight: 8,
+  },
+  activityMessage: {
+    fontSize: 13,
+    fontFamily: 'Poppins-Regular',
+    color: '#6C6C6C',
+    lineHeight: 18,
+    marginTop: 4,
+    marginBottom: 8,
   },
   activityTime: {
     fontSize: 12,
     fontFamily: 'Poppins-Regular',
-    color: '#6C6C6C', // Font subhead color
+    color: '#6C6C6C',
   },
   activityDetails: {
     fontSize: 13,
     fontFamily: 'Poppins-Regular',
-    color: '#6C6C6C', // Font subhead color
+    color: '#6C6C6C',
+  },
+  activityBottomLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  activityCategory: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+    color: '#6C6C6C',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 11,
+    fontFamily: 'Poppins-SemiBold',
   },
   chartLoadingContainer: {
     height: 180,

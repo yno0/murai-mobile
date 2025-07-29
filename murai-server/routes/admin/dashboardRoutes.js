@@ -1,6 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import DetectedWord from '../../models/detectedWordModel.js';
+import Report from '../../models/reportModel.js';
 import UserActivity from '../../models/userActivityLogs.js';
 import User from '../../models/userModel.js';
 
@@ -104,56 +105,89 @@ router.get('/overview', /* authenticateToken, */ async (req, res) => {
 router.get('/activity-chart', /* authenticateToken, */ async (req, res) => {
   try {
     const { timeRange = 'last 7 days' } = req.query;
-    let days = 7;
-    
-    switch (timeRange.toLowerCase()) {
-      case 'today':
-        days = 1;
-        break;
-      case 'last 7 days':
-        days = 7;
-        break;
-      case 'last 30 days':
-        days = 30;
-        break;
-      default:
-        days = 7;
-    }
 
     const chartData = [];
     const labels = [];
-    
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      date.setHours(0, 0, 0, 0);
-      
-      const nextDate = new Date(date);
-      nextDate.setDate(nextDate.getDate() + 1);
-      
-      const [detections, activities] = await Promise.all([
-        DetectedWord.countDocuments({
-          createdAt: { $gte: date, $lt: nextDate }
-        }),
-        UserActivity.countDocuments({
-          createdAt: { $gte: date, $lt: nextDate }
-        })
-      ]);
-      
-      chartData.push({ protected: detections, monitored: activities });
-      labels.push(days === 1 ? date.getHours() + ':00' : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+
+    if (timeRange.toLowerCase() === 'today') {
+      // For today, show hourly data
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Create hourly buckets for today
+      for (let hour = 0; hour < 24; hour += 3) { // Every 3 hours
+        const hourStart = new Date(today);
+        hourStart.setHours(hour, 0, 0, 0);
+
+        const hourEnd = new Date(today);
+        hourEnd.setHours(hour + 3, 0, 0, 0);
+
+        const [detections, reports] = await Promise.all([
+          DetectedWord.countDocuments({
+            createdAt: { $gte: hourStart, $lt: hourEnd }
+          }),
+          Report.countDocuments({
+            createdAt: { $gte: hourStart, $lt: hourEnd }
+          })
+        ]);
+
+        chartData.push({ detections: detections, reports: reports });
+        labels.push(`${hour.toString().padStart(2, '0')}:00`);
+      }
+    } else {
+      // For other time ranges, show daily data
+      let days = 7;
+      switch (timeRange.toLowerCase()) {
+        case 'last 7 days':
+          days = 7;
+          break;
+        case 'last 30 days':
+          days = 30;
+          break;
+        default:
+          days = 7;
+      }
+
+      for (let i = days - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        date.setHours(0, 0, 0, 0);
+
+        const nextDate = new Date(date);
+        nextDate.setDate(nextDate.getDate() + 1);
+
+        const [detections, reports] = await Promise.all([
+          DetectedWord.countDocuments({
+            createdAt: { $gte: date, $lt: nextDate }
+          }),
+          Report.countDocuments({
+            createdAt: { $gte: date, $lt: nextDate }
+          })
+        ]);
+
+        chartData.push({ detections: detections, reports: reports });
+        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+      }
     }
+
+    console.log(`Chart data for ${timeRange}:`, {
+      labels,
+      detections: chartData.map(d => d.detections),
+      reports: chartData.map(d => d.reports)
+    });
 
     res.json({
       labels,
       datasets: [
         {
-          label: 'Protected',
-          data: chartData.map(d => d.protected)
+          label: 'Detections',
+          data: chartData.map(d => d.detections)
         },
         {
-          label: 'Monitored', 
-          data: chartData.map(d => d.monitored)
+          label: 'Reports',
+          data: chartData.map(d => d.reports)
         }
       ]
     });
