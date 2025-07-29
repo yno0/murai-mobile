@@ -32,12 +32,7 @@
   - **Data:** Most active sites (list)
   - **API Calls:** (Mocked, but should map to `/dashboard/websites`)
 
-- **Groups.jsx**
-  - **Charts:**
-    - BarChart (Group Sizes)
-    - PieChart (Group Status Distribution)
-  - **Data:** Largest groups (list)
-  - **API Calls:** (Mocked, should map to `/users/groups`)
+
 
 - **Languages.jsx**
   - **Charts:**
@@ -46,12 +41,7 @@
   - **Data:** Language breakdown (list)
   - **API Calls:** (No direct endpoint, would require `/dashboard/flagged-words` with language aggregation)
 
-- **PatternsOverTime.jsx**
-  - **Charts:**
-    - LineChart (Patterns Over Time)
-    - BarChart (Top 5 Patterns)
-  - **Data:** Pattern summary (list)
-  - **API Calls:** (No direct endpoint, would require `/dashboard/flagged-words` with pattern aggregation)
+
 
 #### Users Screens (`app/(admin)/screens/Users/`)
 - **index.jsx, UsersOverview.jsx, UsersList.jsx**

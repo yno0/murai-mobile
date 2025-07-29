@@ -412,22 +412,8 @@ export default function AdminDashboardScreen({ navigation }) {
       iconColor: "#01B97F",
       screen: "AdminLanguages",
     },
-    {
-      icon: "account-group",
-      title: "Groups",
-      subtitle: "Groups analytics and details",
-      color: "#e8f5f0",
-      iconColor: "#01B97F",
-      screen: "AdminGroups",
-    },
-    {
-      icon: "chart-timeline-variant",
-      title: "Patterns Over Time",
-      subtitle: "Patterns over time analytics and details",
-      color: "#e8f5f0",
-      iconColor: "#01B97F",
-      screen: "AdminPatternsOverTime",
-    },
+
+
   ];
 
   const sideMenuItems = [
@@ -451,16 +437,8 @@ export default function AdminDashboardScreen({ navigation }) {
       icon: "translate",
       action: () => navigation.navigate("AdminLanguages"),
     },
-    {
-      title: "Groups",
-      icon: "account-group",
-      action: () => navigation.navigate("AdminGroups"),
-    },
-    {
-      title: "Patterns Over Time",
-      icon: "trending-up",
-      action: () => navigation.navigate("AdminPatternsOverTime"),
-    },
+
+
   ];
 
   const toggleMenu = () => {

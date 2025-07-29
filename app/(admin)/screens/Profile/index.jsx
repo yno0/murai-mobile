@@ -4,13 +4,13 @@ import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../../context/AuthContext';
 
@@ -159,9 +159,6 @@ export default function AdminProfileScreen() {
               </View>
               <View style={styles.onlineIndicator} />
             </View>
-            <TouchableOpacity style={styles.editImageButton}>
-              <Text style={styles.editImageText}>Edit Image</Text>
-            </TouchableOpacity>
           </View>
 
           <View style={styles.timeContainer}>
@@ -349,17 +346,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#ffffff',
   },
-  editImageButton: {
-    backgroundColor: '#F7F7F7',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  editImageText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    color: '#6C6C6C',
-  },
+
   timeContainer: {
     flexDirection: 'row',
     alignItems: 'center',

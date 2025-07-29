@@ -3,10 +3,8 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { View } from "react-native";
 import AdminDetectionScreen from "../screens/Dashboard/Detection";
-import AdminGroupsScreen from "../screens/Dashboard/Groups";
 import AdminDashboardScreen from "../screens/Dashboard/index";
 import AdminLanguagesScreen from "../screens/Dashboard/Languages";
-import AdminPatternsOverTimeScreen from "../screens/Dashboard/PatternsOverTime";
 import AdminSitesScreen from "../screens/Dashboard/Sites";
 import AdminHomeScreen from "../screens/Home/index";
 import AccountSettingsScreen from "../screens/Profile/AccountSettings";
@@ -56,9 +54,6 @@ function AdminTabNavigator() {
               break;
             case "AdminReports":
               iconName = "file-text";
-              break;
-            case "AdminGroups":
-              iconName = "users";
               break;
             case "AdminSettings":
               iconName = "settings";
@@ -116,8 +111,6 @@ export default function AdminNavigator() {
       <Stack.Screen name="AdminDetection" component={AdminDetectionScreen} />
       <Stack.Screen name="AdminSites" component={AdminSitesScreen} />
       <Stack.Screen name="AdminLanguages" component={AdminLanguagesScreen} />
-      <Stack.Screen name="AdminGroups" component={AdminGroupsScreen} />
-      <Stack.Screen name="AdminPatternsOverTime" component={AdminPatternsOverTimeScreen} />
       <Stack.Screen name="PersonalDetails" component={PersonalDetailsScreen} />
       <Stack.Screen name="SystemLogs" component={SystemLogsScreen} />
       <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />

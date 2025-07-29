@@ -9,7 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { LineChart, PieChart } from 'react-native-chart-kit';
+import { PieChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MainHeader from '../../../components/common/MainHeader';
 
@@ -61,7 +61,15 @@ export default function AdminLanguagesScreen({ navigation }) {
     try {
       setIsLoading(true);
       setError(null);
-      const languages = await languagesService.getLanguages(timeRange);
+
+      // Map time range to match server expectations (same as Detection.jsx)
+      const mappedTimeRange = timeRange === 'Today' ? 'today' :
+                             timeRange === 'Last 7 days' ? 'last 7 days' :
+                             timeRange === 'Last 30 days' ? 'last 30 days' :
+                             timeRange === 'All Time' ? 'all time' :
+                             timeRange.toLowerCase();
+
+      const languages = await languagesService.getLanguages(mappedTimeRange);
 
       setLanguagesData({
         languages,
@@ -100,22 +108,25 @@ export default function AdminLanguagesScreen({ navigation }) {
   // Process language data from API response
   const processLanguageData = () => {
     if (!languagesData.languages || !languagesData.languages.languageDistribution) {
-      return { languageData: [], languageBreakdown: [], trendData: [], trendLabels: [], totalDetections: 0 };
+      return { languageData: [], languageBreakdown: [], totalDetections: 0 };
     }
 
-    const { languageDistribution, totalDetections, trendData, topPatterns } = languagesData.languages;
+    const { languageDistribution, totalDetections, topPatterns } = languagesData.languages;
+
+    // Filter to only include Tagalog, Taglish, and English
+    const allowedLanguages = ['Tagalog', 'Taglish', 'English'];
+    const filteredDistribution = languageDistribution.filter(lang =>
+      allowedLanguages.includes(lang.language)
+    );
 
     // Create balanced colors for pie chart
     const balancedColors = [
-      '#34D399', // Medium emerald
-      '#60A5FA', // Medium blue
-      '#A78BFA', // Medium purple
-      '#FBBF24', // Medium amber
-      '#F87171', // Medium red
-      '#6B7280', // Medium gray
+      '#34D399', // Medium emerald - Tagalog
+      '#60A5FA', // Medium blue - English
+      '#A78BFA', // Medium purple - Taglish
     ];
 
-    const languageData = languageDistribution.map((lang, index) => {
+    const languageData = filteredDistribution.map((lang, index) => {
       return {
         name: `${lang.language} (${lang.percentage}%)`,
         population: lang.count,
@@ -126,7 +137,7 @@ export default function AdminLanguagesScreen({ navigation }) {
       };
     });
 
-    const languageBreakdown = languageDistribution.map(lang => ({
+    const languageBreakdown = filteredDistribution.map(lang => ({
       language: lang.language,
       count: lang.count,
       percentage: `${lang.percentage}%`,
@@ -135,44 +146,20 @@ export default function AdminLanguagesScreen({ navigation }) {
       severityBreakdown: lang.severityBreakdown
     }));
 
-    // Process trend data for chart (last 7 days)
-    const trendEntries = Object.entries(trendData || {}).slice(-7);
-    const chartTrendData = [];
-    const trendLabels = [];
-
-    trendEntries.forEach(([date, languages]) => {
-      const totalForDay = Object.values(languages).reduce((sum, count) => sum + count, 0);
-      chartTrendData.push(totalForDay);
-      trendLabels.push(new Date(date).toLocaleDateString('en-US', { weekday: 'short' }));
-    });
+    // Filter top patterns to only include allowed languages
+    const filteredTopPatterns = (topPatterns || []).filter(pattern =>
+      allowedLanguages.includes(pattern.language)
+    );
 
     return {
       languageData,
       languageBreakdown,
-      trendData: chartTrendData,
-      trendLabels,
       totalDetections,
-      topPatterns: topPatterns || []
+      topPatterns: filteredTopPatterns
     };
   };
 
-  const { languageData, languageBreakdown, trendData, trendLabels, totalDetections, topPatterns } = processLanguageData();
-
-  const lineChartConfig = {
-    backgroundColor: 'transparent',
-    backgroundGradientFrom: '#ffffff',
-    backgroundGradientTo: '#ffffff',
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`, // Gray 500
-    labelColor: (opacity = 1) => `rgba(156, 163, 175, ${opacity})`, // Gray 400
-    style: { borderRadius: 16 },
-    propsForDots: { r: '4', strokeWidth: '2', stroke: '#4F46E5' }, // Indigo 600
-    propsForBackgroundLines: { strokeWidth: 0.5, stroke: '#e5e7eb' }, // Gray 200
-    withHorizontalLabels: true,
-    withVerticalLabels: true,
-    withInnerLines: true,
-    withOuterLines: false,
-  };
+  const { languageData, languageBreakdown, totalDetections, topPatterns } = processLanguageData();
 
   const pieChartConfig = {
     backgroundColor: 'transparent',
@@ -242,67 +229,7 @@ export default function AdminLanguagesScreen({ navigation }) {
         </View>
       ) : (
         <View>
-          {/* Language Detection Trend Chart */}
-          {trendData.length > 0 && (
-            <View style={styles.chartContainer}>
-              <View style={styles.chartHeader}>
-                <Text style={styles.chartTitle}>Language Detection Trend ({selectedTimeRange})</Text>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <LineChart
-                  data={{
-                    labels: trendLabels.length > 0 ? trendLabels : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                    datasets: [
-                      {
-                        data: trendData.length > 0 ? trendData : [0, 0, 0, 0, 0, 0, 0],
-                        color: (opacity = 1) => `rgba(1, 185, 127, ${opacity})`,
-                        strokeWidth: 3,
-                        withDots: true,
-                        fillShadowGradient: 'rgba(1, 185, 127, 0.6)',
-                        fillShadowGradientOpacity: 0.6,
-                      },
-                    ],
-                  }}
-                  width={Math.max((trendLabels.length * 80), width - 40)}
-                  height={220}
-                  chartConfig={{
-                    backgroundColor: 'transparent',
-                    backgroundGradientFrom: '#ffffff',
-                    backgroundGradientTo: '#ffffff',
-                    decimalPlaces: 0,
-                    color: (opacity = 1) => '#01B97F',
-                    labelColor: (opacity = 1) => `rgba(75, 85, 99, ${opacity})`,
-                    style: { borderRadius: 16 },
-                    propsForBackgroundLines: {
-                      strokeWidth: 1,
-                      stroke: '#f3f4f6',
-                      strokeDasharray: '5,5'
-                    },
-                    propsForLabels: {
-                      fontSize: 11,
-                      fontFamily: 'Poppins-Medium'
-                    },
-                  }}
-                  bezier
-                  style={styles.chart}
-                  withDots={true}
-                  withShadow={false}
-                  withInnerLines={true}
-                  withHorizontalLabels={true}
-                  withVerticalLabels={true}
-                  withVerticalLines={false}
-                  withFill={true}
-                  getDotColor={() => '#01B97F'}
-                  getDotProps={() => ({
-                    r: '4',
-                    strokeWidth: '2',
-                    stroke: '#ffffff',
-                    fill: '#01B97F'
-                  })}
-                />
-              </ScrollView>
-            </View>
-          )}
+
 
           {/* Language Distribution Pie Chart */}
           {languageData.length > 0 && (
@@ -344,6 +271,24 @@ export default function AdminLanguagesScreen({ navigation }) {
             </View>
           )}
 
+          {/* Top Patterns by Language */}
+          {topPatterns && topPatterns.length > 0 && (
+            <View style={styles.analyticsSectionContainer}>
+              <Text style={styles.analyticsSectionTitle}>Top Patterns by Language</Text>
+              <View style={styles.analyticsList}>
+                {topPatterns.slice(0, 5).map((pattern, idx) => (
+                  <View key={idx} style={styles.analyticsListItem}>
+                    <View style={styles.languageInfo}>
+                      <Text style={styles.analyticsListItemText}>{pattern.language}</Text>
+                      <Text style={styles.languageCount}>{pattern.patternType} - {pattern.count} detections</Text>
+                      <Text style={styles.patternExamples}>Examples: {pattern.examples.join(', ')}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
           {/* Language Breakdown */}
           <View style={styles.analyticsSectionContainer}>
             <Text style={styles.analyticsSectionTitle}>Language Breakdown</Text>
@@ -353,6 +298,9 @@ export default function AdminLanguagesScreen({ navigation }) {
                   <View style={styles.languageInfo}>
                     <Text style={styles.analyticsListItemText}>{item.language}</Text>
                     <Text style={styles.languageCount}>{item.count} detections</Text>
+                    {item.avgAccuracy && (
+                      <Text style={styles.languageAccuracy}>Accuracy: {(item.avgAccuracy * 100).toFixed(1)}%</Text>
+                    )}
                   </View>
                   <View style={styles.percentageBadge}>
                     <Text style={styles.percentageText}>{item.percentage}</Text>
@@ -511,10 +459,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     color: '#ffffff',
   },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 16,
-  },
+
   languageInfo: {
     flex: 1,
   },
@@ -534,5 +479,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Poppins-Medium',
     color: '#01B97F',
+  },
+  patternExamples: {
+    fontSize: 11,
+    fontFamily: 'Poppins-Regular',
+    color: '#9ca3af',
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  languageAccuracy: {
+    fontSize: 11,
+    fontFamily: 'Poppins-Regular',
+    color: '#059669',
+    marginTop: 2,
   },
 });

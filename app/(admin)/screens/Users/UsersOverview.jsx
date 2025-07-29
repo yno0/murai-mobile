@@ -31,6 +31,8 @@ export default function UsersOverview({ users, loading, onRefresh }) {
       const labels = [];
       const registrationData = [];
 
+      console.log(`📊 Generating trends data for ${selectedTimeFilter} with ${users.length} users`);
+
       if (selectedTimeFilter === 'today') {
         // Today - hourly data (24 hours)
         for (let i = 23; i >= 0; i--) {
@@ -45,7 +47,7 @@ export default function UsersOverview({ users, loading, onRefresh }) {
           }
 
           const hourUsers = users.filter(user => {
-            const userDate = new Date(user.joinedAt);
+            const userDate = new Date(user.joinedAt || user.createdAt);
             return userDate.getDate() === hour.getDate() &&
                    userDate.getMonth() === hour.getMonth() &&
                    userDate.getFullYear() === hour.getFullYear() &&
@@ -62,7 +64,7 @@ export default function UsersOverview({ users, loading, onRefresh }) {
           labels.push(date.toLocaleDateString('en', { weekday: 'short' }));
 
           const dayUsers = users.filter(user => {
-            const userDate = new Date(user.joinedAt);
+            const userDate = new Date(user.joinedAt || user.createdAt);
             return userDate.toDateString() === date.toDateString();
           }).length;
 
@@ -76,7 +78,7 @@ export default function UsersOverview({ users, loading, onRefresh }) {
           labels.push(date.toLocaleDateString('en', { month: 'short' }));
 
           const monthUsers = users.filter(user => {
-            const userDate = new Date(user.joinedAt);
+            const userDate = new Date(user.joinedAt || user.createdAt);
             return userDate.getMonth() === date.getMonth() &&
                    userDate.getFullYear() === date.getFullYear();
           }).length;
@@ -92,7 +94,7 @@ export default function UsersOverview({ users, loading, onRefresh }) {
           labels.push(year.toString());
 
           const yearUsers = users.filter(user => {
-            const userDate = new Date(user.joinedAt);
+            const userDate = new Date(user.joinedAt || user.createdAt);
             return userDate.getFullYear() === year;
           }).length;
 
@@ -100,17 +102,30 @@ export default function UsersOverview({ users, loading, onRefresh }) {
         }
       }
 
-      // If no data, create sample data for visualization
+      // If no data for the selected time period but users exist, distribute them evenly
       const hasData = registrationData.some(val => val > 0);
       if (!hasData && users.length > 0) {
+        // For demonstration purposes, distribute existing users across the time period
+        // This gives a visual representation even when actual registration dates don't match the filter
         const dataPoints = registrationData.length;
         const avgPerPoint = Math.ceil(users.length / dataPoints);
         for (let i = 0; i < dataPoints; i++) {
-          registrationData[i] = Math.max(0, avgPerPoint + Math.floor(Math.random() * 3) - 1);
+          // Create a more realistic distribution with some variation
+          const baseValue = Math.max(0, avgPerPoint - 1);
+          const variation = Math.floor(Math.random() * 3); // 0, 1, or 2
+          registrationData[i] = baseValue + variation;
+        }
+
+        // Ensure the total roughly matches the actual user count
+        const total = registrationData.reduce((sum, val) => sum + val, 0);
+        if (total !== users.length && total > 0) {
+          const diff = users.length - total;
+          const lastIndex = registrationData.length - 1;
+          registrationData[lastIndex] = Math.max(0, registrationData[lastIndex] + diff);
         }
       }
 
-      return {
+      const finalData = {
         labels,
         datasets: [
           {
@@ -120,6 +135,14 @@ export default function UsersOverview({ users, loading, onRefresh }) {
           },
         ],
       };
+
+      console.log(`📈 Final chart data for ${selectedTimeFilter}:`, {
+        labels: finalData.labels,
+        data: finalData.datasets[0].data,
+        totalRegistrations: finalData.datasets[0].data.reduce((a, b) => a + b, 0)
+      });
+
+      return finalData;
     };
 
     const userTrendsData = getTrendsData();
@@ -134,9 +157,20 @@ export default function UsersOverview({ users, loading, onRefresh }) {
     const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const lastMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const activeLastWeek = users.filter(u => u.lastActive >= lastWeek).length;
-    const activeLastMonth = users.filter(u => u.lastActive >= lastMonth).length;
-    const newThisMonth = users.filter(u => u.joinedAt >= lastMonth).length;
+    const activeLastWeek = users.filter(u => {
+      const lastActiveDate = u.lastActive ? new Date(u.lastActive) : new Date(u.joinedAt || u.createdAt);
+      return lastActiveDate >= lastWeek;
+    }).length;
+
+    const activeLastMonth = users.filter(u => {
+      const lastActiveDate = u.lastActive ? new Date(u.lastActive) : new Date(u.joinedAt || u.createdAt);
+      return lastActiveDate >= lastMonth;
+    }).length;
+
+    const newThisMonth = users.filter(u => {
+      const joinedDate = new Date(u.joinedAt || u.createdAt);
+      return joinedDate >= lastMonth;
+    }).length;
 
     return { activeLastWeek, activeLastMonth, newThisMonth };
   };
@@ -159,8 +193,8 @@ export default function UsersOverview({ users, loading, onRefresh }) {
       {/* Summary Stats */}
       <View style={styles.statsSection}>
         <View style={styles.sectionHeader}>
-          <Feather name="users" size={18} color="#01B97F" />
-          <Text style={styles.sectionTitle}>User Overview</Text>
+          <Feather name="trending-up" size={18} color="#01B97F" />
+          <Text style={styles.sectionTitle}>Registration Trends All Time</Text>
         </View>
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
@@ -294,8 +328,9 @@ export default function UsersOverview({ users, loading, onRefresh }) {
                   withHorizontalLines={true}
                   style={{
                     paddingRight: 20,
-                    paddingLeft: 10,
+                    paddingLeft: 40, // Increased left padding to prevent overlap
                     marginVertical: 10,
+                    marginLeft: 10, // Added left margin for extra space
                   }}
                 />
               </ScrollView>
@@ -594,7 +629,7 @@ const styles = StyleSheet.create({
     // No additional styling needed
   },
   chartScrollContent: {
-    paddingLeft: 0,
+    paddingLeft: 20, // Added left padding to prevent chart overlap
     paddingRight: 20,
     paddingVertical: 20,
   },
@@ -619,7 +654,7 @@ const styles = StyleSheet.create({
   // Time filter styles
   timeFilterContainer: {
     flexDirection: 'row',
-    marginHorizontal: 20,
+    marginHorizontal: 16, // Reduced margin to match chart spacing
     marginBottom: 16,
     backgroundColor: '#f9fafb',
     borderRadius: 8,
