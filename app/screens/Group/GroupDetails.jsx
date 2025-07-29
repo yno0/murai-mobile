@@ -127,17 +127,30 @@ export default function GroupDetailsScreen() {
 
   const recordActivity = async (type, message, metadata = {}) => {
     try {
-      await api.post(`/users/groups/${groupId}/activities`, {
+      // Only record activity if we have valid groupId and user
+      if (!groupId || !user) {
+        console.log('Skipping activity recording - missing groupId or user');
+        return;
+      }
+
+      const activityData = {
         type,
         message,
         metadata,
         userId: user?.id || user?._id,
         userName: user?.name || user?.username || 'Unknown User'
-      });
+      };
+
+      console.log('Recording activity:', activityData);
+
+      await api.post(`/users/groups/${groupId}/activities`, activityData);
+      
       // Refresh activities after recording
       fetchGroupActivities(groupId);
     } catch (err) {
       console.error('Failed to record activity:', err);
+      // Don't throw the error - just log it so it doesn't break the UI
+      // The activity recording failure shouldn't prevent the main functionality
     }
   };
 
@@ -219,15 +232,21 @@ export default function GroupDetailsScreen() {
   // Activity logging helper
   const logActivity = async (action, details = '') => {
     try {
+      // Only log activity if we have groupData
+      if (!groupData) {
+        console.log('Skipping activity logging - no groupData available');
+        return;
+      }
+
       const activityMessages = {
         'viewed_group_info': `Viewed group information for "${groupData?.name}"`,
-        'opened_rename_group': `Opened rename dialog for group "${groupData?.name}"`,
-        'regenerated_invite_code': `Regenerated invite code for group "${groupData?.name}"`,
-        'initiated_group_deletion': `Initiated deletion process for group "${groupData?.name}"`,
-        'removed_member': `Removed member from group "${groupData?.name}"`,
+        'settings_updated': `Opened rename dialog for group "${groupData?.name}"`,
+        'code_regenerated': `Regenerated invite code for group "${groupData?.name}"`,
+        'group_deleted': `Initiated deletion process for group "${groupData?.name}"`,
+        'member_removed': `Removed member from group "${groupData?.name}"`,
         'member_joined': `New member joined group "${groupData?.name}"`,
         'member_left': `Member left group "${groupData?.name}"`,
-        'code_regenerated': `Regenerated invite code for group "${groupData?.name}"`
+        'group_updated': `Group settings updated for "${groupData?.name}"`
       };
 
       await recordActivity(
@@ -241,6 +260,7 @@ export default function GroupDetailsScreen() {
       );
     } catch (error) {
       console.log('Failed to log activity:', error);
+      // Don't throw the error - just log it so it doesn't break the UI
     }
   };
 
@@ -284,7 +304,7 @@ export default function GroupDetailsScreen() {
       console.log('Remove member response:', response.data);
 
       // Record activity
-      await logActivity('removed_member', `Removed ${memberToRemove.name || 'Member'} from group "${groupData.name}"`);
+      await logActivity('member_removed', `Removed ${memberToRemove.name || 'Member'} from group "${groupData.name}"`);
       await recordActivity(
         'member_removed',
         `${memberToRemove.name || 'Member'} was removed from the group`,
@@ -940,7 +960,12 @@ export default function GroupDetailsScreen() {
                 onPress={() => {
                   setAdminMenuVisible(false);
                   setInfoModalVisible(true);
-                  logActivity('viewed_group_info');
+                  // Wrap in try-catch to prevent UI breaking if activity logging fails
+                  try {
+                    logActivity('settings_updated');
+                  } catch (error) {
+                    console.log('Activity logging failed but continuing with modal:', error);
+                  }
                 }}
                 activeOpacity={0.7}
               >
@@ -960,7 +985,12 @@ export default function GroupDetailsScreen() {
                 onPress={() => {
                   setAdminMenuVisible(false);
                   openEditModal();
-                  logActivity('opened_rename_group');
+                  // Wrap in try-catch to prevent UI breaking if activity logging fails
+                  try {
+                    logActivity('settings_updated');
+                  } catch (error) {
+                    console.log('Activity logging failed but continuing with modal:', error);
+                  }
                 }}
                 activeOpacity={0.7}
               >
@@ -980,7 +1010,12 @@ export default function GroupDetailsScreen() {
                 onPress={() => {
                   setAdminMenuVisible(false);
                   handleRegenerateCode();
-                  logActivity('regenerated_invite_code');
+                  // Wrap in try-catch to prevent UI breaking if activity logging fails
+                  try {
+                    logActivity('code_regenerated');
+                  } catch (error) {
+                    console.log('Activity logging failed but continuing with action:', error);
+                  }
                 }}
                 activeOpacity={0.7}
               >
@@ -1003,7 +1038,12 @@ export default function GroupDetailsScreen() {
                 onPress={() => {
                   setAdminMenuVisible(false);
                   handleDeleteGroup();
-                  logActivity('initiated_group_deletion');
+                  // Wrap in try-catch to prevent UI breaking if activity logging fails
+                  try {
+                    logActivity('group_deleted');
+                  } catch (error) {
+                    console.log('Activity logging failed but continuing with action:', error);
+                  }
                 }}
                 activeOpacity={0.7}
               >

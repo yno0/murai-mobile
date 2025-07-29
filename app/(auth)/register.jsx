@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Link } from "expo-router";
 import { useState } from "react";
-import { Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppButton from "../components/common/AppButton";
 import AppInput from "../components/common/AppInput";
 import { COLORS } from "../constants/theme";
@@ -19,6 +19,9 @@ export default function Register() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
@@ -74,6 +77,12 @@ export default function Register() {
   };
 
   const handleRegister = async () => {
+    // Check if agreement is accepted
+    if (!agreementAccepted) {
+      setError("Please accept the Terms of Service and Privacy Policy to continue");
+      return;
+    }
+
     // Clear previous errors
     setNameError("");
     setEmailError("");
@@ -108,19 +117,28 @@ export default function Register() {
     try {
       setError("");
       setLoading(true);
-      await register(email, password, name);
+      console.log('🔄 Starting registration process...');
+
+      await register(name.trim(), email.trim(), password);
+      console.log('✅ Registration successful');
     } catch (err) {
-      // Handle backend error codes
-      if (err.code === 400 && err.message?.toLowerCase().includes('exists')) {
+      console.error('❌ Registration error:', {
+        code: err.code,
+        type: err.type,
+        message: err.message,
+        response: err.response
+      });
+
+      // Handle specific Appwrite error codes
+      if (err.type === 'user_already_exists' || err.code === 409) {
         setError("An account with this email already exists");
-      } else if (err.code === 400) {
-        setError("Invalid registration details");
+      } else if (err.message?.toLowerCase().includes('invalid')) {
+        setError("Please check your information and try again");
       } else if (err.message) {
-        setError(err.message);
+        setError(`Registration failed: ${err.message}`);
       } else {
         setError("Failed to create account. Please try again.");
       }
-      console.error("Registration error:", err);
     } finally {
       setLoading(false);
     }
@@ -130,13 +148,15 @@ export default function Register() {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       {/* Header Section */}
       <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <MaterialCommunityIcons name="account-plus" size={40} color="#02B97F" />
-        </View>
+        <Image 
+          source={require("../../assets/images/logo.png")} 
+          style={styles.logo}
+          resizeMode="contain"
+        />
         <Text style={styles.title}>Create Account</Text>
         <Text style={styles.subtitle}>Join MURAi to get started</Text>
       </View>
@@ -176,35 +196,83 @@ export default function Register() {
         </View>
 
         <View style={styles.inputContainer}>
-          <AppInput
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (passwordError) setPasswordError("");
-            }}
-            placeholder="Create a password"
-            secureTextEntry
-            style={[styles.input, passwordError ? styles.inputError : null]}
-          />
+          <View style={styles.passwordContainer}>
+            <AppInput
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (passwordError) setPasswordError("");
+              }}
+              placeholder="Create a password"
+              secureTextEntry={!showPassword}
+              style={[styles.input, styles.passwordInput, passwordError ? styles.inputError : null]}
+            />
+            <TouchableOpacity
+              style={styles.eyeIcon}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <MaterialCommunityIcons
+                name={showPassword ? "eye-off" : "eye"}
+                size={24}
+                color="#6b7280"
+              />
+            </TouchableOpacity>
+          </View>
           {passwordError ? (
             <Text style={styles.errorText}>{passwordError}</Text>
           ) : null}
         </View>
 
         <View style={styles.inputContainer}>
-          <AppInput
-            value={confirmPassword}
-            onChangeText={(text) => {
-              setConfirmPassword(text);
-              if (confirmPasswordError) setConfirmPasswordError("");
-            }}
-            placeholder="Confirm your password"
-            secureTextEntry
-            style={[styles.input, confirmPasswordError ? styles.inputError : null]}
-          />
+          <View style={styles.passwordContainer}>
+            <AppInput
+              value={confirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                if (confirmPasswordError) setConfirmPasswordError("");
+              }}
+              placeholder="Confirm your password"
+              secureTextEntry={!showConfirmPassword}
+              style={[styles.input, styles.passwordInput, confirmPasswordError ? styles.inputError : null]}
+            />
+            <TouchableOpacity
+              style={styles.eyeIcon}
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              <MaterialCommunityIcons
+                name={showConfirmPassword ? "eye-off" : "eye"}
+                size={24}
+                color="#6b7280"
+              />
+            </TouchableOpacity>
+          </View>
           {confirmPasswordError ? (
             <Text style={styles.errorText}>{confirmPasswordError}</Text>
           ) : null}
+        </View>
+
+        {/* Agreement Checkbox */}
+        <View style={styles.agreementContainer}>
+          <TouchableOpacity
+            style={styles.checkboxContainer}
+            onPress={() => setAgreementAccepted(!agreementAccepted)}
+          >
+            <View style={[styles.checkbox, agreementAccepted && styles.checkboxChecked]}>
+              {agreementAccepted && (
+                <MaterialCommunityIcons name="check" size={16} color="#ffffff" />
+              )}
+            </View>
+            <Text style={styles.agreementText}>
+              I agree to the{' '}
+              <Text style={styles.agreementLink} onPress={() => setShowTermsModal(true)}>
+                Terms of Service
+              </Text>
+              {' '}and{' '}
+              <Text style={styles.agreementLink} onPress={() => setShowPrivacyModal(true)}>
+                Privacy Policy
+              </Text>
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {error ? (
@@ -228,6 +296,7 @@ export default function Register() {
         onPress={handleRegister}
         loading={loading}
         style={styles.createAccountButton}
+        disabled={!agreementAccepted}
       />
 
       {/* Sign In Link */}
@@ -238,16 +307,6 @@ export default function Register() {
         <Link href="/(auth)/login" style={styles.footerLink}>
           Sign In
         </Link>
-      </View>
-
-      {/* Terms and Conditions */}
-      <View style={styles.termsContainer}>
-        <Text style={styles.termsText}>
-          By creating an account, you agree to our{' '}
-          <Text style={styles.termsLink} onPress={() => setShowTermsModal(true)}>Terms of Service</Text>
-          {' '}and{' '}
-          <Text style={styles.termsLink} onPress={() => setShowPrivacyModal(true)}>Privacy Policy</Text>
-        </Text>
       </View>
 
       {/* Terms of Service Modal */}
@@ -348,7 +407,7 @@ export default function Register() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#ffffff',
   },
   header: {
     alignItems: 'center',
@@ -356,22 +415,10 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     paddingHorizontal: 24,
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
+  logo: {
+    width: 120,
+    height: 120,
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
   },
   title: {
     fontSize: 32,
@@ -450,30 +497,67 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Poppins-SemiBold',
   },
-  termsContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 40,
+
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 0,
   },
-  termsText: {
-    color: '#6b7280',
+  passwordInput: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  eyeIcon: {
+    padding: 5,
+  },
+  agreementContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  checkboxChecked: {
+    backgroundColor: '#02B97F',
+    borderColor: '#02B97F',
+  },
+  agreementText: {
     fontSize: 13,
     fontFamily: 'Poppins-Regular',
-    textAlign: 'center',
+    color: '#6b7280',
   },
-  termsLink: {
+  agreementLink: {
     color: '#02B97F',
-    fontSize: 13,
-    fontFamily: 'Poppins-SemiBold',
+    textDecorationLine: 'underline',
   },
+
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
     backgroundColor: '#ffffff',
     borderRadius: 10,
+    padding: 20,
     width: '90%',
     maxHeight: '80%',
     shadowColor: '#000',
@@ -486,9 +570,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    marginBottom: 15,
   },
   modalTitle: {
     fontSize: 20,
@@ -496,18 +578,19 @@ const styles = StyleSheet.create({
     color: '#1f2937',
   },
   modalBody: {
-    padding: 16,
+    maxHeight: '70%',
   },
   modalText: {
     fontSize: 14,
     fontFamily: 'Poppins-Regular',
     color: '#4b5563',
     lineHeight: 22,
+    marginBottom: 15,
   },
   modalSectionTitle: {
     fontSize: 16,
     fontFamily: 'Poppins-SemiBold',
     color: '#1f2937',
-    marginTop: 16,
+    marginBottom: 8,
   },
 });
