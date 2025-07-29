@@ -761,4 +761,169 @@ router.get("/reports", authenticateToken, async (req, res) => {
   }
 });
 
+// POST /api/users/detected-words - Log detected inappropriate content
+router.post("/detected-words", authenticateToken, async (req, res) => {
+  try {
+    const {
+      word,
+      context,
+      url,
+      patternType,
+      language,
+      severity,
+      siteType
+    } = req.body;
+
+    // Validate required fields
+    if (!word || !context || !url) {
+      return res.status(400).json({
+        message: "Word, context, and URL are required"
+      });
+    }
+
+    // Dynamic import for DetectedWord model
+    const { default: DetectedWord } = await import("../../models/detectedWordModel.js");
+
+    // Create new detected word entry
+    const detectedWord = new DetectedWord({
+      userId: req.user.id,
+      word: word.toLowerCase().trim(),
+      context: context.trim(),
+      url: url.trim(),
+      sentimentScore: 0.8, // Default sentiment score
+      accuracy: 0.95, // Default accuracy
+      responseTime: 50, // Default response time in ms
+      patternType: patternType || 'Profanity',
+      language: language || 'Mixed',
+      severity: severity || 'medium',
+      siteType: siteType || 'Website',
+      createdAt: new Date()
+    });
+
+    await detectedWord.save();
+
+    // Log user activity for content detection
+    await logUserActivity(
+      req.user.id,
+      "detection",
+      `Inappropriate content detected: "${word}" on ${url}`,
+      "content_detection",
+      {
+        word,
+        context: context.substring(0, 100),
+        url,
+        patternType,
+        severity
+      }
+    );
+
+    res.status(201).json({
+      message: "Detection logged successfully",
+      detection: {
+        id: detectedWord._id,
+        word: detectedWord.word,
+        patternType: detectedWord.patternType,
+        severity: detectedWord.severity,
+        createdAt: detectedWord.createdAt
+      }
+    });
+
+  } catch (error) {
+    console.error("Log detected word error:", error);
+    res.status(500).json({
+      message: "Server error",
+      error: error.message
+    });
+  }
+});
+
+// GET /api/users/detected-words - Get user's detected words
+router.get("/detected-words", authenticateToken, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      severity = "",
+      patternType = "",
+      language = "",
+      startDate = "",
+      endDate = ""
+    } = req.query;
+
+    // Dynamic import for DetectedWord model
+    const { default: DetectedWord } = await import("../../models/detectedWordModel.js");
+
+    // Build filter
+    const filter = { userId: req.user.id };
+    if (severity && severity !== "all") filter.severity = severity;
+    if (patternType && patternType !== "all") filter.patternType = patternType;
+    if (language && language !== "all") filter.language = language;
+
+    // Date range filter
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get detected words
+    const detectedWords = await DetectedWord.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const totalDetections = await DetectedWord.countDocuments(filter);
+
+    // Get summary statistics
+    const stats = await DetectedWord.aggregate([
+      { $match: { userId: req.user.id } },
+      {
+        $group: {
+          _id: null,
+          totalDetections: { $sum: 1 },
+          avgSentimentScore: { $avg: "$sentimentScore" },
+          avgAccuracy: { $avg: "$accuracy" },
+          avgResponseTime: { $avg: "$responseTime" },
+          severityBreakdown: {
+            $push: "$severity"
+          },
+          patternBreakdown: {
+            $push: "$patternType"
+          }
+        }
+      }
+    ]);
+
+    res.json({
+      detectedWords,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalDetections / parseInt(limit)),
+        totalDetections,
+        hasNextPage: skip + detectedWords.length < totalDetections,
+        hasPrevPage: page > 1
+      },
+      statistics: stats[0] || {
+        totalDetections: 0,
+        avgSentimentScore: 0,
+        avgAccuracy: 0,
+        avgResponseTime: 0,
+        severityBreakdown: [],
+        patternBreakdown: []
+      }
+    });
+
+  } catch (error) {
+    console.error("Get detected words error:", error);
+    res.status(500).json({
+      message: "Server error",
+      error: error.message
+    });
+  }
+});
+
 export default router;

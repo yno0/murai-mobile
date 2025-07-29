@@ -8,25 +8,34 @@ const preferenceSchema = new Schema ({
     },
     language: {
         type: String,
-        enum: ['Taglish', 'English', 'Tagalog']
+        enum: ['Taglish', 'English', 'Tagalog', 'Both'],
+        default: 'Both'
+    },
+    sensitivity: {
+        type: String,
+        enum: ['low', 'medium', 'high'],
+        default: 'medium'
     },
     whitelistSite:{
         type: [String],
+        default: []
     },
     whitelistTerms:{
         type: [String],
+        default: []
     },
     flagStyle: {
         type: String,
         enum: ['default', 'custom', 'asterisk', 'underline', 'blur', 'highlight', 'none'],
+        default: 'highlight'
     },
     isHighlighted:{
         type: Boolean,
-        default: false,
+        default: true,
     },
     color: {
         type: String,
-        default: '#FF0000',
+        default: '#374151',
     },
     extensionEnabled: {
         type: Boolean,

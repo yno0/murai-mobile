@@ -237,9 +237,9 @@ export default function ExtensionScreen() {
     setSyncStatus('Syncing...');
 
     try {
-      console.log('🔄 Auto-syncing extension settings from database...');
+      console.log('🔄 Auto-syncing extension settings...');
 
-      // Get latest preferences from database via API
+      // Get latest preferences from mobile app
       const preferences = await getPreferences();
 
       if (preferences) {
@@ -248,38 +248,16 @@ export default function ExtensionScreen() {
         setLastSyncTime(now);
         setSyncStatus('Synced');
 
-        console.log('✅ Extension settings synced successfully from database');
-        console.log('📱 Synced preferences from DB:', {
+        console.log('✅ Extension settings synced successfully');
+        console.log('📱 Synced preferences:', {
           language: preferences.language,
           sensitivity: preferences.sensitivity,
           whitelistTerms: preferences.whitelistTerms?.length || 0,
           whitelistSites: preferences.whitelistSite?.length || 0,
           flagStyle: preferences.flagStyle,
           isHighlighted: preferences.isHighlighted,
-          color: preferences.color,
-          updatedAt: preferences.updatedAt
+          color: preferences.color
         });
-
-        // Log sync activity to server
-        try {
-          const { user: authUser } = useAuth();
-          if (authUser?.token) {
-            await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000'}/api/users/extension-sync`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${authUser.token}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                syncType: 'mobile_auto',
-                platform: 'mobile',
-                timestamp: new Date().toISOString()
-              })
-            });
-          }
-        } catch (logError) {
-          console.log('Failed to log sync activity:', logError);
-        }
       } else {
         setSyncStatus('No settings found');
         setTimeout(() => setSyncStatus('Not synced'), 2000);

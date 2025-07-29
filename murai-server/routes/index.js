@@ -10,8 +10,6 @@ const router = express.Router();
 // Authentication routes (shared)
 router.use('/auth', authRoutes);
 
-// Detection routes (shared) - will be added dynamically
-
 // Notification routes (shared)
 router.use('/notifications', notificationRoutes);
 
