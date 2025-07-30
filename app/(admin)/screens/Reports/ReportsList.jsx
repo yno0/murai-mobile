@@ -1,13 +1,13 @@
 import { Feather } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const ITEMS_PER_PAGE = 10;
@@ -25,27 +25,32 @@ export default function ReportsList({
   const [currentPage, setCurrentPage] = useState(1);
   const [paginatedReports, setPaginatedReports] = useState([]);
 
-  // Filter reports based on search and filter
-  const filteredReports = reports.filter(report => {
-    const matchesSearch = !searchQuery ||
-      report.reportedText.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      report.reportedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      report.category.toLowerCase().includes(searchQuery.toLowerCase());
+  // Filter reports based on search and filter - memoized to prevent infinite loops
+  const filteredReports = useMemo(() => {
+    return reports.filter(report => {
+      const matchesSearch = !searchQuery ||
+        report.reportedText.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        report.reportedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        report.category.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesFilter = selectedFilter === 'all' || report.status === selectedFilter;
+      const matchesFilter = selectedFilter === 'all' || report.status === selectedFilter;
 
-    return matchesSearch && matchesFilter;
-  });
+      return matchesSearch && matchesFilter;
+    });
+  }, [reports, searchQuery, selectedFilter]);
 
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredReports.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
+  // Calculate pagination - memoized to prevent recalculation on every render
+  const { totalPages, startIndex, endIndex } = useMemo(() => {
+    const total = Math.ceil(filteredReports.length / ITEMS_PER_PAGE);
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    return { totalPages: total, startIndex: start, endIndex: end };
+  }, [filteredReports.length, currentPage]);
 
   useEffect(() => {
     const paginated = filteredReports.slice(startIndex, endIndex);
     setPaginatedReports(paginated);
-  }, [filteredReports, currentPage]);
+  }, [filteredReports, startIndex, endIndex]);
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -240,7 +245,7 @@ export default function ReportsList({
           </View>
         )}
         ListFooterComponent={renderPagination}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
         style={styles.flatList}
       />
     </View>
@@ -253,7 +258,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   searchSection: {
-    paddingHorizontal: 20,
     paddingBottom: 16,
   },
   searchContainer: {
@@ -261,7 +265,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     borderWidth: 1,
     borderColor: '#f3f4f6',
   },
@@ -276,14 +280,13 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   filterSection: {
-    paddingHorizontal: 20,
     paddingBottom: 20,
   },
   filterContainer: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 4,
+    padding: 2,
     borderWidth: 1,
     borderColor: '#f3f4f6',
   },
@@ -312,8 +315,8 @@ const styles = StyleSheet.create({
   reportItem: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: 18,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#f3f4f6',
     flexDirection: 'row',
@@ -370,7 +373,7 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 50,
   },
   emptyText: {
     fontSize: 16,
@@ -386,8 +389,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   paginationContainer: {
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingTop: 24,
+    paddingBottom: 16,
     alignItems: 'center',
   },
   paginationInfo: {

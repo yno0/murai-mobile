@@ -1,13 +1,13 @@
 import { Feather } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const ITEMS_PER_PAGE = 10;
@@ -26,15 +26,18 @@ export default function UsersList({
   const [paginatedUsers, setPaginatedUsers] = useState([]);
 
   // Since filtering is done on the server side, we just use the users directly
-  // Calculate pagination
-  const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
+  // Calculate pagination - memoized to prevent recalculation on every render
+  const { totalPages, startIndex, endIndex } = useMemo(() => {
+    const total = Math.ceil(users.length / ITEMS_PER_PAGE);
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    return { totalPages: total, startIndex: start, endIndex: end };
+  }, [users.length, currentPage]);
 
   useEffect(() => {
     const paginated = users.slice(startIndex, endIndex);
     setPaginatedUsers(paginated);
-  }, [users, currentPage, startIndex, endIndex]);
+  }, [users, startIndex, endIndex]);
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -236,7 +239,7 @@ export default function UsersList({
           </View>
         )}
         ListFooterComponent={renderPagination}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }} // Increased padding
         style={styles.flatList}
       />
     </View>
@@ -249,17 +252,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   searchSection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24, // Increased from 20 to 24
     paddingBottom: 16,
+    paddingTop: 8, // Added top padding for breathing room
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18, // Increased from 16 to 18
     borderWidth: 1,
     borderColor: '#f3f4f6',
+    marginHorizontal: 4, // Added horizontal margin for better spacing
   },
   searchIcon: {
     marginRight: 12,
@@ -287,7 +292,7 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   filterSection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24, // Increased from 20 to 24
     paddingBottom: 20,
   },
   filterContainer: {
@@ -297,6 +302,7 @@ const styles = StyleSheet.create({
     padding: 4,
     borderWidth: 1,
     borderColor: '#f3f4f6',
+    marginHorizontal: 4, // Added horizontal margin for better spacing
   },
   filterButton: {
     flex: 1,
@@ -323,8 +329,9 @@ const styles = StyleSheet.create({
   userItem: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: 18, // Increased from 16 to 18
+    marginBottom: 14, // Increased from 12 to 14
+    marginHorizontal: 4, // Added horizontal margin for better spacing
     borderWidth: 1,
     borderColor: '#f3f4f6',
     flexDirection: 'row',
@@ -379,7 +386,8 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 50, // Increased from 40 to 50
+    paddingHorizontal: 24, // Added horizontal padding
   },
   emptyText: {
     fontSize: 16,
@@ -395,8 +403,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   paginationContainer: {
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingTop: 24, // Increased from 20 to 24
+    paddingBottom: 16, // Increased from 10 to 16
+    paddingHorizontal: 24, // Added horizontal padding
     alignItems: 'center',
   },
   paginationInfo: {

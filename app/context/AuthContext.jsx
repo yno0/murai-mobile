@@ -17,7 +17,18 @@ export function AuthProvider({ children }) {
       // Use AsyncStorage for React Native
       const storedUser = await AsyncStorage.getItem('user');
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const user = JSON.parse(storedUser);
+
+        // Check if user status is deactivated
+        if (user.status === 'inactive' || user.status === 'suspended') {
+          console.log('🚫 User account is deactivated, logging out...');
+          // Clear stored data for deactivated users
+          await AsyncStorage.removeItem('token');
+          await AsyncStorage.removeItem('user');
+          setUser(null);
+        } else {
+          setUser(user);
+        }
       } else {
         setUser(null);
       }
@@ -51,7 +62,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const register = async (email, password, name) => {
+  const register = async (name, email, password) => {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
@@ -69,8 +80,7 @@ export function AuthProvider({ children }) {
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
       setUser(data.user);
 
-      // Redirect to main app
-      router.replace('/(app)');
+      // Don't auto-redirect, let the register screen handle it
     } catch (error) {
       throw error;
     }

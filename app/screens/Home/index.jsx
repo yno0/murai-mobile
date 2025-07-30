@@ -2,17 +2,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import React from 'react';
 import {
-  Animated,
-  Dimensions,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Animated,
+    Dimensions,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import LoadingDots from '../../components/common/LoadingDots';
 import NotificationDetailModal from '../../components/notifications/NotificationDetailModal';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
@@ -551,11 +552,13 @@ function HomeScreen({ navigation }) {
       {/* Loading State */}
       {loading && (
         <View style={styles.loadingContainer}>
-          <View style={styles.loadingCard}>
-            <MaterialCommunityIcons name="shield-check" size={48} color="#02B97F" />
-            <Text style={styles.loadingTitle}>Loading Protection Data</Text>
-            <Text style={styles.loadingSubtitle}>Fetching your security overview...</Text>
-          </View>
+          <LoadingDots
+            text="Loading your security overview"
+            dotColor="#02B97F"
+            textColor="#6b7280"
+            size={10}
+            textSize={16}
+          />
         </View>
       )}
 
@@ -986,8 +989,13 @@ function HomeScreen({ navigation }) {
           <View style={styles.activityListContainer}>
           {loading ? (
               <View style={styles.emptyStateContainer}>
-                <MaterialCommunityIcons name="loading" size={24} color="#9ca3af" />
-                <Text style={styles.emptyStateText}>Loading activities...</Text>
+                <LoadingDots
+                  text="Loading activities"
+                  dotColor="#02B97F"
+                  textColor="#9ca3af"
+                  size={8}
+                  textSize={14}
+                />
               </View>
           ) : error ? (
               <View style={styles.emptyStateContainer}>
@@ -1339,14 +1347,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   viewAllText: {
     fontSize: 14,
@@ -1360,14 +1360,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
   },
   emptyStateText: {
     fontSize: 16,
@@ -1388,14 +1382,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     marginTop: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
   },
   activityList: {
     backgroundColor: '#ffffff',
@@ -1500,14 +1488,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#02B97F',
     borderRadius: 20,
     padding: 24,
-    shadowColor: '#02B97F',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
   },
   heroContent: {
     flexDirection: 'row',
@@ -1606,14 +1586,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
   },
   quickActionTitle: {
     fontSize: 16,
@@ -1633,37 +1607,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 80,
+    paddingHorizontal: 20,
   },
-  loadingCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(2, 185, 127, 0.1)',
-  },
-  loadingTitle: {
-    fontSize: 18,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#1f2937',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  loadingSubtitle: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: '#6b7280',
-    textAlign: 'center',
-  },
+
   protectionToggleButton: {
     flexDirection: 'row',
     alignItems: 'center',

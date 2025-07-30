@@ -1,7 +1,12 @@
 import { Feather } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     Dimensions,
     Modal,
     RefreshControl,
@@ -142,6 +147,7 @@ export default function AdminDashboardScreen({ navigation }) {
   const [selectedToDate, setSelectedToDate] = useState(null);
   const [isSelectingFrom, setIsSelectingFrom] = useState(true);
   const [showYearPicker, setShowYearPicker] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [dashboardData, setDashboardData] = useState({
     overview: null,
     chartData: null,
@@ -412,8 +418,14 @@ export default function AdminDashboardScreen({ navigation }) {
       iconColor: "#01B97F",
       screen: "AdminLanguages",
     },
-
-
+    {
+      icon: "file-document-outline",
+      title: "Generate Report",
+      subtitle: "Create comprehensive analytics PDF",
+      color: "#fef3c7",
+      iconColor: "#d97706",
+      action: "generateReport",
+    },
   ];
 
   const sideMenuItems = [
@@ -437,8 +449,14 @@ export default function AdminDashboardScreen({ navigation }) {
       icon: "translate",
       action: () => navigation.navigate("AdminLanguages"),
     },
-
-
+    {
+      title: "Generate Report",
+      icon: "file-document-outline",
+      action: () => {
+        setIsMenuOpen(false);
+        generateReport();
+      },
+    },
   ];
 
   const toggleMenu = () => {
@@ -480,12 +498,12 @@ export default function AdminDashboardScreen({ navigation }) {
     const dayNum = parseInt(day);
     const monthNum = parseInt(month);
     const yearNum = parseInt(year);
-    
+
     if (isNaN(dayNum) || isNaN(monthNum) || isNaN(yearNum)) return false;
     if (monthNum < 1 || monthNum > 12) return false;
     if (dayNum < 1 || dayNum > 31) return false;
     if (yearNum < 1900 || yearNum > 2100) return false;
-    
+
     // Check for valid day in month
     const date = new Date(yearNum, monthNum - 1, dayNum);
     return date.getDate() === dayNum && date.getMonth() === monthNum - 1;
@@ -503,22 +521,22 @@ export default function AdminDashboardScreen({ navigation }) {
     const daysInMonth = getDaysInMonth(date);
     const firstDay = getFirstDayOfMonth(date);
     const days = [];
-    
+
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDay; i++) {
       days.push(null);
     }
-    
+
     // Add days of the month
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(new Date(date.getFullYear(), date.getMonth(), i));
     }
-    
+
     return days;
   };
 
   const isSameDay = (date1, date2) => {
-    return date1 && date2 && 
+    return date1 && date2 &&
            date1.getDate() === date2.getDate() &&
            date1.getMonth() === date2.getMonth() &&
            date1.getFullYear() === date2.getFullYear();
@@ -530,9 +548,9 @@ export default function AdminDashboardScreen({ navigation }) {
   };
 
   const formatMonthYear = (date) => {
-    return date.toLocaleDateString('en-US', { 
-      month: 'long', 
-      year: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric'
     });
   };
 
@@ -580,6 +598,647 @@ export default function AdminDashboardScreen({ navigation }) {
     }
   };
 
+  // Generate comprehensive PDF report
+  const generateReport = async () => {
+    if (isGeneratingReport) {
+      Alert.alert("Please Wait", "A report is already being generated. Please wait for it to complete.");
+      return;
+    }
+
+    try {
+      setIsGeneratingReport(true);
+      console.log('📊 Starting report generation...');
+
+      Alert.alert(
+        "🔄 Generating Report",
+        "Creating your comprehensive analytics report...\n\nThis may take a few moments depending on the amount of data.",
+        [{ text: "OK" }]
+      );
+
+      // Get auth token
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        console.error('❌ No authentication token found');
+        Alert.alert("Error", "Authentication required. Please log in again.");
+        return;
+      }
+
+      console.log('🔑 Token found, fetching data...');
+
+      // Fetch comprehensive data for the report
+      const reportData = await fetchReportData(token);
+
+      if (!reportData) {
+        throw new Error('Failed to fetch report data');
+      }
+
+      console.log('📄 Generating HTML content...');
+
+      // Generate HTML content for the PDF
+      const htmlContent = generateReportHTML(reportData);
+
+      console.log('🖨️ Creating PDF...');
+
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const filename = `MURAi_Analytics_Report_${timestamp}.pdf`;
+
+      // Create PDF
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false,
+      });
+
+      console.log('✅ PDF created successfully:', uri);
+
+      // Save to device documents folder and offer sharing
+      try {
+        // Save to app's documents directory (accessible to user)
+        const downloadUri = `${FileSystem.documentDirectory}${filename}`;
+        await FileSystem.copyAsync({
+          from: uri,
+          to: downloadUri
+        });
+
+        console.log('💾 PDF saved to device documents folder');
+
+        Alert.alert(
+          "✅ Report Generated Successfully!",
+          `Your comprehensive analytics report has been created and saved!\n\n📄 File: ${filename}\n\nWhat would you like to do next?`,
+          [
+            {
+              text: "📤 Share Report",
+              onPress: () => shareReport(downloadUri, filename),
+              style: "default"
+            },
+            {
+              text: "📱 Save to Downloads",
+              onPress: () => shareReport(downloadUri, filename, true),
+              style: "default"
+            },
+            { text: "✅ Done", style: "cancel" }
+          ]
+        );
+
+      } catch (saveError) {
+        console.warn('⚠️ Could not save to documents, using temporary file:', saveError);
+        // Fallback to original temporary file
+        Alert.alert(
+          "✅ Report Generated!",
+          `Your analytics report has been created successfully!\n\n📄 File: ${filename}`,
+          [
+            {
+              text: "📤 Share Report",
+              onPress: () => shareReport(uri, filename),
+              style: "default"
+            },
+            { text: "✅ Done", style: "cancel" }
+          ]
+        );
+      }
+
+    } catch (error) {
+      console.error('❌ Error generating report:', error);
+
+      let errorMessage = "Failed to generate report. Please try again.";
+
+      if (error.message?.includes('JSON')) {
+        errorMessage = "Error processing server data. Please check your connection and try again.";
+      } else if (error.message?.includes('fetch')) {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (error.message?.includes('token')) {
+        errorMessage = "Authentication error. Please log in again.";
+      }
+
+      Alert.alert("Error", errorMessage);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  // Helper function to share the report
+  const shareReport = async (uri, filename, saveToDownloads = false) => {
+    try {
+      console.log('📤 Attempting to share PDF...');
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: saveToDownloads ? 'Save MURAi Report to Downloads' : 'Share MURAi Analytics Report',
+          UTI: 'com.adobe.pdf',
+        });
+        console.log('✅ PDF shared successfully');
+
+        // Show appropriate success message
+        if (saveToDownloads) {
+          Alert.alert(
+            "💾 Save to Downloads",
+            "Use the share menu to save your report to Downloads folder or any other location on your device.",
+            [{ text: "Got it!", style: "default" }]
+          );
+        }
+
+      } else {
+        Alert.alert(
+          "📄 Report Ready",
+          `Your report "${filename}" has been generated successfully!\n\n📁 The file is saved in your app's documents folder.\n\n💡 Tip: Use a file manager app to access and move the file to your preferred location.`,
+          [{ text: "Got it!", style: "default" }]
+        );
+      }
+    } catch (shareError) {
+      console.error('❌ Error sharing report:', shareError);
+      Alert.alert(
+        "📄 Report Generated",
+        `Your report "${filename}" was created successfully!\n\n📁 The file is saved in your app's documents folder.\n\n⚠️ Sharing encountered an issue, but your file is safely saved.`,
+        [
+          {
+            text: "📂 File Info",
+            onPress: () => {
+              Alert.alert(
+                "📂 File Location",
+                `Your report is saved as:\n\n📄 ${filename}\n\n📁 Location: App Documents Folder\n\n💡 You can access it through your device's file manager or by using the share function in other apps.`,
+                [{ text: "Thanks!", style: "default" }]
+              );
+            }
+          },
+          { text: "OK", style: "cancel" }
+        ]
+      );
+    }
+  };
+
+  // Fetch comprehensive data for the report
+  const fetchReportData = async (token) => {
+    try {
+      console.log('🔄 Fetching report data...');
+
+      // Helper function to safely parse JSON response
+      const safeJsonParse = async (response, endpoint) => {
+        try {
+          if (!response.ok) {
+            console.warn(`⚠️ ${endpoint} returned status: ${response.status}`);
+            return null;
+          }
+          const text = await response.text();
+          if (!text) {
+            console.warn(`⚠️ ${endpoint} returned empty response`);
+            return null;
+          }
+          return JSON.parse(text);
+        } catch (error) {
+          console.error(`❌ Error parsing JSON for ${endpoint}:`, error);
+          return null;
+        }
+      };
+
+      const [
+        overviewRes,
+        detectedWordsRes,
+        reportsRes,
+        usersRes,
+        websitesRes
+      ] = await Promise.all([
+        fetch(`${API_BASE_URL}/dashboard/overview?timeRange=all%20time`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch(`${API_BASE_URL}/admin/detected-words?limit=50&sortBy=createdAt&sortOrder=desc`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch(`${API_BASE_URL}/admin/reports?limit=50&sortBy=createdAt&sortOrder=desc`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch(`${API_BASE_URL}/admin/users?limit=100&sortBy=createdAt&sortOrder=desc`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch(`${API_BASE_URL}/dashboard/websites?timeRange=all%20time`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      ]);
+
+      console.log('📡 API responses received, parsing...');
+
+      const overview = await safeJsonParse(overviewRes, 'overview');
+      const detectedWords = await safeJsonParse(detectedWordsRes, 'detected-words');
+      const reports = await safeJsonParse(reportsRes, 'reports');
+      const users = await safeJsonParse(usersRes, 'users');
+      const websites = await safeJsonParse(websitesRes, 'websites');
+
+      console.log('✅ Data parsed successfully');
+
+      return {
+        overview: overview || {},
+        detectedWords: (detectedWords?.detectedWords || detectedWords || []).slice(0, 50),
+        reports: (reports?.reports || reports || []).slice(0, 50),
+        users: (users?.users || users || []).slice(0, 100),
+        websites: (websites?.topWebsites || websites?.websites || websites || []).slice(0, 15),
+        generatedAt: new Date().toISOString(),
+        timeRange: selectedTimeRange
+      };
+    } catch (error) {
+      console.error('Error fetching report data:', error);
+      throw error;
+    }
+  };
+
+  // Generate HTML content for the PDF report
+  const generateReportHTML = (data) => {
+    const formatDate = (dateString) => {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    };
+
+    const getSeverityColor = (severity) => {
+      switch (severity?.toLowerCase()) {
+        case 'high': return '#dc2626';
+        case 'medium': return '#d97706';
+        case 'low': return '#16a34a';
+        default: return '#6b7280';
+      }
+    };
+
+    const getRiskColor = (risk) => {
+      switch (risk?.toLowerCase()) {
+        case 'high': return '#dc2626';
+        case 'medium': return '#d97706';
+        case 'low': return '#16a34a';
+        default: return '#6b7280';
+      }
+    };
+
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>MURAi Analytics Report</title>
+      <style>
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          margin: 0;
+          padding: 20px;
+          background-color: #ffffff;
+          color: #333;
+          line-height: 1.6;
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 40px;
+          border-bottom: 3px solid #01B97F;
+          padding-bottom: 20px;
+        }
+        .logo {
+          font-size: 32px;
+          font-weight: bold;
+          color: #01B97F;
+          margin-bottom: 10px;
+        }
+        .subtitle {
+          font-size: 18px;
+          color: #6b7280;
+          margin-bottom: 10px;
+        }
+        .report-info {
+          font-size: 14px;
+          color: #9ca3af;
+        }
+        .section {
+          margin-bottom: 40px;
+          page-break-inside: avoid;
+        }
+        .section-title {
+          font-size: 24px;
+          font-weight: bold;
+          color: #111827;
+          margin-bottom: 20px;
+          border-left: 4px solid #01B97F;
+          padding-left: 15px;
+        }
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 20px;
+          margin-bottom: 30px;
+        }
+        .stat-card {
+          background: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 20px;
+          text-align: center;
+        }
+        .stat-value {
+          font-size: 28px;
+          font-weight: bold;
+          color: #01B97F;
+          margin-bottom: 5px;
+        }
+        .stat-label {
+          font-size: 14px;
+          color: #6b7280;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 20px;
+          background: white;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .table th {
+          background: #01B97F;
+          color: white;
+          padding: 12px;
+          text-align: left;
+          font-weight: 600;
+        }
+        .table td {
+          padding: 12px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .table tr:last-child td {
+          border-bottom: none;
+        }
+        .table tr:nth-child(even) {
+          background: #f9fafb;
+        }
+        .badge {
+          display: inline-block;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+        .badge-high { background: #fee2e2; color: #dc2626; }
+        .badge-medium { background: #fef3c7; color: #d97706; }
+        .badge-low { background: #f0fdf4; color: #16a34a; }
+        .badge-default { background: #f3f4f6; color: #6b7280; }
+        .summary-box {
+          background: #f0f9ff;
+          border: 1px solid #0ea5e9;
+          border-radius: 8px;
+          padding: 20px;
+          margin-bottom: 30px;
+        }
+        .summary-title {
+          font-size: 18px;
+          font-weight: bold;
+          color: #0369a1;
+          margin-bottom: 10px;
+        }
+        .page-break {
+          page-break-before: always;
+        }
+        .footer {
+          margin-top: 40px;
+          text-align: center;
+          font-size: 12px;
+          color: #9ca3af;
+          border-top: 1px solid #e5e7eb;
+          padding-top: 20px;
+        }
+      </style>
+    </head>
+    <body>
+      <!-- Header -->
+      <div class="header">
+        <div class="logo">MURAi</div>
+        <div class="subtitle">Comprehensive Analytics Report</div>
+        <div class="report-info">
+          Generated on: ${formatDate(data.generatedAt)}<br>
+          Time Range: ${data.timeRange}<br>
+          Report Type: Overall Analytics
+        </div>
+      </div>
+
+      <!-- Executive Summary -->
+      <div class="section">
+        <h2 class="section-title">Executive Summary</h2>
+        <div class="summary-box">
+          <div class="summary-title">Key Metrics Overview</div>
+          <p>This comprehensive report provides insights into MURAi's content monitoring and protection effectiveness.
+          The data covers ${(data.detectedWords || []).length} detected words, ${(data.reports || []).length} reports,
+          ${(data.users || []).length} users, and ${(data.websites || []).length} monitored websites.</p>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value">${data.overview?.harmfulContentDetected?.value || data.overview?.totalDetections || (data.detectedWords || []).length || '0'}</div>
+            <div class="stat-label">Harmful Content Detected</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${data.overview?.websitesMonitored?.value || data.overview?.totalWebsites || (data.websites || []).length || '0'}</div>
+            <div class="stat-label">Websites Monitored</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${data.overview?.protectionEffectiveness?.value || '95%'}</div>
+            <div class="stat-label">Protection Effectiveness</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${(data.users || []).length}</div>
+            <div class="stat-label">Total Users</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detected Words Analysis -->
+      <div class="section">
+        <h2 class="section-title">Detected Words Analysis</h2>
+        <p>Recent content detection patterns and severity analysis.</p>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Word/Phrase</th>
+              <th>Severity</th>
+              <th>Language</th>
+              <th>Pattern Type</th>
+              <th>Detected At</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(data.detectedWords || []).slice(0, 20).map(word => `
+              <tr>
+                <td>${word.word || 'N/A'}</td>
+                <td>
+                  <span class="badge badge-${word.severity || 'default'}" style="color: ${getSeverityColor(word.severity)}">
+                    ${word.severity || 'Unknown'}
+                  </span>
+                </td>
+                <td>${word.language || 'Unknown'}</td>
+                <td>${word.patternType || 'General'}</td>
+                <td>${word.createdAt ? formatDate(word.createdAt) : 'N/A'}</td>
+              </tr>
+            `).join('')}
+            ${(data.detectedWords || []).length === 0 ? `
+              <tr>
+                <td colspan="5" style="text-align: center; color: #6b7280; padding: 20px;">
+                  No detected words data available
+                </td>
+              </tr>
+            ` : ''}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Page Break -->
+      <div class="page-break"></div>
+
+      <!-- Reports Analysis -->
+      <div class="section">
+        <h2 class="section-title">Reports Analysis</h2>
+        <p>User-generated reports and their resolution status.</p>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Report ID</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Reported By</th>
+              <th>Created At</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(data.reports || []).slice(0, 20).map(report => `
+              <tr>
+                <td>${report._id?.slice(-8) || 'N/A'}</td>
+                <td>${report.type || 'General'}</td>
+                <td>
+                  <span class="badge badge-${report.status === 'resolved' ? 'low' : report.status === 'pending' ? 'medium' : 'default'}">
+                    ${report.status || 'Unknown'}
+                  </span>
+                </td>
+                <td>${report.reportedBy?.name || report.reportedBy || 'Anonymous'}</td>
+                <td>${report.createdAt ? formatDate(report.createdAt) : 'N/A'}</td>
+              </tr>
+            `).join('')}
+            ${(data.reports || []).length === 0 ? `
+              <tr>
+                <td colspan="5" style="text-align: center; color: #6b7280; padding: 20px;">
+                  No reports data available
+                </td>
+              </tr>
+            ` : ''}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Users Analysis -->
+      <div class="section">
+        <h2 class="section-title">Users Analysis</h2>
+        <p>User registration and activity patterns.</p>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Joined</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(data.users || []).slice(0, 20).map(user => `
+              <tr>
+                <td>${user.name || 'N/A'}</td>
+                <td>${user.email || 'N/A'}</td>
+                <td>
+                  <span class="badge badge-${user.role === 'admin' ? 'low' : 'default'}">
+                    ${user.role || 'User'}
+                  </span>
+                </td>
+                <td>
+                  <span class="badge badge-${user.status === 'active' ? 'low' : 'medium'}">
+                    ${user.status || 'Unknown'}
+                  </span>
+                </td>
+                <td>${(user.joinedAt || user.createdAt) ? formatDate(user.joinedAt || user.createdAt) : 'N/A'}</td>
+              </tr>
+            `).join('')}
+            ${(data.users || []).length === 0 ? `
+              <tr>
+                <td colspan="5" style="text-align: center; color: #6b7280; padding: 20px;">
+                  No users data available
+                </td>
+              </tr>
+            ` : ''}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Websites Analysis -->
+      <div class="section">
+        <h2 class="section-title">Monitored Websites</h2>
+        <p>Top websites by detection activity and risk assessment.</p>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Domain</th>
+              <th>Detections</th>
+              <th>Risk Level</th>
+              <th>Accuracy</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(data.websites || []).slice(0, 15).map(site => `
+              <tr>
+                <td>${site.domain || site.url || 'N/A'}</td>
+                <td>${site.detectionCount || site.count || 0}</td>
+                <td>
+                  <span class="badge badge-${site.riskLevel || 'default'}" style="color: ${getRiskColor(site.riskLevel)}">
+                    ${site.riskLevel || 'Unknown'}
+                  </span>
+                </td>
+                <td>${site.accuracy || 'N/A'}${site.accuracy ? '%' : ''}</td>
+              </tr>
+            `).join('')}
+            ${(data.websites || []).length === 0 ? `
+              <tr>
+                <td colspan="4" style="text-align: center; color: #6b7280; padding: 20px;">
+                  No websites data available
+                </td>
+              </tr>
+            ` : ''}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <p>This report was automatically generated by MURAi Analytics System</p>
+        <p>© ${new Date().getFullYear()} MURAi - Content Monitoring & Protection Platform</p>
+      </div>
+    </body>
+    </html>
+    `;
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -612,8 +1271,8 @@ export default function AdminDashboardScreen({ navigation }) {
         style={{ paddingHorizontal: 0 }}
       />
       <View style={styles.timeRangeContainer}>
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.timeRangeScrollContent}
         >
@@ -746,7 +1405,13 @@ export default function AdminDashboardScreen({ navigation }) {
           <TouchableOpacity
             key={index}
             style={styles.menuItem}
-            onPress={() => navigation.navigate(option.screen)}
+            onPress={() => {
+              if (option.action === 'generateReport') {
+                generateReport();
+              } else {
+                navigation.navigate(option.screen);
+              }
+            }}
           >
             <View style={[styles.menuIcon, { backgroundColor: option.color }]}>
               <MaterialCommunityIcons
@@ -756,10 +1421,24 @@ export default function AdminDashboardScreen({ navigation }) {
               />
             </View>
             <View style={styles.menuContent}>
-              <Text style={styles.menuItemTitle}>{option.title}</Text>
-              <Text style={styles.menuItemSubtitle}>{option.subtitle}</Text>
+              <Text style={styles.menuItemTitle}>
+                {option.action === 'generateReport' && isGeneratingReport ?
+                  '🔄 Generating Report...' :
+                  option.title
+                }
+              </Text>
+              <Text style={styles.menuItemSubtitle}>
+                {option.action === 'generateReport' && isGeneratingReport ?
+                  'Please wait while we create your PDF...' :
+                  option.subtitle
+                }
+              </Text>
             </View>
-            <Feather name="chevron-right" size={20} color="#9ca3af" />
+            {option.action === 'generateReport' && isGeneratingReport ? (
+              <ActivityIndicator size="small" color="#d97706" />
+            ) : (
+              <Feather name="chevron-right" size={20} color="#9ca3af" />
+            )}
           </TouchableOpacity>
         ))}
       </View>
@@ -973,7 +1652,7 @@ export default function AdminDashboardScreen({ navigation }) {
                 <Feather name="x" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.dateInputContainer}>
               <View style={styles.calendarHeader}>
                 <TouchableOpacity onPress={() => handleMonthChange('prev')}>
@@ -981,7 +1660,7 @@ export default function AdminDashboardScreen({ navigation }) {
                 </TouchableOpacity>
                 <View style={styles.calendarTitleContainer}>
                   <Text style={styles.calendarTitle}>{formatMonthYear(currentMonth)}</Text>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.yearSelector}
                     onPress={() => setShowYearPicker(true)}
                   >
@@ -1044,13 +1723,13 @@ export default function AdminDashboardScreen({ navigation }) {
             </View>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.cancelButton}
                 onPress={closeCustomDateModal}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.applyButton}
                 onPress={applyDateRange}
               >
@@ -1076,7 +1755,7 @@ export default function AdminDashboardScreen({ navigation }) {
                 <Feather name="x" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.yearPickerScroll}>
               {Array.from({ length: 11 }, (_, i) => {
                 const year = new Date().getFullYear() - i;

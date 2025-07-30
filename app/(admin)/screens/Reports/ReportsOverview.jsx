@@ -13,145 +13,82 @@ import { BarChart } from "react-native-chart-kit";
 
 const { width } = Dimensions.get("window");
 
-// API configuration
-const API_BASE_URL = 'https://murai-server.onrender.com/api';
-
 export default function ReportsOverview({
   reports = [],
   loading = false,
   onRefresh,
   overviewStats = null,
-  selectedTimeRange = 'today',
 }) {
   const [currentDetectionPage, setCurrentDetectionPage] = useState(1);
-  const [detectedWords, setDetectedWords] = useState([]);
-  const [detectedWordsLoading, setDetectedWordsLoading] = useState(false);
   const DETECTION_ITEMS_PER_PAGE = 5;
 
-  // Helper function to get auth token
-  const getAuthToken = async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      return token;
-    } catch (error) {
-      console.error('Error getting auth token:', error);
-      return null;
-    }
-  };
-
-  // Helper function to make authenticated API calls
-  const makeAuthenticatedRequest = useCallback(async (url, options = {}) => {
-    const token = await getAuthToken();
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    const response = await fetch(`${API_BASE_URL}${url}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  }, []);
-
-  // Function to fetch detected words from server
-  const fetchDetectedWords = useCallback(async () => {
-    console.log('🔄 Loading detected words...');
-    setDetectedWordsLoading(true);
-    try {
-      const token = await getAuthToken();
-      if (!token) {
-        console.error('❌ No token found for detected words');
-        return;
-      }
-
-      // Calculate date range based on selectedTimeRange
-      const now = new Date();
-      let startDate = new Date();
-
-      switch (selectedTimeRange) {
-        case 'today':
-          startDate.setHours(0, 0, 0, 0);
-          break;
-        case 'week':
-          startDate.setDate(now.getDate() - 7);
-          break;
-        case 'month':
-          startDate.setMonth(now.getMonth() - 1);
-          break;
-        case 'year':
-          startDate.setFullYear(now.getFullYear() - 1);
-          break;
-        default:
-          startDate.setHours(0, 0, 0, 0);
-      }
-
-      const params = new URLSearchParams({
-        startDate: startDate.toISOString(),
-        endDate: now.toISOString(),
-        limit: '20',
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      });
-
-      console.log('📡 Making API call to:', `${API_BASE_URL}/admin/detected-words?${params}`);
-      const data = await makeAuthenticatedRequest(`/admin/detected-words?${params}`);
-      console.log('✅ Detected words API response:', data);
-
-      // Transform the data to match the expected format
-      const transformedWords = (data.detectedWords || []).map(word => ({
-        id: word._id,
-        word: word.word,
-        site: word.url ? new URL(word.url).hostname : 'Unknown',
-        time: getTimeAgo(new Date(word.createdAt)),
-        severity: word.severity || 'medium',
-        language: word.language || 'EN',
-        context: word.context,
-        patternType: word.patternType
-      }));
-
-      console.log('📊 Transformed detected words:', transformedWords.length, 'words');
-      setDetectedWords(transformedWords);
-    } catch (error) {
-      console.error('❌ Load detected words error:', error);
-      // Fallback to empty array on error
-      setDetectedWords([]);
-    } finally {
-      setDetectedWordsLoading(false);
-    }
-  }, [selectedTimeRange, makeAuthenticatedRequest]);
-
-  // Helper function to calculate time ago
-  const getTimeAgo = (date) => {
-    const now = new Date();
-    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
-
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
-
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `${diffInDays}d ago`;
-  };
-
-  // Load detected words when component mounts or time range changes
-  useEffect(() => {
-    fetchDetectedWords();
-  }, [fetchDetectedWords]);
-
-  // Use actual detected words data instead of mock data
-  const recentlyDetectedWords = detectedWords;
+  // Mock recently detected words data
+  const recentlyDetectedWords = [
+    {
+      id: 1,
+      word: "inappropriate",
+      site: "example.com",
+      time: "2 min ago",
+      severity: "high",
+      language: "EN",
+    },
+    {
+      id: 2,
+      word: "spam content",
+      site: "test.org",
+      time: "5 min ago",
+      severity: "medium",
+      language: "EN",
+    },
+    {
+      id: 3,
+      word: "toxic behavior",
+      site: "demo.net",
+      time: "8 min ago",
+      severity: "high",
+      language: "EN",
+    },
+    {
+      id: 4,
+      word: "harassment",
+      site: "sample.com",
+      time: "12 min ago",
+      severity: "high",
+      language: "EN",
+    },
+    {
+      id: 5,
+      word: "offensive language",
+      site: "website.org",
+      time: "15 min ago",
+      severity: "medium",
+      language: "EN",
+    },
+    {
+      id: 6,
+      word: "hate speech",
+      site: "portal.com",
+      time: "18 min ago",
+      severity: "high",
+      language: "EN",
+    },
+    {
+      id: 7,
+      word: "bullying",
+      site: "forum.net",
+      time: "22 min ago",
+      severity: "medium",
+      language: "EN",
+    },
+    {
+      id: 8,
+      word: "profanity",
+      site: "blog.org",
+      time: "25 min ago",
+      severity: "low",
+      language: "EN",
+    },
+  ];
   const getStats = () => {
     // Use overviewStats if available (from API), otherwise calculate from reports array
     if (overviewStats && typeof overviewStats === 'object' && overviewStats.total !== undefined) {
@@ -229,11 +166,8 @@ export default function ReportsOverview({
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
-          refreshing={loading || detectedWordsLoading}
-          onRefresh={() => {
-            onRefresh();
-            fetchDetectedWords();
-          }}
+          refreshing={loading}
+          onRefresh={onRefresh}
           tintColor="#01B97F"
           colors={["#01B97F"]}
         />
@@ -316,19 +250,15 @@ export default function ReportsOverview({
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <BarChart
                 data={{
-                  labels: categoryStats.map((item) => {
-                    const category = item.category || 'Unknown';
-                    // Truncate long category names to prevent overlap
-                    return category.length > 8 ? category.substring(0, 8) + '...' : category;
-                  }),
+                  labels: categoryStats.map((item) => item.category || 'Unknown'),
                   datasets: [
                     {
                       data: categoryStats.map((item) => item.count || 0),
                     },
                   ],
                 }}
-                width={Math.max(categoryStats.length * 120, width - 40)} // Increased spacing between bars
-                height={240} // Increased height for better label visibility
+                width={Math.max(categoryStats.length * 80, width - 60)}
+                height={220}
                 fromZero
                 showBarTops
                 showValuesOnTopOfBars
@@ -344,15 +274,9 @@ export default function ReportsOverview({
                   },
                   propsForLabels: {
                     fontFamily: "Poppins-Medium",
-                    fontSize: 10, // Smaller font size to prevent overlap
                   },
-                  barPercentage: 0.7, // Add spacing between bars
                 }}
-                style={{
-                  borderRadius: 16,
-                  paddingRight: 20, // Add right padding
-                  marginLeft: 10, // Add left margin
-                }}
+                style={{ borderRadius: 16 }}
               />
             </ScrollView>
           ) : (
@@ -463,56 +387,44 @@ export default function ReportsOverview({
           </View>
 
           {/* Table Rows */}
-          {detectedWordsLoading ? (
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading detected words...</Text>
-            </View>
-          ) : recentlyDetectedWords.length > 0 ? (
-            recentlyDetectedWords
-              .slice(
-                (currentDetectionPage - 1) * DETECTION_ITEMS_PER_PAGE,
-                currentDetectionPage * DETECTION_ITEMS_PER_PAGE
-              )
-              .map((item) => (
-                <View key={item.id} style={styles.tableRow}>
-                  <Text style={[styles.tableCell, { flex: 2 }]} numberOfLines={1}>
-                    {item.word}
-                  </Text>
-                  <Text
-                    style={[styles.tableCell, { flex: 1.5 }]}
-                    numberOfLines={1}
+          {recentlyDetectedWords
+            .slice(
+              (currentDetectionPage - 1) * DETECTION_ITEMS_PER_PAGE,
+              currentDetectionPage * DETECTION_ITEMS_PER_PAGE
+            )
+            .map((item) => (
+              <View key={item.id} style={styles.tableRow}>
+                <Text style={[styles.tableCell, { flex: 2 }]} numberOfLines={1}>
+                  {item.word}
+                </Text>
+                <Text
+                  style={[styles.tableCell, { flex: 1.5 }]}
+                  numberOfLines={1}
+                >
+                  {item.site}
+                </Text>
+                <Text style={[styles.tableCell, { flex: 1 }]} numberOfLines={1}>
+                  {item.time}
+                </Text>
+                <View style={[styles.tableCell, { flex: 1 }]}>
+                  <View
+                    style={[
+                      styles.severityBadge,
+                      { backgroundColor: getSeverityColor(item.severity) },
+                    ]}
                   >
-                    {item.site}
-                  </Text>
-                  <Text style={[styles.tableCell, { flex: 1 }]} numberOfLines={1}>
-                    {item.time}
-                  </Text>
-                  <View style={[styles.tableCell, { flex: 1 }]}>
-                    <View
+                    <Text
                       style={[
-                        styles.severityBadge,
-                        { backgroundColor: getSeverityColor(item.severity) },
+                        styles.severityText,
+                        { color: getSeverityTextColor(item.severity) },
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.severityText,
-                          { color: getSeverityTextColor(item.severity) },
-                        ]}
-                      >
-                        {item.severity}
-                      </Text>
-                    </View>
+                      {item.severity}
+                    </Text>
                   </View>
                 </View>
-              ))
-          ) : (
-            <View style={styles.emptyDetectionContainer}>
-              <Feather name="shield-alert" size={48} color="#d1d5db" />
-              <Text style={styles.emptyDetectionText}>No detected words found for {selectedTimeRange}</Text>
-              <Text style={styles.emptyDetectionSubtext}>Try selecting a different time range</Text>
-            </View>
-          )}
+              </View>
+            ))}
 
           {/* Pagination */}
           {Math.ceil(recentlyDetectedWords.length / DETECTION_ITEMS_PER_PAGE) >
@@ -1021,34 +933,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Regular',
     color: '#9ca3af',
     marginTop: 12,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  loadingText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: '#6b7280',
-  },
-  emptyDetectionContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  emptyDetectionText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#9ca3af',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  emptyDetectionSubtext: {
-    fontSize: 12,
-    fontFamily: 'Poppins-Regular',
-    color: '#9ca3af',
-    marginTop: 4,
-    textAlign: 'center',
   },
 });

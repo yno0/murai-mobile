@@ -27,7 +27,6 @@ export default function AdminReportsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentView, setCurrentView] = useState('overview'); // 'overview' or 'list'
-  const [selectedTimeRange, setSelectedTimeRange] = useState('today'); // 'today', 'week', 'month', 'year'
   const [confirmationModal, setConfirmationModal] = useState({
     visible: false,
     action: null,
@@ -334,7 +333,6 @@ export default function AdminReportsScreen() {
       loading={loading}
       onRefresh={loadReports}
       overviewStats={overviewStats}
-      selectedTimeRange={selectedTimeRange}
     />
   );
 
@@ -391,66 +389,6 @@ export default function AdminReportsScreen() {
           <Feather name="list" size={16} color={currentView === 'list' ? '#01B97F' : '#6B7280'} />
           <Text style={[styles.viewToggleText, currentView === 'list' && styles.viewToggleTextActive]}>
             Reports List
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Time Range Filter */}
-      <View style={styles.timeRangeContainer}>
-        <TouchableOpacity
-          style={[
-            styles.timeRangeButton,
-            selectedTimeRange === 'today' && styles.timeRangeButtonActive
-          ]}
-          onPress={() => setSelectedTimeRange('today')}
-        >
-          <Text style={[
-            styles.timeRangeText,
-            selectedTimeRange === 'today' && styles.timeRangeTextActive
-          ]}>
-            Today
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.timeRangeButton,
-            selectedTimeRange === 'week' && styles.timeRangeButtonActive
-          ]}
-          onPress={() => setSelectedTimeRange('week')}
-        >
-          <Text style={[
-            styles.timeRangeText,
-            selectedTimeRange === 'week' && styles.timeRangeTextActive
-          ]}>
-            Week
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.timeRangeButton,
-            selectedTimeRange === 'month' && styles.timeRangeButtonActive
-          ]}
-          onPress={() => setSelectedTimeRange('month')}
-        >
-          <Text style={[
-            styles.timeRangeText,
-            selectedTimeRange === 'month' && styles.timeRangeTextActive
-          ]}>
-            Month
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.timeRangeButton,
-            selectedTimeRange === 'year' && styles.timeRangeButtonActive
-          ]}
-          onPress={() => setSelectedTimeRange('year')}
-        >
-          <Text style={[
-            styles.timeRangeText,
-            selectedTimeRange === 'year' && styles.timeRangeTextActive
-          ]}>
-            Year
           </Text>
         </TouchableOpacity>
       </View>
@@ -754,33 +692,6 @@ const styles = StyleSheet.create({
   viewToggleTextActive: {
     fontFamily: 'Poppins-SemiBold',
     color: '#01B97F',
-  },
-  // Time Range Filter Styles
-  timeRangeContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    padding: 4,
-    marginHorizontal: 20,
-    marginBottom: 20,
-  },
-  timeRangeButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  timeRangeButtonActive: {
-    backgroundColor: '#01B97F',
-  },
-  timeRangeText: {
-    fontSize: 12,
-    fontFamily: 'Poppins-Medium',
-    color: '#6b7280',
-  },
-  timeRangeTextActive: {
-    color: '#ffffff',
   },
   // Modal Styles (matching Users management patterns)
   modalContainer: {

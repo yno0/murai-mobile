@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    Dimensions,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAccessibility } from '../../context/AccessibilityContext';
@@ -16,7 +16,7 @@ import WhitelistManager from './WhitelistManager';
 
 const { width } = Dimensions.get('window');
 
-// Enhanced MURAi Color Scheme with gradients and modern touches
+// Enhanced MURAi Color Scheme with better contrast
 const COLORS = {
   PRIMARY: '#02B97F',
   PRIMARY_DARK: '#01A06E',
@@ -24,9 +24,9 @@ const COLORS = {
   BACKGROUND: '#ffffff',
   CARD_BG: '#ffffff',
   SECTION_BG: '#F8FAFC',
-  TEXT_MAIN: '#111827',
-  TEXT_SECONDARY: '#6B7280',
-  TEXT_MUTED: '#9CA3AF',
+  TEXT_MAIN: '#1F2937', // Darker for better contrast
+  TEXT_SECONDARY: '#4B5563', // Darker for better contrast
+  TEXT_MUTED: '#6B7280',
   BORDER: '#E5E7EB',
   BORDER_LIGHT: '#F1F5F9',
   SUCCESS: '#10B981',
@@ -148,103 +148,12 @@ export default function ExtensionSettings({ onClose }) {
     }
   };
 
-  // Privacy control handlers
-  const handleExportData = async () => {
-    try {
-      // For extension settings, we'll export the current preferences
-      const exportData = {
-        exportInfo: {
-          exportDate: new Date().toISOString(),
-          type: 'extension_settings',
-          version: '1.0'
-        },
-        settings: {
-          extensionEnabled,
-          language,
-          sensitivity,
-          whitelistSite,
-          whitelistTerms,
-          flagStyle,
-          color
-        }
-      };
 
-      const jsonContent = JSON.stringify(exportData, null, 2);
-      const fileName = `murai_extension_settings_${new Date().toISOString().split('T')[0]}.json`;
-
-      // Create a blob and download (for web) or share (for mobile)
-      Alert.alert(
-        "Export Complete",
-        `Your extension settings have been prepared for export as ${fileName}`,
-        [{ text: "OK" }]
-      );
-    } catch (error) {
-      console.error('Export error:', error);
-      Alert.alert("Error", "Failed to export settings. Please try again.");
-    }
-  };
-
-  const handlePrivacyPolicy = () => {
-    Alert.alert(
-      "Privacy Policy",
-      "MURAi Privacy Policy\n\nWe respect your privacy and are committed to protecting your personal data. Our extension:\n\n• Only processes content locally on your device\n• Does not store personal browsing data\n• Sends anonymized usage statistics (if enabled)\n• Allows you to control all data sharing preferences\n\nFor the full privacy policy, visit: https://murai.app/privacy",
-      [
-        { text: "Close", style: "cancel" },
-        { text: "View Full Policy", onPress: () => {
-          // In a real app, you might open a web browser or modal
-          Alert.alert("Info", "Full privacy policy would open in browser");
-        }}
-      ]
-    );
-  };
-
-  const handleDeleteAllData = () => {
-    Alert.alert(
-      "Confirm Data Deletion",
-      "This will reset all your extension settings to defaults and clear your activity history. Are you absolutely sure?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Reset Everything",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // Reset all settings to defaults
-              setExtensionEnabled(true);
-              setLanguage('English');
-              setSensitivity('medium');
-              setWhitelistSite([]);
-              setWhitelistTerms([]);
-              setFlagStyle('highlight');
-              setColor('#374151');
-
-              // Save the reset preferences
-              const defaultPreferences = {
-                extensionEnabled: true,
-                language: 'English',
-                sensitivity: 'medium',
-                whitelistSite: [],
-                whitelistTerms: [],
-                flagStyle: 'highlight',
-                color: '#374151',
-              };
-
-              await updatePreferences(defaultPreferences);
-              Alert.alert('Success', 'All settings have been reset to defaults.');
-            } catch (error) {
-              console.error('Reset error:', error);
-              Alert.alert('Error', 'Failed to reset settings. Please try again.');
-            }
-          }
-        }
-      ]
-    );
-  };
 
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={[styles.loadingText, getAccessibleTextStyle({})]}>Loading...</Text>
       </View>
     );
   }
@@ -256,11 +165,11 @@ export default function ExtensionSettings({ onClose }) {
         <TouchableOpacity onPress={onClose} style={getAccessibleTouchableStyle(styles.closeButton)}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.TEXT_SECONDARY} />
         </TouchableOpacity>
-        <Text style={getAccessibleTextStyle(styles.title)}>Extension Settings</Text>
+        <Text style={[styles.title, getAccessibleTextStyle({})]}>Extension Settings</Text>
         {hasChanges && (
           <TouchableOpacity onPress={savePreferences} style={getAccessibleTouchableStyle(styles.saveButton)}>
             <MaterialCommunityIcons name="content-save" size={18} color="#ffffff" />
-            <Text style={getAccessibleTextStyle(styles.saveButtonText)}>Save</Text>
+            <Text style={[styles.saveButtonText, getAccessibleTextStyle({})]}>Save</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -274,8 +183,8 @@ export default function ExtensionSettings({ onClose }) {
               <MaterialCommunityIcons name="translate" size={22} color={COLORS.PRIMARY} />
             </View>
             <View style={styles.headerTextContainer}>
-              <Text style={getAccessibleTextStyle(styles.sectionTitle)}>Language Detection</Text>
-              <Text style={getAccessibleTextStyle(styles.sectionDescription)}>Choose which language to monitor for inappropriate content</Text>
+              <Text style={[styles.sectionTitle, getAccessibleTextStyle({})]}>Language Detection</Text>
+              <Text style={[styles.sectionDescription, getAccessibleTextStyle({})]}>Choose which language to monitor for inappropriate content</Text>
             </View>
           </View>
 
@@ -303,16 +212,18 @@ export default function ExtensionSettings({ onClose }) {
                   />
                 </View>
                 <View style={styles.languageCardContent}>
-                  <Text style={getAccessibleTextStyle([
+                  <Text style={[
                     styles.languageCardTitle,
-                    language === key && styles.languageCardTitleSelected
-                  ])}>
+                    language === key && styles.languageCardTitleSelected,
+                    getAccessibleTextStyle({})
+                  ]}>
                     {key}
                   </Text>
-                  <Text style={getAccessibleTextStyle([
+                  <Text style={[
                     styles.languageCardDescription,
-                    language === key && styles.languageCardDescriptionSelected
-                  ])}>
+                    language === key && styles.languageCardDescriptionSelected,
+                    getAccessibleTextStyle({})
+                  ]}>
                     {description}
                   </Text>
                 </View>
@@ -333,8 +244,8 @@ export default function ExtensionSettings({ onClose }) {
               <MaterialCommunityIcons name="speedometer" size={22} color={COLORS.PRIMARY} />
             </View>
             <View style={styles.headerTextContainer}>
-              <Text style={getAccessibleTextStyle(styles.sectionTitle)}>Sensitivity Level</Text>
-              <Text style={getAccessibleTextStyle(styles.sectionDescription)}>Adjust how strictly content is filtered</Text>
+              <Text style={[styles.sectionTitle, getAccessibleTextStyle({})]}>Sensitivity Level</Text>
+              <Text style={[styles.sectionDescription, getAccessibleTextStyle({})]}>Adjust how strictly content is filtered</Text>
             </View>
           </View>
 
@@ -362,16 +273,18 @@ export default function ExtensionSettings({ onClose }) {
                   />
                 </View>
                 <View style={styles.sensitivityTextContainer}>
-                  <Text style={getAccessibleTextStyle([
+                  <Text style={[
                     styles.sensitivityLabel,
-                    sensitivity === key && styles.sensitivityLabelSelected
-                  ])}>
+                    sensitivity === key && styles.sensitivityLabelSelected,
+                    getAccessibleTextStyle({})
+                  ]}>
                     {label}
                   </Text>
-                  <Text style={getAccessibleTextStyle([
+                  <Text style={[
                     styles.sensitivityDesc,
-                    sensitivity === key && styles.sensitivityDescSelected
-                  ])}>
+                    sensitivity === key && styles.sensitivityDescSelected,
+                    getAccessibleTextStyle({})
+                  ]}>
                     {desc}
                   </Text>
                 </View>
@@ -390,18 +303,18 @@ export default function ExtensionSettings({ onClose }) {
               <MaterialCommunityIcons name="shield-check" size={22} color={COLORS.PRIMARY} />
             </View>
             <View style={styles.headerTextContainer}>
-              <Text style={styles.sectionTitle}>Whitelist Management</Text>
-              <Text style={styles.sectionDescription}>Manage trusted sites and terms that should not be flagged</Text>
+              <Text style={[styles.sectionTitle, getAccessibleTextStyle({})]}>Whitelist Management</Text>
+              <Text style={[styles.sectionDescription, getAccessibleTextStyle({})]}>Manage trusted sites and terms that should not be flagged</Text>
             </View>
           </View>
 
           <View style={styles.whitelistContainer}>
             <View style={styles.whitelistSection}>
-              <Text style={styles.whitelistSectionTitle}>Trusted Sites ({whitelistSite.length})</Text>
+              <Text style={[styles.whitelistSectionTitle, getAccessibleTextStyle({})]}>Trusted Sites ({whitelistSite.length})</Text>
               {whitelistSite.slice(0, 5).map((site, index) => (
                 <View key={index} style={styles.whitelistItem}>
                   <MaterialCommunityIcons name="web" size={16} color={COLORS.PRIMARY} />
-                  <Text style={styles.whitelistItemText}>{site}</Text>
+                  <Text style={[styles.whitelistItemText, getAccessibleTextStyle({})]}>{site}</Text>
                   <TouchableOpacity
                     onPress={() => setWhitelistSite(whitelistSite.filter((_, i) => i !== index))}
                     style={styles.removeButton}
@@ -415,18 +328,18 @@ export default function ExtensionSettings({ onClose }) {
                   style={styles.seeMoreButton}
                   onPress={() => openWhitelistModal('sites')}
                 >
-                  <Text style={styles.seeMoreText}>See {whitelistSite.length - 5} more sites</Text>
+                  <Text style={[styles.seeMoreText, getAccessibleTextStyle({})]}>See {whitelistSite.length - 5} more sites</Text>
                   <MaterialCommunityIcons name="chevron-right" size={16} color={COLORS.PRIMARY} />
                 </TouchableOpacity>
               )}
             </View>
 
             <View style={styles.whitelistSection}>
-              <Text style={styles.whitelistSectionTitle}>Trusted Terms ({whitelistTerms.length})</Text>
+              <Text style={[styles.whitelistSectionTitle, getAccessibleTextStyle({})]}>Trusted Terms ({whitelistTerms.length})</Text>
               {whitelistTerms.slice(0, 5).map((term, index) => (
                 <View key={index} style={styles.whitelistItem}>
                   <MaterialCommunityIcons name="text" size={16} color={COLORS.PRIMARY} />
-                  <Text style={styles.whitelistItemText}>{term}</Text>
+                  <Text style={[styles.whitelistItemText, getAccessibleTextStyle({})]}>{term}</Text>
                   <TouchableOpacity
                     onPress={() => setWhitelistTerms(whitelistTerms.filter((_, i) => i !== index))}
                     style={styles.removeButton}
@@ -440,7 +353,7 @@ export default function ExtensionSettings({ onClose }) {
                   style={styles.seeMoreButton}
                   onPress={() => openWhitelistModal('terms')}
                 >
-                  <Text style={styles.seeMoreText}>See {whitelistTerms.length - 5} more terms</Text>
+                  <Text style={[styles.seeMoreText, getAccessibleTextStyle({})]}>See {whitelistTerms.length - 5} more terms</Text>
                   <MaterialCommunityIcons name="chevron-right" size={16} color={COLORS.PRIMARY} />
                 </TouchableOpacity>
               )}
@@ -451,7 +364,7 @@ export default function ExtensionSettings({ onClose }) {
               onPress={() => openWhitelistModal('sites')}
             >
               <MaterialCommunityIcons name="plus" size={20} color={COLORS.PRIMARY} />
-              <Text style={styles.addWhitelistText}>Add to Whitelist</Text>
+              <Text style={[styles.addWhitelistText, getAccessibleTextStyle({})]}>Add to Whitelist</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -463,8 +376,8 @@ export default function ExtensionSettings({ onClose }) {
               <MaterialCommunityIcons name="flag" size={22} color={COLORS.PRIMARY} />
             </View>
             <View style={styles.headerTextContainer}>
-              <Text style={styles.sectionTitle}>Flag Style</Text>
-              <Text style={styles.sectionDescription}>Choose how flagged content should be displayed</Text>
+              <Text style={[styles.sectionTitle, getAccessibleTextStyle({})]}>Flag Style</Text>
+              <Text style={[styles.sectionDescription, getAccessibleTextStyle({})]}>Choose how flagged content should be displayed</Text>
             </View>
           </View>
 
@@ -491,13 +404,15 @@ export default function ExtensionSettings({ onClose }) {
                 />
                 <Text style={[
                   styles.flagStyleLabel,
-                  flagStyle === key && styles.flagStyleLabelSelected
+                  flagStyle === key && styles.flagStyleLabelSelected,
+                  getAccessibleTextStyle({})
                 ]}>
                   {label}
                 </Text>
                 <Text style={[
                   styles.flagStyleDesc,
-                  flagStyle === key && styles.flagStyleDescSelected
+                  flagStyle === key && styles.flagStyleDescSelected,
+                  getAccessibleTextStyle({})
                 ]}>
                   {desc}
                 </Text>
@@ -518,15 +433,15 @@ export default function ExtensionSettings({ onClose }) {
               <MaterialCommunityIcons name="eye" size={22} color={COLORS.PRIMARY} />
             </View>
             <View style={styles.headerTextContainer}>
-              <Text style={styles.sectionTitle}>Preview</Text>
-              <Text style={styles.sectionDescription}>See how flagged content will appear</Text>
+              <Text style={[styles.sectionTitle, getAccessibleTextStyle({})]}>Preview</Text>
+              <Text style={[styles.sectionDescription, getAccessibleTextStyle({})]}>See how flagged content will appear</Text>
             </View>
           </View>
 
         <View style={styles.previewContainer}>
-            <Text style={styles.previewLabel}>Sample Text:</Text>
+            <Text style={[styles.previewLabel, getAccessibleTextStyle({})]}>Sample Text:</Text>
             <View style={styles.previewTextContainer}>
-              <Text style={styles.previewText}>
+              <Text style={[styles.previewText, getAccessibleTextStyle({})]}>
                 This is a sample text with some{' '}
                 <Text style={[
                   styles.flaggedText,
@@ -544,11 +459,11 @@ export default function ExtensionSettings({ onClose }) {
 
             <View style={styles.previewSettings}>
               <View style={styles.previewSettingRow}>
-                <Text style={styles.previewSettingLabel}>Style:</Text>
-                <Text style={styles.previewSettingValue}>{flagStyle.charAt(0).toUpperCase() + flagStyle.slice(1)}</Text>
+                <Text style={[styles.previewSettingLabel, getAccessibleTextStyle({})]}>Style:</Text>
+                <Text style={[styles.previewSettingValue, getAccessibleTextStyle({})]}>{flagStyle.charAt(0).toUpperCase() + flagStyle.slice(1)}</Text>
               </View>
               <View style={styles.previewSettingRow}>
-                <Text style={styles.previewSettingLabel}>Color:</Text>
+                <Text style={[styles.previewSettingLabel, getAccessibleTextStyle({})]}>Color:</Text>
                 <View style={[styles.colorPreview, { backgroundColor: color }]} />
               </View>
 
@@ -556,83 +471,7 @@ export default function ExtensionSettings({ onClose }) {
           </View>
         </View>
 
-        {/* Privacy Controls */}
-        <View style={styles.sectionCard}>
-          <View style={styles.enhancedHeader}>
-            <View style={styles.iconContainer}>
-              <MaterialCommunityIcons name="shield-account" size={22} color={COLORS.PRIMARY} />
-            </View>
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.sectionTitle}>Privacy & Data</Text>
-              <Text style={styles.sectionDescription}>Manage your data and privacy preferences</Text>
-            </View>
-          </View>
 
-          <View style={styles.privacyActionsContainer}>
-            <TouchableOpacity
-              style={styles.privacyActionButton}
-              onPress={() => Alert.alert(
-                "Export Data",
-                "This will export all your extension settings, preferences, and activity data. Continue?",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Export", onPress: handleExportData }
-                ]
-              )}
-            >
-              <View style={styles.privacyActionLeft}>
-                <MaterialCommunityIcons name="download" size={20} color={COLORS.PRIMARY} />
-                <View style={styles.privacyActionContent}>
-                  <Text style={styles.privacyActionTitle}>Export My Data</Text>
-                  <Text style={styles.privacyActionDescription}>Download your settings and activity</Text>
-                </View>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.TEXT_SECONDARY} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.privacyActionButton}
-              onPress={() => Alert.alert(
-                "Privacy Policy",
-                "View our privacy policy to understand how we handle your data.",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "View Policy", onPress: handlePrivacyPolicy }
-                ]
-              )}
-            >
-              <View style={styles.privacyActionLeft}>
-                <MaterialCommunityIcons name="file-document" size={20} color={COLORS.PRIMARY} />
-                <View style={styles.privacyActionContent}>
-                  <Text style={styles.privacyActionTitle}>Privacy Policy</Text>
-                  <Text style={styles.privacyActionDescription}>Read our data handling practices</Text>
-                </View>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.TEXT_SECONDARY} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.privacyActionButton, styles.dangerAction]}
-              onPress={() => Alert.alert(
-                "Delete All Data",
-                "⚠️ This will permanently delete all your data including settings, preferences, and activity logs. This action cannot be undone!",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Delete Forever", style: "destructive", onPress: handleDeleteAllData }
-                ]
-              )}
-            >
-              <View style={styles.privacyActionLeft}>
-                <MaterialCommunityIcons name="delete-forever" size={20} color={COLORS.ERROR} />
-                <View style={styles.privacyActionContent}>
-                  <Text style={[styles.privacyActionTitle, styles.dangerText]}>Delete All Data</Text>
-                  <Text style={[styles.privacyActionDescription, styles.dangerText]}>Permanently remove all your data</Text>
-                </View>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.ERROR} />
-            </TouchableOpacity>
-          </View>
-        </View>
 
         {/* Color Settings */}
         <View style={styles.sectionCard}>
@@ -641,8 +480,8 @@ export default function ExtensionSettings({ onClose }) {
               <MaterialCommunityIcons name="palette" size={22} color={COLORS.PRIMARY} />
             </View>
             <View style={styles.headerTextContainer}>
-              <Text style={styles.sectionTitle}>Flag Color</Text>
-              <Text style={styles.sectionDescription}>Choose the color for flagged content</Text>
+              <Text style={[styles.sectionTitle, getAccessibleTextStyle({})]}>Flag Color</Text>
+              <Text style={[styles.sectionDescription, getAccessibleTextStyle({})]}>Choose the color for flagged content</Text>
             </View>
           </View>
 
@@ -652,39 +491,10 @@ export default function ExtensionSettings({ onClose }) {
               { color: '#F59E0B', name: 'Orange' },
               { color: '#10B981', name: 'Green' },
               { color: '#3B82F6', name: 'Blue' },
-              { color: '#6366F1', name: 'Indigo' },
               { color: '#8B5CF6', name: 'Purple' },
               { color: '#EC4899', name: 'Pink' },
               { color: '#374151', name: 'Gray' },
-              { color: '#DC2626', name: 'Dark Red' },
-              { color: '#EA580C', name: 'Dark Orange' },
-              { color: '#059669', name: 'Dark Green' },
-              { color: '#2563EB', name: 'Dark Blue' },
-              { color: '#4F46E5', name: 'Dark Indigo' },
-              { color: '#7C3AED', name: 'Dark Purple' },
-              { color: '#DB2777', name: 'Dark Pink' },
-              { color: '#1F2937', name: 'Dark Gray' },
-              { color: '#FEE2E2', name: 'Light Red' },
-              { color: '#FED7AA', name: 'Light Orange' },
-              { color: '#D1FAE5', name: 'Light Green' },
-              { color: '#DBEAFE', name: 'Light Blue' },
-              { color: '#E0E7FF', name: 'Light Indigo' },
-              { color: '#EDE9FE', name: 'Light Purple' },
-              { color: '#FCE7F3', name: 'Light Pink' },
-              { color: '#F3F4F6', name: 'Light Gray' },
-              { color: '#F97316', name: 'Bright Orange' },
-              { color: '#22C55E', name: 'Bright Green' },
-              { color: '#0EA5E9', name: 'Bright Blue' },
-              { color: '#8B5CF6', name: 'Bright Purple' },
-              { color: '#F43F5E', name: 'Bright Pink' },
-              { color: '#6B7280', name: 'Medium Gray' },
-              { color: '#991B1B', name: 'Deep Red' },
-              { color: '#92400E', name: 'Deep Orange' },
-              { color: '#14532D', name: 'Deep Green' },
-              { color: '#1E40AF', name: 'Deep Blue' },
-              { color: '#3730A3', name: 'Deep Purple' },
-              { color: '#9D174D', name: 'Deep Pink' },
-              { color: '#111827', name: 'Deep Gray' }
+              { color: '#1F2937', name: 'Dark Gray' }
             ].map(({ color: colorOption, name }) => (
               <TouchableOpacity
                 key={colorOption}
@@ -694,6 +504,7 @@ export default function ExtensionSettings({ onClose }) {
                   color === colorOption && styles.colorSelected
                 ]}
                 onPress={() => setColor(colorOption)}
+                accessibilityLabel={`Select ${name} color for flagged content`}
               />
             ))}
           </View>
@@ -841,10 +652,10 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   sectionDescription: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: 'Poppins-Regular',
     color: COLORS.TEXT_SECONDARY,
-    lineHeight: 18,
+    lineHeight: 16,
     marginBottom: 12,
   },
   settingRow: {
@@ -855,7 +666,8 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: 14,
-    color: '#374151',
+    fontFamily: 'Poppins-Medium',
+    color: COLORS.TEXT_MAIN,
   },
   optionGroup: {
     gap: 10,
@@ -868,23 +680,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   optionSelected: {
-    borderColor: '#36DCA6',
-    backgroundColor: '#f0fdf4',
+    borderColor: COLORS.PRIMARY,
+    backgroundColor: COLORS.PRIMARY,
   },
   optionText: {
     fontSize: 14,
-    color: '#374151',
+    fontFamily: 'Poppins-Medium',
+    color: COLORS.TEXT_MAIN,
     textAlign: 'center',
   },
   optionTextSelected: {
-    color: '#36DCA6',
-    fontWeight: '600',
+    color: '#ffffff',
+    fontFamily: 'Poppins-SemiBold',
   },
   loadingText: {
     textAlign: 'center',
     marginTop: 50,
     fontSize: 16,
-    color: '#6b7280',
+    fontFamily: 'Poppins-Medium',
+    color: COLORS.TEXT_SECONDARY,
   },
   inputRow: {
     flexDirection: 'row',
@@ -894,15 +708,16 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: COLORS.BORDER,
     borderRadius: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 14,
-    color: '#374151',
+    fontFamily: 'Poppins-Regular',
+    color: COLORS.TEXT_MAIN,
   },
   addButton: {
-    backgroundColor: '#36DCA6',
+    backgroundColor: COLORS.PRIMARY,
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 6,
@@ -910,7 +725,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: '#ffffff',
-    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 14,
   },
   listItem: {
@@ -926,7 +741,8 @@ const styles = StyleSheet.create({
   listItemText: {
     flex: 1,
     fontSize: 14,
-    color: '#374151',
+    fontFamily: 'Poppins-Regular',
+    color: COLORS.TEXT_MAIN,
   },
   removeButton: {
     backgroundColor: '#ef4444',
@@ -937,19 +753,19 @@ const styles = StyleSheet.create({
   removeButtonText: {
     color: '#ffffff',
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
   },
   colorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 16,
     justifyContent: 'space-between',
     paddingHorizontal: 4,
   },
   colorOption: {
-    width: (width - 80) / 6,
-    height: (width - 80) / 6,
-    borderRadius: ((width - 80) / 6) / 2,
+    width: (width - 80) / 4,
+    height: (width - 80) / 4,
+    borderRadius: ((width - 80) / 4) / 2,
     borderWidth: 3,
     borderColor: 'transparent',
     shadowColor: COLORS.SHADOW,
@@ -1008,14 +824,15 @@ const styles = StyleSheet.create({
   },
   languageCardTitleSelected: {
     color: '#ffffff',
+    fontFamily: 'Poppins-SemiBold',
   },
   languageCardDescription: {
-    fontSize: 13,
+    fontSize: 11,
     fontFamily: 'Poppins-Regular',
     color: COLORS.TEXT_SECONDARY,
   },
   languageCardDescriptionSelected: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.9)',
   },
   languageCardCheck: {
     marginLeft: 12,
@@ -1120,15 +937,16 @@ const styles = StyleSheet.create({
   },
   flagStyleLabelSelected: {
     color: '#ffffff',
+    fontFamily: 'Poppins-SemiBold',
   },
   flagStyleDesc: {
-    fontSize: 12,
+    fontSize: 10,
     fontFamily: 'Poppins-Regular',
     color: COLORS.TEXT_SECONDARY,
     textAlign: 'center',
   },
   flagStyleDescSelected: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.9)',
   },
   flagStyleCheck: {
     position: 'absolute',
@@ -1145,8 +963,9 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   settingDescription: {
-    fontSize: 12,
-    color: '#6b7280',
+    fontSize: 11,
+    fontFamily: 'Poppins-Regular',
+    color: COLORS.TEXT_SECONDARY,
     marginTop: 4,
   },
   optionGrid: {
@@ -1170,18 +989,19 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   optionCardSelected: {
-    backgroundColor: '#36DCA6',
-    borderColor: '#36DCA6',
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
     transform: [{ scale: 1.02 }],
   },
   optionCardText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
+    fontFamily: 'Poppins-SemiBold',
+    color: COLORS.TEXT_MAIN,
     marginTop: 8,
   },
   optionCardTextSelected: {
     color: '#ffffff',
+    fontFamily: 'Poppins-SemiBold',
   },
   sensitivityContainer: {
     gap: 12,
@@ -1217,19 +1037,21 @@ const styles = StyleSheet.create({
   },
   sensitivityLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
+    fontFamily: 'Poppins-SemiBold',
+    color: COLORS.TEXT_MAIN,
   },
   sensitivityLabelSelected: {
     color: '#ffffff',
+    fontFamily: 'Poppins-SemiBold',
   },
   sensitivityDesc: {
-    fontSize: 13,
-    color: '#6b7280',
+    fontSize: 11,
+    fontFamily: 'Poppins-Regular',
+    color: COLORS.TEXT_SECONDARY,
     marginTop: 2,
   },
   sensitivityDescSelected: {
-    color: '#e5f9f0',
+    color: 'rgba(255, 255, 255, 0.9)',
   },
   // Preview Styles
   previewContainer: {
@@ -1241,8 +1063,8 @@ const styles = StyleSheet.create({
   },
   previewLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
+    fontFamily: 'Poppins-SemiBold',
+    color: COLORS.TEXT_MAIN,
     marginBottom: 8,
   },
   previewTextContainer: {
@@ -1255,11 +1077,12 @@ const styles = StyleSheet.create({
   },
   previewText: {
     fontSize: 16,
+    fontFamily: 'Poppins-Regular',
     lineHeight: 24,
-    color: '#374151',
+    color: COLORS.TEXT_MAIN,
   },
   flaggedText: {
-    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 4,
@@ -1275,12 +1098,13 @@ const styles = StyleSheet.create({
   },
   previewSettingLabel: {
     fontSize: 14,
-    color: '#6b7280',
+    fontFamily: 'Poppins-Regular',
+    color: COLORS.TEXT_SECONDARY,
   },
   previewSettingValue: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
+    fontFamily: 'Poppins-SemiBold',
+    color: COLORS.TEXT_MAIN,
   },
   colorPreview: {
     width: 20,
@@ -1289,50 +1113,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
-  // Privacy Controls Styles
-  privacyActionsContainer: {
-    gap: 12,
-  },
-  privacyActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.BACKGROUND,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER_LIGHT,
-    shadowColor: COLORS.SHADOW_LIGHT,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  privacyActionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
-  privacyActionContent: {
-    flex: 1,
-  },
-  privacyActionTitle: {
-    fontSize: 15,
-    fontFamily: 'Poppins-SemiBold',
-    color: COLORS.TEXT_MAIN,
-    marginBottom: 2,
-  },
-  privacyActionDescription: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-    color: COLORS.TEXT_SECONDARY,
-  },
-  dangerAction: {
-    borderColor: COLORS.ERROR,
-    backgroundColor: '#FEF2F2',
-  },
-  dangerText: {
-    color: COLORS.ERROR,
-  },
+
 });

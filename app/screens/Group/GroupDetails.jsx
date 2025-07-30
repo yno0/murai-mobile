@@ -1,21 +1,21 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Clipboard,
-  Dimensions,
-  FlatList,
-  Modal,
-  Platform,
-  ScrollView,
-  Share,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Clipboard,
+    Dimensions,
+    FlatList,
+    Modal,
+    Platform,
+    ScrollView,
+    Share,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Header from '../../components/common/Header';
@@ -431,13 +431,32 @@ export default function GroupDetailsScreen() {
     }
   };
 
-  const renderMemberItem = ({ item }) => {
+  const handleMemberPress = (member) => {
+    console.log('🔍 Member pressed:', member);
+    const memberId = member.userId || member.id || member._id;
+    console.log('🔍 Navigating to MemberAnalytics with:', { memberId, memberName: member.name, groupId });
+    navigation.navigate('MemberAnalytics', {
+      memberId: memberId,
+      memberName: member.name || 'Unknown User',
+      groupId: groupId,
+    });
+  };
+
+  const renderMemberItem = ({ item, key }) => {
     // ALL items in groupData.members are just members (from GroupUserModel)
     // The admin is ONLY the user in groupData.userId (from Group model)
     // So this item is NEVER an admin, always a member
 
     return (
-      <View style={styles.memberItem}>
+      <TouchableOpacity
+        key={key}
+        style={styles.memberItem}
+        onPress={() => {
+          console.log('🔍 TouchableOpacity pressed for member:', item.name);
+          handleMemberPress(item);
+        }}
+        activeOpacity={0.7}
+      >
         <View style={styles.memberInfo}>
           <View style={styles.memberAvatar}>
             <Text style={styles.memberInitial}>{item.name?.charAt(0).toUpperCase() || 'U'}</Text>
@@ -455,24 +474,16 @@ export default function GroupDetailsScreen() {
                   Member
                 </Text>
               </View>
-              <Text style={styles.memberJoined}>
-                Joined {item.joinedAt ? new Date(item.joinedAt).toLocaleDateString() : 'Unknown'}
-              </Text>
             </View>
           </View>
         </View>
         <View style={styles.memberActions}>
-          <View style={styles.statusIndicator}>
-            <View style={[styles.statusDot, { backgroundColor: Math.random() > 0.5 ? '#10b981' : '#d1d5db' }]} />
-            <Text style={styles.statusText}>
-              {Math.random() > 0.5 ? 'Online' : 'Offline'}
-            </Text>
-          </View>
           {/* Admin can remove any member since all items here are members */}
           {isAdmin && (
             <TouchableOpacity
               style={styles.removeButton}
-              onPress={() => {
+              onPress={(e) => {
+                e.stopPropagation(); // Prevent triggering member press
                 console.log('🔴 REMOVE BUTTON PRESSED!');
                 const memberId = item.userId || item.id || item._id;
                 console.log('Calling handleRemoveMember with:', memberId, item.name);
@@ -482,8 +493,9 @@ export default function GroupDetailsScreen() {
               <MaterialCommunityIcons name="account-minus" size={16} color="#ef4444" />
             </TouchableOpacity>
           )}
+          <MaterialCommunityIcons name="chevron-right" size={20} color="#6b7280" style={styles.chevronIcon} />
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -605,9 +617,7 @@ export default function GroupDetailsScreen() {
                           Admin
                         </Text>
                       </View>
-                      <Text style={styles.memberJoined}>
-                        Created {groupData.createAt ? new Date(groupData.createAt).toLocaleDateString() : 'Unknown'}
-                      </Text>
+
                     </View>
                   </View>
                 </View>
@@ -620,11 +630,9 @@ export default function GroupDetailsScreen() {
                 Members ({groupData.members?.length || 0})
               </Text>
               {groupData.members && groupData.members.length > 0 ? (
-                groupData.members.map((item, index) => (
-                  <View key={item.id || index}>
-                    {renderMemberItem({ item })}
-                  </View>
-                ))
+                groupData.members.map((item, index) =>
+                  renderMemberItem({ item, key: item.id || index })
+                )
               ) : (
                 <View style={styles.emptyMembersContainer}>
                   <MaterialCommunityIcons name="account-group-outline" size={48} color="#9ca3af" />
@@ -2080,41 +2088,22 @@ const styles = StyleSheet.create({
   adminRoleText: {
     color: '#02B97F',
   },
-  memberJoined: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
+
   memberActions: {
-    alignItems: 'flex-end',
-  },
-  statusIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 8,
   },
-  statusText: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginLeft: 6,
+  chevronIcon: {
+    marginLeft: 8,
   },
+
   removeButton: {
     padding: 6,
     borderRadius: 6,
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
   },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: '#ffffff',
-  },
-  memberJoined: {
-    fontSize: 12,
-    fontFamily: 'Poppins-Regular',
-    color: '#9ca3af',
-  },
+
   activityItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',

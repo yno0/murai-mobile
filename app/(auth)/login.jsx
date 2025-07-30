@@ -21,6 +21,7 @@ export default function Login() {
   const [cooldownTime, setCooldownTime] = useState(0);
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
 
   useEffect(() => {
@@ -112,10 +113,16 @@ export default function Login() {
         response: err.response
       });
 
-      // Handle specific Appwrite error codes
+      // Handle specific error codes
       if (err.message?.includes('Rate limit')) {
         setError(`Too many login attempts. Please wait ${RATE_LIMIT_COOLDOWN} seconds.`);
         setCooldownTime(RATE_LIMIT_COOLDOWN);
+      } else if (err.code === 403) {
+        // Account deactivated - ensure user stays on login screen
+        setError(err.message || "Your account has been deactivated. Please contact support for assistance.");
+        // Clear any stored data for deactivated users
+        await AsyncStorage.removeItem('token');
+        await AsyncStorage.removeItem('user');
       } else if (err.type === 'user_invalid_credentials' || err.code === 401) {
         setError("Incorrect email or password");
       } else if (err.code === 404) {
@@ -168,6 +175,7 @@ export default function Login() {
             keyboardType="email-address"
             autoCapitalize="none"
             style={[styles.input, emailError ? styles.inputError : null]}
+            editable={cooldownTime === 0}
           />
           {emailError ? (
             <Text style={styles.errorText}>{emailError}</Text>
@@ -175,16 +183,30 @@ export default function Login() {
         </View>
 
         <View style={styles.inputContainer}>
-          <AppInput
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (passwordError) setPasswordError("");
-            }}
-            placeholder="Enter your password"
-            secureTextEntry
-            style={[styles.input, passwordError ? styles.inputError : null]}
-          />
+          <View style={styles.passwordWrapper}>
+            <AppInput
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (passwordError) setPasswordError("");
+              }}
+              placeholder="Enter your password"
+              secureTextEntry={!showPassword}
+              style={[styles.passwordInput, passwordError ? styles.inputError : null]}
+              editable={cooldownTime === 0}
+            />
+            <TouchableOpacity
+              style={styles.eyeIcon}
+              onPress={() => setShowPassword(!showPassword)}
+              disabled={cooldownTime > 0}
+            >
+              <MaterialCommunityIcons
+                name={showPassword ? "eye-off" : "eye"}
+                size={20}
+                color={cooldownTime > 0 ? "#9ca3af" : "#6b7280"}
+              />
+            </TouchableOpacity>
+          </View>
           {passwordError ? (
             <Text style={styles.errorText}>{passwordError}</Text>
           ) : null}
@@ -285,6 +307,30 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: COLORS.ERROR,
     borderWidth: 1,
+  },
+  passwordWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  passwordInput: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingRight: 50,
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#1f2937',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 16,
+    padding: 8,
+    borderRadius: 8,
   },
   errorText: {
     color: COLORS.ERROR,

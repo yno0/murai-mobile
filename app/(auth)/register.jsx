@@ -22,6 +22,7 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
@@ -121,6 +122,9 @@ export default function Register() {
 
       await register(name.trim(), email.trim(), password);
       console.log('✅ Registration successful');
+
+      // Show success modal instead of auto-redirect
+      setShowSuccessModal(true);
     } catch (err) {
       console.error('❌ Registration error:', {
         code: err.code,
@@ -196,7 +200,7 @@ export default function Register() {
         </View>
 
         <View style={styles.inputContainer}>
-          <View style={styles.passwordContainer}>
+          <View style={styles.passwordWrapper}>
             <AppInput
               value={password}
               onChangeText={(text) => {
@@ -205,7 +209,7 @@ export default function Register() {
               }}
               placeholder="Create a password"
               secureTextEntry={!showPassword}
-              style={[styles.input, styles.passwordInput, passwordError ? styles.inputError : null]}
+              style={[styles.passwordInput, passwordError ? styles.inputError : null]}
             />
             <TouchableOpacity
               style={styles.eyeIcon}
@@ -213,7 +217,7 @@ export default function Register() {
             >
               <MaterialCommunityIcons
                 name={showPassword ? "eye-off" : "eye"}
-                size={24}
+                size={20}
                 color="#6b7280"
               />
             </TouchableOpacity>
@@ -224,7 +228,7 @@ export default function Register() {
         </View>
 
         <View style={styles.inputContainer}>
-          <View style={styles.passwordContainer}>
+          <View style={styles.passwordWrapper}>
             <AppInput
               value={confirmPassword}
               onChangeText={(text) => {
@@ -233,7 +237,7 @@ export default function Register() {
               }}
               placeholder="Confirm your password"
               secureTextEntry={!showConfirmPassword}
-              style={[styles.input, styles.passwordInput, confirmPasswordError ? styles.inputError : null]}
+              style={[styles.passwordInput, confirmPasswordError ? styles.inputError : null]}
             />
             <TouchableOpacity
               style={styles.eyeIcon}
@@ -241,7 +245,7 @@ export default function Register() {
             >
               <MaterialCommunityIcons
                 name={showConfirmPassword ? "eye-off" : "eye"}
-                size={24}
+                size={20}
                 color="#6b7280"
               />
             </TouchableOpacity>
@@ -308,6 +312,44 @@ export default function Register() {
           Sign In
         </Link>
       </View>
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <View style={styles.successIconContainer}>
+                <MaterialCommunityIcons
+                  name="check-circle"
+                  size={60}
+                  color={COLORS.SUCCESS}
+                />
+              </View>
+
+              <Text style={styles.modalTitle}>Account Created Successfully!</Text>
+              <Text style={styles.modalMessage}>
+                Welcome to MURAi! Your account has been created and you&apos;re now logged in.
+              </Text>
+
+              <AppButton
+                title="Get Started"
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  // Navigate to main app using the router from expo-router
+                  const { router } = require('expo-router');
+                  router.replace('/(app)');
+                }}
+                style={styles.modalButton}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Terms of Service Modal */}
       <Modal
@@ -443,10 +485,44 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 0,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#1f2937',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   inputError: {
     borderColor: COLORS.ERROR,
     borderWidth: 1,
+    backgroundColor: '#fef2f2',
+  },
+  passwordWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  passwordInput: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingRight: 50,
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#1f2937',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 16,
+    padding: 8,
+    borderRadius: 8,
   },
   errorText: {
     color: COLORS.ERROR,
@@ -498,22 +574,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
   },
 
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 0,
-  },
-  passwordInput: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  eyeIcon: {
-    padding: 5,
-  },
+
   agreementContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -554,6 +615,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
+  modalContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    width: '85%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  successIconContainer: {
+    marginBottom: 20,
+  },
+  modalMessage: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: COLORS.TEXT_SECONDARY,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  modalButton: {
+    width: '100%',
+    marginTop: 8,
+  },
   modalContent: {
     backgroundColor: '#ffffff',
     borderRadius: 10,
@@ -575,7 +663,9 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontFamily: 'Poppins-Bold',
-    color: '#1f2937',
+    color: COLORS.TEXT_MAIN,
+    textAlign: 'center',
+    marginBottom: 12,
   },
   modalBody: {
     maxHeight: '70%',
