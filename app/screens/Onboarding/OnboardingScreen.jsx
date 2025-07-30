@@ -84,11 +84,9 @@ export default function OnboardingScreen() {
     <View style={styles.slide}>
       <View style={styles.content}>
         {/* Skip Button */}
-        <View style={styles.skipButtonContainer}>
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-            <Text style={styles.skipText}>Skip</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+          <Text style={styles.skipText}>Skip</Text>
+        </TouchableOpacity>
 
         {/* Header */}
         <View style={styles.header}>
@@ -174,8 +172,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   skipButton: {
+    position: 'absolute',
+    top: 50,
+    right: 32,
     paddingHorizontal: 16,
     paddingVertical: 8,
+    zIndex: 10,
   },
   skipText: {
     fontSize: 16,
@@ -196,12 +198,7 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 40,
   },
-  skipButtonContainer: {
-    width: '100%',
-    alignItems: 'flex-end',
-    marginBottom: 20,
-    paddingHorizontal: 24,
-  },
+
   header: {
     alignItems: 'center',
   },

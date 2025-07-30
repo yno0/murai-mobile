@@ -9,7 +9,7 @@ import api from '../../services/api';
 
 export default function PrivacyControls() {
   const navigation = useNavigation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const [privacySettings, setPrivacySettings] = useState({
     dataSharing: false,
@@ -143,9 +143,13 @@ export default function PrivacyControls() {
         [
           {
             text: "OK",
-            onPress: () => {
-              // Navigate to login or logout user
-              navigation.navigate('Login');
+            onPress: async () => {
+              // Properly logout user using AuthContext
+              if (logout) {
+                await logout();
+              } else {
+                navigation.navigate('Login');
+              }
             }
           }
         ]

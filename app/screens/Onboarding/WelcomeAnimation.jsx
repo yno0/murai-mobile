@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import {
-  Animated,
-  Dimensions,
-  Image,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View
+    Animated,
+    Dimensions,
+    Image,
+    StatusBar,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');

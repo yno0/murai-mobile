@@ -41,6 +41,16 @@ const preferenceSchema = new Schema ({
         type: Boolean,
         default: true,
     },
+    privacy: {
+        shareData: {
+            type: Boolean,
+            default: false,
+        },
+        allowAnalytics: {
+            type: Boolean,
+            default: true,
+        },
+    },
     totalActiveTime: {
         type: Number,
         default: 0, // Total active time in minutes

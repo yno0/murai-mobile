@@ -122,7 +122,7 @@ export default function Login() {
         setError(err.message || "Your account has been deactivated. Please contact support for assistance.");
         // Clear any stored data for deactivated users
         await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('user');
+        await AsyncStorage.removeItem('user');  
       } else if (err.type === 'user_invalid_credentials' || err.code === 401) {
         setError("Incorrect email or password");
       } else if (err.code === 404) {

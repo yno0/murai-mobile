@@ -8,7 +8,7 @@ const userActivitySchema = new Schema({
     },
     activityType:{
         type: String,
-        enum: ['login', 'logout', 'update', 'visit', 'report', 'group_join', 'group_leave', 'flagged', 'other'],
+        enum: ['login', 'logout', 'update', 'visit', 'report', 'group_join', 'group_leave', 'flagged', 'sync', 'detection', 'export', 'delete', 'other'],
         required: true,
     },
     activityDetails:{

@@ -1,10 +1,14 @@
 import bcrypt from "bcryptjs";
 import express from "express";
 import { authenticateToken } from "../../middleware/authMiddleware.js";
+import DetectedWord from "../../models/detectedWordModel.js";
 import GroupCode from "../../models/groupCode.js";
 import Group from "../../models/groupModel.js";
 import GroupMember from "../../models/groupUserModel.js";
+import Notification from "../../models/notificationModel.js";
 import Preference from "../../models/preferenceModel.js";
+import Report from "../../models/reportModel.js";
+import UserActivity from "../../models/userActivityLogs.js";
 import UserInfo from "../../models/userInfoModel.js";
 import User from "../../models/userModel.js";
 
@@ -15,7 +19,8 @@ async function logUserActivity(
   userId,
   activityType,
   activityDetails,
-  activityCategory = null
+  activityCategory = null,
+  metadata = null
 ) {
   try {
     // Dynamic import for UserActivity
@@ -28,6 +33,7 @@ async function logUserActivity(
       activityType,
       activityDetails,
       activityCategory: activityCategory || activityType,
+      // Note: metadata is not stored in the current schema but can be added if needed
     });
 
     await userActivity.save();
