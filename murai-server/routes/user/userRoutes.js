@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import express from "express";
-import jwt from "jsonwebtoken";
+import { authenticateToken } from "../../middleware/authMiddleware.js";
 import GroupCode from "../../models/groupCode.js";
 import Group from "../../models/groupModel.js";
 import GroupMember from "../../models/groupUserModel.js";
@@ -39,18 +39,7 @@ async function logUserActivity(
   }
 }
 
-// Middleware to authenticate JWT
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-  if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, process.env.JWT_SECRET_KEY, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-}
 
 // GET /api/users/me
 router.get("/me", authenticateToken, async (req, res) => {

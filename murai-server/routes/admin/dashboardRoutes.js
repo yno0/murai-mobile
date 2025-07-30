@@ -1,5 +1,5 @@
 import express from 'express';
-import jwt from 'jsonwebtoken';
+import { authenticateToken } from '../../middleware/authMiddleware.js';
 import DetectedWord from '../../models/detectedWordModel.js';
 import Report from '../../models/reportModel.js';
 import UserActivity from '../../models/userActivityLogs.js';
@@ -7,18 +7,7 @@ import User from '../../models/userModel.js';
 
 const router = express.Router();
 
-// Middleware to authenticate JWT
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, process.env.JWT_SECRET_KEY, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-}
 
 // GET /api/dashboard/overview - Overall dashboard statistics
 router.get('/overview', /* authenticateToken, */ async (req, res) => {

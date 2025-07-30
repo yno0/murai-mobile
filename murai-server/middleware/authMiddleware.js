@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
 
-// Middleware to authenticate JWT token
-export function authenticateToken(req, res, next) {
+// Middleware to authenticate JWT token and check user status
+export async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -10,12 +10,32 @@ export function authenticateToken(req, res, next) {
     return res.status(401).json({ message: 'Access token required' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET_KEY, (err, user) => {
+  jwt.verify(token, process.env.JWT_SECRET_KEY, async (err, userPayload) => {
     if (err) {
       return res.status(403).json({ message: 'Invalid or expired token' });
     }
-    req.user = user;
-    next();
+
+    try {
+      // Check if user still exists and is active
+      const user = await User.findById(userPayload.id);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Check if user account is deactivated
+      if (user.status === 'inactive' || user.status === 'suspended') {
+        return res.status(403).json({
+          message: 'Your account has been deactivated. Please contact support for assistance.'
+        });
+      }
+
+      req.user = userPayload;
+      req.fullUser = user; // Attach full user object for routes that need it
+      next();
+    } catch (error) {
+      console.error('Authentication error:', error);
+      return res.status(500).json({ message: 'Server error during authentication' });
+    }
   });
 }
 

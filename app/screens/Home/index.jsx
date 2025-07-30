@@ -2,14 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import React from 'react';
 import {
-    Animated,
-    Dimensions,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Animated,
+  Dimensions,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -497,7 +497,7 @@ function HomeScreen({ navigation }) {
         iconColor: '#ffffff',
         title: 'Protection Active',
         subtitle: 'Your digital safety is being monitored 24/7',
-        badgeText: `${Math.round(homeStats.overall?.averageAccuracy || 0)}%`,
+        badgeText: 'ON',
         badgeColor: '#ffffff'
       };
     } else {
@@ -585,11 +585,6 @@ function HomeScreen({ navigation }) {
               <View style={styles.heroTextContainer}>
                 <Text style={getAccessibleTextStyle(styles.heroTitle)}>{protectionConfig.title}</Text>
                 <Text style={getAccessibleTextStyle(styles.heroSubtitle)}>{protectionConfig.subtitle}</Text>
-              </View>
-              <View style={[styles.heroBadge, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-                <Text style={getAccessibleTextStyle([styles.heroBadgeText, { color: protectionConfig.badgeColor }])}>
-                  {protectionConfig.badgeText}
-                </Text>
               </View>
             </View>
             <View style={styles.heroStats}>

@@ -1,21 +1,10 @@
 import express from "express";
-import jwt from "jsonwebtoken";
+import { authenticateToken } from "../middleware/authMiddleware.js";
 import Notification from "../models/notificationModel.js";
 
 const router = express.Router();
 
-// Middleware to authenticate JWT (reuse from userRoutes if needed)
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-  if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, process.env.JWT_SECRET_KEY, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-}
 
 // Get all notifications for the logged-in user
 router.get("/", authenticateToken, async (req, res) => {

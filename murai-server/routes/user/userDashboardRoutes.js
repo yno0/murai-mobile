@@ -1,23 +1,12 @@
 import express from 'express';
-import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
+import { authenticateToken } from '../../middleware/authMiddleware.js';
 import DetectedWord from '../../models/detectedWordModel.js';
 import UserActivity from '../../models/userActivityLogs.js';
 
 const router = express.Router();
 
-// Middleware to authenticate JWT
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, process.env.JWT_SECRET_KEY, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-}
 
 // GET /api/user-dashboard/overview - User-specific dashboard overview
 router.get('/overview', authenticateToken, async (req, res) => {

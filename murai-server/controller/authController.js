@@ -13,6 +13,14 @@ const login = async (req, res) => {
         if (!user.password) {
             return res.status(400).json({ message: 'User has no password set. Please register again or use a different login method.' });
         }
+
+        // Check if user account is deactivated
+        if (user.status === 'inactive' || user.status === 'suspended') {
+            return res.status(403).json({
+                message: 'Your account has been deactivated. Please contact support for assistance.'
+            });
+        }
+
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(401).json({ message: 'Invalid credentials' });
@@ -25,7 +33,8 @@ const login = async (req, res) => {
                 _id: user._id,
                 email: user.email,
                 role: user.role,
-                name: user.name
+                name: user.name,
+                status: user.status
             }
         });
     } catch (err) {
